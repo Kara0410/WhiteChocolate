@@ -1,15 +1,19 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
-import { useColorScheme } from 'react-native';
+// Import the compiled Tailwind stylesheet — must happen once at the app root.
+import '../../global.css';
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import AppTabs from '@/components/app-tabs';
+import { cssInterop } from 'nativewind';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Stack } from 'expo-router';
 
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
+// SafeAreaView is a third-party component; NativeWind doesn't patch it automatically.
+// cssInterop wires its className prop to the underlying style prop.
+cssInterop(SafeAreaView, { className: 'style' });
+
+export default function RootLayout() {
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
-      <AppTabs />
-    </ThemeProvider>
+    <Stack>
+      <Stack.Screen name="(tabs)"       options={{ headerShown: false }} />
+      <Stack.Screen name="parking/[id]" options={{ headerShown: true }} />
+    </Stack>
   );
 }

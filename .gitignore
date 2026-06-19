@@ -41,3 +41,7 @@ example
 # generated native folders
 /ios
 /android
+
+# project export archives
+*.zip
+React-Native-App-Redesign-App-*/
