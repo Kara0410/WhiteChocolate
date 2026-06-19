@@ -2,7 +2,13 @@
 const fs = require('fs');
 const path = require('path');
 
-const CSV_PATH = 'C:\\Users\\bpola\\Desktop\\CodeProjects\\munich_open_data_portal.csv';
+// Usage: node scripts/generate-parking-data.js path/to/munich_open_data_portal.csv
+// Falls back to data-source/munich_open_data_portal.csv relative to the repo root.
+const CSV_PATH = process.argv[2] ?? path.join(__dirname, '..', 'data-source', 'munich_open_data_portal.csv');
+if (!process.argv[2] && !require('fs').existsSync(CSV_PATH)) {
+  console.error('Usage: node scripts/generate-parking-data.js <path-to-csv>');
+  process.exit(1);
+}
 const OUT_PATH = path.join(__dirname, '..', 'src', 'data', 'munich_parking.ts');
 
 function parseCSV(text) {
