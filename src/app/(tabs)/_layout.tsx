@@ -11,8 +11,6 @@ export default function TabLayout() {
         <Stack.Screen name="track"    />
         <Stack.Screen name="profile"  />
         <Stack.Screen name="settings" />
-        <Stack.Screen name="list"     />
-        <Stack.Screen name="about"    />
       </Stack>
       <FloatingNavBar />
     </View>

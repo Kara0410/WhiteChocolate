@@ -1,56 +1,68 @@
-# Welcome to your Expo app 👋
+# ParkMunich
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A native iOS/Android app for exploring Munich's public parking data, built with
+[Expo](https://docs.expo.dev/) (SDK 54), Expo Router, and `react-native-maps`.
+Parking-regulation data comes from the Munich Open Data Portal.
 
-## Get started
+## Getting started
 
-1. Install dependencies
+1. Install dependencies:
 
    ```bash
    npm install
    ```
 
-2. Start the app
+2. Provide Google Maps API keys. Copy `.env.example` to `.env` and fill in your
+   native Maps SDK keys (see the comments in `.env.example` for how to create and
+   restrict them):
 
    ```bash
-   npx expo start
+   cp .env.example .env
    ```
 
-In the output, you'll find options to open the app in a
+3. Start the dev server:
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+   ```bash
+   npm start
+   ```
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+   The map requires native modules (`react-native-maps`), so run on a
+   **development build** rather than Expo Go:
 
-## Get a fresh project
+   ```bash
+   npm run android   # or: npm run ios
+   ```
 
-When you're ready, run:
+## Project layout
 
-```bash
-npm run reset-project
+```
+src/
+  app/            File-based routes (Expo Router)
+    (tabs)/       Map, Search, Track, Profile, Settings screens
+    parking/      Parking detail screen
+  components/     Reusable UI (maps, cards, nav bar, filters)
+  constants/      Theme, parking/zone/vehicle constants
+  data/           Bundled Munich parking dataset
+  hooks/          useLocation
+  services/       Parking data source
+  utils/          Geo + parking helpers
+scripts/
+  generate-parking-data.js   Regenerate the bundled dataset (npm run generate:parking)
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Useful scripts
 
-### Other setup steps
+| Command                      | Description                              |
+| ---------------------------- | ---------------------------------------- |
+| `npm start`                  | Start the Expo dev server                |
+| `npm run android` / `ios`    | Run on a connected device / simulator    |
+| `npm run lint`               | Lint with `expo lint`                    |
+| `npm run generate:parking`   | Rebuild the bundled parking dataset      |
+| `npm run build:dev:android`  | EAS development build (Android)          |
+| `npm run build:dev:ios`      | EAS development build (iOS)              |
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+## Maps & secrets
 
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Google Maps keys are embedded into the **native build** by the `react-native-maps`
+Expo config plugin (`app.config.ts`); they are not exposed in the JS bundle at
+runtime. `.env` is gitignored — never commit real keys.

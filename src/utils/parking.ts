@@ -53,6 +53,29 @@ export function getBadgeColor(gruppe: string): string {
 
 type UserLoc = { lat: number; lon: number };
 
+// ---------------------------------------------------------------------------
+// Indexed-base cache
+// ---------------------------------------------------------------------------
+
+/**
+ * Stamps each entry with its original array index, memoized by source-array
+ * identity. filterAndSort runs on every keystroke; without this it would clone
+ * all ~1,700 entries on each call just to attach _idx. Since parkingData is a
+ * stable module-level reference, we compute the stamped array once and reuse it.
+ *
+ * The cached objects are only ever read downstream (filter returns subsets that
+ * share these objects; the distance branch clones before mutating), so reuse is
+ * safe — nothing mutates the cache.
+ */
+let indexedCache: { src: ParkingEntry[]; out: DisplayEntry[] } | null = null;
+
+function indexed(data: ParkingEntry[]): DisplayEntry[] {
+  if (indexedCache && indexedCache.src === data) return indexedCache.out;
+  const out: DisplayEntry[] = data.map((e, i) => ({ ...e, _idx: i }));
+  indexedCache = { src: data, out };
+  return out;
+}
+
 /**
  * Applies text search, type-filter chips, and optional distance sorting
  * to the full parking dataset.
@@ -70,9 +93,9 @@ export function filterAndSort(
   activeFilters: Set<string>,
   userLoc: UserLoc | null,
 ): DisplayEntry[] {
-  // Stamp each entry with its original index before any reordering.
-  // This index is the stable navigation key used by the detail screen.
-  let result: DisplayEntry[] = data.map((e, i) => ({ ...e, _idx: i }));
+  // Stamp each entry with its original index before any reordering (cached by
+  // source identity). This index is the stable navigation key for the detail screen.
+  let result: DisplayEntry[] = indexed(data);
 
   // ── 1. Full-text search ────────────────────────────────────────────────
   if (query.trim()) {

@@ -1,4 +1,4 @@
-import { type ReactNode, useMemo, useState } from 'react';
+import { memo, type ReactNode, useDeferredValue, useMemo, useState } from 'react';
 import {
   FlatList,
   Platform,
@@ -13,7 +13,6 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import TopBar from '@/components/TopBar';
 import { C, GLASS_CARD, R } from '@/constants/theme';
 import {
-  availabilityEstimate,
   availabilityPercent,
   availabilityTone,
   type Zone,
@@ -71,7 +70,7 @@ function ZoneRow({ zone, onReserve, first }: { zone: Zone; onReserve: (z: Zone) 
 
 // ─── Street row (full dataset results) ────────────────────────────────────────
 
-function StreetRow({ item }: { item: DisplayEntry }) {
+const StreetRow = memo(function StreetRow({ item }: { item: DisplayEntry }) {
   return (
     <View style={{
       flexDirection:  'row',
@@ -104,7 +103,7 @@ function StreetRow({ item }: { item: DisplayEntry }) {
       )}
     </View>
   );
-}
+});
 
 // ─── Section card wrapper ─────────────────────────────────────────────────────
 
@@ -125,14 +124,18 @@ export default function SearchScreen() {
   const [query, setQuery] = useState('');
   const [activeQuick, setActiveQuick] = useState<string | null>(null);
 
+  // Defer the query so the full-dataset search runs at lower priority and the
+  // TextInput stays responsive while typing.
+  const deferredQuery = useDeferredValue(query);
+
   const searchResults = useMemo(() => {
-    if (!query.trim()) return [];
-    return filterAndSort(parkingData, query, new Set(), null).slice(0, 20);
-  }, [query]);
+    if (!deferredQuery.trim()) return [];
+    return filterAndSort(parkingData, deferredQuery, new Set(), null).slice(0, 20);
+  }, [deferredQuery]);
 
   const filteredZones = useMemo(() =>
-    ZONES.filter(z => (z.name + z.area).toLowerCase().includes(query.toLowerCase())),
-    [query],
+    ZONES.filter(z => (z.name + z.area).toLowerCase().includes(deferredQuery.toLowerCase())),
+    [deferredQuery],
   );
 
   function handleReserve(zone: Zone) {

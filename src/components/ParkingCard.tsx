@@ -6,7 +6,7 @@
  * Everything else is expressed as Tailwind className.
  */
 
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -20,7 +20,7 @@ type Props = {
   showDist: boolean;
 };
 
-export default function ParkingCard({ item, showDist }: Props) {
+function ParkingCard({ item, showDist }: Props) {
   const badgeColor = getBadgeColor(item.gruppe);
   // Dark-background badges (red, grey) need white text; light ones use near-black.
   const badgeTextColor =
@@ -100,3 +100,9 @@ export default function ParkingCard({ item, showDist }: Props) {
     </Pressable>
   );
 }
+
+// Rows are rendered in a long FlatList; memoizing prevents every visible card
+// from re-rendering when the parent re-renders (e.g. on each search keystroke).
+// item identity is stable (the cached _idx-stamped objects), so a shallow
+// prop compare is correct here.
+export default memo(ParkingCard);

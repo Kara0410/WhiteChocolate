@@ -25,3 +25,8 @@ export const GLASS_CARD = {
   shadowRadius:  36,
   elevation:     10,
 } as const;
+
+// Frosted-glass (expo-blur BlurView) tuning shared by glass surfaces
+export const BLUR_INTENSITY = 50;
+export const BLUR_TINT = 'light' as const;
+export const GLASS_BORDER = 'rgba(255,255,255,0.55)';

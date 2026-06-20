@@ -5,18 +5,32 @@
  * Passed by ParkingCard when the user taps a list row.
  */
 
-import { Linking, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import {
+  Linking,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  TurboModuleRegistry,
+  View,
+} from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { parkingData } from '@/data/munich_parking';
 import { getBadgeColor } from '@/utils/parking';
 import InfoRow from '@/components/InfoRow';
-// react-native-maps is native-only. Loaded via require() so Metro can
-// dead-code-eliminate it when building the web bundle.
+
+// react-native-maps is native-only AND requires its native module to be linked
+// into the running binary. We require() it (so Metro can dead-code-eliminate it
+// from the web bundle) only after probing with the non-throwing
+// TurboModuleRegistry.get — requiring it when the module is absent (Expo Go, or
+// a stale dev client) would throw at module-eval and crash this route, leaving
+// the map fallback unreachable. When null, the OSM tile below is shown instead.
 let MapView: any = null;
 let Marker: any  = null;
-if (Platform.OS !== 'web') {
+if (Platform.OS !== 'web' && TurboModuleRegistry?.get?.('RNMapsAirModule') != null) {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const maps = require('react-native-maps');
   MapView = maps.default;
   Marker  = maps.Marker;
