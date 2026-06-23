@@ -46,3 +46,4 @@ example
 # project export archives
 *.zip
 React-Native-App-Redesign-App-*/
+.gstack/

@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useState } from 'react';
+import { memo, useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE, type Region } from 'react-native-maps';
 import Animated, {
@@ -8,44 +8,28 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { getBadgeColor, type DisplayEntry } from '@/utils/parking';
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-type CoordEntry = DisplayEntry & { lat: number; lon: number };
-
-function hasCoords(item: DisplayEntry): item is CoordEntry {
-  return typeof item.lat === 'number' && typeof item.lon === 'number';
-}
+import { C } from '@/constants/theme';
+import { confidenceOpacity, confidenceTone, type Zone } from '@/constants/zones';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const MUNICH_REGION: Region = {
   latitude: 48.1351,
   longitude: 11.5824,
-  latitudeDelta: 0.08,
-  longitudeDelta: 0.08,
+  latitudeDelta: 0.06,
+  longitudeDelta: 0.06,
 };
 
-// Cap visible markers per region to avoid rendering thousands at once.
-const MAX_VISIBLE = 300;
+// ─── ZoneMarker ──────────────────────────────────────────────────────────────
+// Asymmetrical pill chip (rounded everywhere but one corner) so zones read as
+// confidence pins rather than generic map dots — mirrors the mockup's
+// .zone-chip treatment. tracksViewChanges is only true for the selected pin
+// since that's the only one animating, keeping iOS marker diffing cheap.
 
-// ─── ParkingMarker ───────────────────────────────────────────────────────────
-// Memoized so React doesn't re-create this component on every map re-render.
-// tracksViewChanges={false} on the Marker prevents iOS from diffing the native
-// view tree on every frame — a significant performance win for dense datasets.
+const ZoneMarker = memo(function ZoneMarker({ zone, selected }: { zone: Zone; selected: boolean }) {
+  const color = confidenceTone(zone.pct);
+  const opacity = confidenceOpacity(zone.freshness);
 
-const ParkingMarker = memo(function ParkingMarker({
-  item,
-  selected,
-}: {
-  item: CoordEntry;
-  selected: boolean;
-}) {
-  const color = getBadgeColor(item.gruppe);
-  const label = item.angebot > 0 ? String(item.angebot) : 'P';
-
-  // Looping pulse ring — only mounted/animating for the selected pin.
   const pulse = useSharedValue(0);
   useEffect(() => {
     if (!selected) return;
@@ -65,13 +49,20 @@ const ParkingMarker = memo(function ParkingMarker({
       )}
       <View
         style={[
-          styles.marker,
-          { backgroundColor: color },
-          selected && styles.markerSelected,
+          styles.chip,
+          {
+            backgroundColor: color,
+            opacity,
+            borderStyle: zone.freshness === 'none' ? 'dashed' : 'solid',
+          },
+          selected && styles.chipSelected,
         ]}
       >
-        <Text style={[styles.markerLabel, { transform: [{ rotate: '45deg' }] }]} numberOfLines={1}>
-          {label}
+        <Text style={styles.chipPct} numberOfLines={1}>
+          {zone.pct === null ? '—' : `${zone.pct}%`}
+        </Text>
+        <Text style={styles.chipAge} numberOfLines={1}>
+          {zone.age}
         </Text>
       </View>
     </View>
@@ -81,81 +72,47 @@ const ParkingMarker = memo(function ParkingMarker({
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 export interface ParkingMapProps {
-  parkingData: DisplayEntry[];
+  zones: Zone[];
   userLocation: { lat: number; lon: number } | null;
-  onSelect: (item: DisplayEntry) => void;
-  selectedIdx?: number;
+  onSelect: (zone: Zone) => void;
+  selectedId?: string;
   mapRef: React.RefObject<MapView>;
 }
 
 // ─── ParkingMapView ───────────────────────────────────────────────────────────
 
 export default function ParkingMapView({
-  parkingData,
+  zones,
   userLocation,
   onSelect,
-  selectedIdx,
+  selectedId,
   mapRef,
 }: ParkingMapProps) {
-  const [region, setRegion] = useState<Region>(MUNICH_REGION);
-
-  // Compute once: entries with valid lat/lon
-  const withCoords = useMemo(
-    () => parkingData.filter(hasCoords),
-    [parkingData],
-  );
-
-  // On each region change, clip to visible bounds capped at MAX_VISIBLE.
-  // Recomputing is cheap here because withCoords is already memoized.
-  const visibleMarkers = useMemo((): CoordEntry[] => {
-    const { latitude, longitude, latitudeDelta, longitudeDelta } = region;
-    const latMin = latitude - latitudeDelta / 2;
-    const latMax = latitude + latitudeDelta / 2;
-    const lonMin = longitude - longitudeDelta / 2;
-    const lonMax = longitude + longitudeDelta / 2;
-
-    const inBounds = withCoords.filter(
-      (item) =>
-        item.lat >= latMin &&
-        item.lat <= latMax &&
-        item.lon >= lonMin &&
-        item.lon <= lonMax,
-    );
-
-    return inBounds.length <= MAX_VISIBLE ? inBounds : inBounds.slice(0, MAX_VISIBLE);
-  }, [withCoords, region]);
-
   return (
     <MapView
       ref={mapRef}
       style={StyleSheet.absoluteFillObject}
       provider={PROVIDER_GOOGLE}
       initialRegion={MUNICH_REGION}
-      onRegionChangeComplete={setRegion}
-      // Show the native blue-dot only after we have a GPS fix
       showsUserLocation={!!userLocation}
       showsMyLocationButton={false}
       showsCompass={false}
-      // Android: removes the "Open in Maps" toolbar that appears on marker press
       toolbarEnabled={false}
-      // Show a loading indicator while map tiles fetch
       loadingEnabled
-      loadingBackgroundColor="#F7F8FC"
-      loadingIndicatorColor="#007AFF"
+      loadingBackgroundColor={C.mapTint}
+      loadingIndicatorColor={C.accent}
     >
-      {visibleMarkers.map((item) => {
-        const isSelected = item._idx === selectedIdx;
+      {zones.map((zone) => {
+        const isSelected = zone.id === selectedId;
         return (
           <Marker
-            key={item._idx}
-            coordinate={{ latitude: item.lat, longitude: item.lon }}
-            onPress={() => onSelect(item)}
-            // iOS: render once and skip native view-tree diffing each frame —
-            // except the selected pin, which needs to redraw while it pulses.
+            key={zone.id}
+            coordinate={{ latitude: zone.lat, longitude: zone.lon }}
+            onPress={() => onSelect(zone)}
             tracksViewChanges={isSelected}
             anchor={{ x: 0.5, y: 0.5 }}
           >
-            <ParkingMarker item={item} selected={isSelected} />
+            <ZoneMarker zone={zone} selected={isSelected} />
           </Marker>
         );
       })}
@@ -167,43 +124,50 @@ export default function ParkingMapView({
 
 const styles = StyleSheet.create({
   markerWrap: {
-    width: 44,
-    height: 44,
+    width: 64,
+    height: 64,
     alignItems: 'center',
     justifyContent: 'center',
   },
   pulseRing: {
     position: 'absolute',
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
   },
-  marker: {
-    width: 38,
-    height: 38,
-    // Teardrop / pin shape: rounded everywhere but one sharp corner, rotated
-    // -45deg so that corner points down at the coordinate.
-    borderTopLeftRadius: 19,
-    borderTopRightRadius: 19,
-    borderBottomLeftRadius: 19,
-    borderBottomRightRadius: 4,
-    transform: [{ rotate: '-45deg' }],
+  chip: {
+    minWidth: 48,
+    minHeight: 48,
+    paddingHorizontal: 4,
+    transform: [{ rotate: '-8deg' }],
+    borderWidth: 2,
+    borderColor: 'rgba(23,33,38,0.45)',
+    borderTopLeftRadius: 99,
+    borderTopRightRadius: 99,
+    borderBottomLeftRadius: 99,
+    borderBottomRightRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.22,
+    shadowRadius: 6,
     elevation: 5,
   },
-  markerSelected: {
+  chipSelected: {
     borderWidth: 3,
-    borderColor: 'rgba(255,255,255,0.85)',
+    borderColor: 'rgba(255,252,245,0.92)',
   },
-  markerLabel: {
-    color: '#fff',
-    fontSize: 11,
+  chipPct: {
+    color: C.text,
+    fontSize: 13,
     fontWeight: '800',
-    letterSpacing: -0.3,
+    lineHeight: 15,
+  },
+  chipAge: {
+    color: C.text,
+    fontSize: 9,
+    fontWeight: '700',
+    lineHeight: 10,
   },
 });

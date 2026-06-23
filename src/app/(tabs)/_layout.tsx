@@ -1,18 +1,39 @@
-import { Stack } from 'expo-router';
+import { Stack, useGlobalSearchParams, usePathname, useRouter } from 'expo-router';
 import { View } from 'react-native';
-import FloatingNavBar from '@/components/FloatingNavBar';
+import BottomNavBar from '@/components/BottomNavBar';
+import { C } from '@/constants/theme';
 
 export default function TabLayout() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const { focusSearch } = useGlobalSearchParams<{ focusSearch?: string }>();
+
+  const activeKey = pathname.endsWith('/account')
+    ? 'profile'
+    : pathname.endsWith('/favorites')
+      ? 'favorite'
+    : pathname.endsWith('/list')
+      ? focusSearch
+        ? 'search'
+        : 'car'
+      : 'parking';
+
   return (
-    <View style={{ flex: 1, backgroundColor: '#F7F8FC' }}>
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
       <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="map"      />
-        <Stack.Screen name="search"   />
-        <Stack.Screen name="track"    />
-        <Stack.Screen name="profile"  />
-        <Stack.Screen name="settings" />
+        <Stack.Screen name="map"       />
+        <Stack.Screen name="list"      />
+        <Stack.Screen name="favorites" />
+        <Stack.Screen name="account"   />
       </Stack>
-      <FloatingNavBar />
+      <BottomNavBar
+        activeKey={activeKey}
+        onProfilePress={() => router.push('/account')}
+        onSearchPress={() => router.push({ pathname: '/list', params: { focusSearch: Date.now().toString() } })}
+        onCarPress={() => router.push('/list')}
+        onFavoritePress={() => router.push('/favorites')}
+        onParkingPress={() => router.push({ pathname: '/map', params: { locate: Date.now().toString() } })}
+      />
     </View>
   );
 }

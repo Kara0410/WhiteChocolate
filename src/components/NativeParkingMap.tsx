@@ -23,7 +23,7 @@ import type { ParkingMapProps } from './ParkingMapView';
 // We probe with the non-throwing TurboModuleRegistry.get() first, and only import
 // the real map (which pulls in react-native-maps) when the module is present.
 // On web, TurboModuleRegistry isn't implemented — optional chaining keeps it safe.
-const MAPS_AVAILABLE = TurboModuleRegistry?.get?.('RNMapsAirModule') != null;
+export const MAPS_AVAILABLE = TurboModuleRegistry?.get?.('RNMapsAirModule') != null;
 
 // Lazily import so react-native-maps is never evaluated when MAPS_AVAILABLE is false.
 const ParkingMapView = MAPS_AVAILABLE

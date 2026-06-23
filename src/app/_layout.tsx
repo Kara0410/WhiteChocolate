@@ -14,6 +14,8 @@ export default function RootLayout() {
     <Stack>
       <Stack.Screen name="(tabs)"       options={{ headerShown: false }} />
       <Stack.Screen name="parking/[id]" options={{ headerShown: true }} />
+      <Stack.Screen name="billing"      options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="fresh-check"  options={{ headerShown: false, presentation: 'transparentModal', animation: 'fade' }} />
     </Stack>
   );
 }
