@@ -5,7 +5,6 @@ import { router, useLocalSearchParams } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import TopBar from '@/components/TopBar';
-import { MAPS_AVAILABLE } from '@/components/NativeParkingMap';
 import { C, R } from '@/constants/theme';
 import { confidenceTone, ZONES, type Zone } from '@/constants/zones';
 import { parkingData } from '@/data/munich_parking';
@@ -59,7 +58,6 @@ const StreetRow = memo(function StreetRow({ item }: { item: DisplayEntry }) {
 // ─── ListScreen ───────────────────────────────────────────────────────────────
 
 export default function ListScreen() {
-  const [evOnly, setEvOnly] = useState(false);
   const [query, setQuery] = useState('');
   const deferredQuery = useDeferredValue(query);
   const searchInputRef = useRef<TextInput>(null);
@@ -70,8 +68,6 @@ export default function ListScreen() {
     const focusTimer = setTimeout(() => searchInputRef.current?.focus(), 120);
     return () => clearTimeout(focusTimer);
   }, [focusSearch]);
-
-  const visibleZones = useMemo(() => (evOnly ? ZONES.filter((z) => z.ev) : ZONES), [evOnly]);
 
   const searchResults = useMemo(() => {
     if (!deferredQuery.trim()) return [];
@@ -93,30 +89,10 @@ export default function ListScreen() {
               <TopBar
                 title="Parking zones"
                 subtitle="List fallback"
-                action={
-                  <Pressable
-                    onPress={() => setEvOnly((v) => !v)}
-                    style={{
-                      minWidth: 48, minHeight: 44, borderRadius: 16, paddingHorizontal: 14,
-                      backgroundColor: evOnly ? C.deep : C.surfaceWarm,
-                      alignItems: 'center', justifyContent: 'center',
-                    }}
-                  >
-                    <Text style={{ color: evOnly ? '#fff' : C.deep, fontWeight: '900', fontSize: 13 }}>EV only</Text>
-                  </Pressable>
-                }
               />
 
-              {!MAPS_AVAILABLE && (
-                <View style={{ borderRadius: R.md, backgroundColor: C.dangerSoft, padding: 12, marginBottom: 10 }}>
-                  <Text style={{ color: C.dangerText, fontSize: 13, fontWeight: '800' }}>
-                    Map tiles are slow. List remains available.
-                  </Text>
-                </View>
-              )}
-
               <View style={{ borderTopWidth: 1, borderTopColor: 'rgba(23,33,38,0.10)', marginBottom: 16 }}>
-                {visibleZones.map((zone, i) => (
+                {ZONES.map((zone, i) => (
                   <ZoneRow key={zone.id} zone={zone} first={i === 0} />
                 ))}
               </View>
@@ -161,16 +137,6 @@ export default function ListScreen() {
               <StreetRow item={item} />
             </View>
           )}
-          ListFooterComponent={
-            !query ? (
-              <Pressable onPress={() => router.push('/fresh-check')} style={{
-                minHeight: 54, borderRadius: R.lg, backgroundColor: C.deep,
-                alignItems: 'center', justifyContent: 'center', marginTop: 4,
-              }}>
-                <Text style={{ color: '#fff', fontWeight: '900', fontSize: 15 }}>I’m leaving now</Text>
-              </Pressable>
-            ) : null
-          }
         />
       </SafeAreaView>
     </View>

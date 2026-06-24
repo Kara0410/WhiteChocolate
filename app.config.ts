@@ -17,6 +17,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: 'com.whitechoclate.app',
+    config: {
+      googleMaps: {
+        apiKey: 'AIzaSyBEWjoMb_1aEHjJYpZBJitANZ5yQJ0fVYA',
+      },
+    },
     adaptiveIcon: {
       backgroundColor: '#E6F4FE',
       foregroundImage: './assets/images/android-icon-foreground.png',
@@ -41,15 +46,15 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         },
       },
     ],
-    // Maps SDK keys are embedded into the native build (not JS bundle).
+    // Android Google Maps key is embedded into the native build (not JS bundle).
     // Restrict Android key to your package name + SHA-1 in Google Cloud Console.
-    // Restrict iOS key to your bundle identifier.
-    // Keys are read from environment at build time only — not exposed at runtime.
+    // iOS uses Apple Maps through expo-maps and does not need a Google Maps key.
+    // The key is read from environment at build time only — not exposed at runtime.
     [
-      'react-native-maps',
+      'expo-maps',
       {
-        androidGoogleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_ANDROID_API_KEY ?? '',
-        iosGoogleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_IOS_API_KEY ?? '',
+        requestLocationPermission: true,
+        locationPermission: 'Allow WhiteChoclate to use your location',
       },
     ],
   ],

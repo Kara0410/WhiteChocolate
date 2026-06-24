@@ -1,40 +1,11 @@
-/**
- * Parking detail screen — full info for one entry plus an inline map.
- *
- * Route param: id — numeric index into parkingData[].
- * Passed by ParkingCard when the user taps a list row.
- */
-
-import {
-  Linking,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  TurboModuleRegistry,
-  View,
-} from 'react-native';
+import { Linking, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
+import { AppleMaps, GoogleMaps, type CameraPosition } from 'expo-maps';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
+import InfoRow from '@/components/InfoRow';
 import { parkingData } from '@/data/munich_parking';
 import { getBadgeColor } from '@/utils/parking';
-import InfoRow from '@/components/InfoRow';
-
-// react-native-maps is native-only AND requires its native module to be linked
-// into the running binary. We require() it (so Metro can dead-code-eliminate it
-// from the web bundle) only after probing with the non-throwing
-// TurboModuleRegistry.get — requiring it when the module is absent (Expo Go, or
-// a stale dev client) would throw at module-eval and crash this route, leaving
-// the map fallback unreachable. When null, the OSM tile below is shown instead.
-let MapView: any = null;
-let Marker: any  = null;
-if (Platform.OS !== 'web' && TurboModuleRegistry?.get?.('RNMapsAirModule') != null) {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const maps = require('react-native-maps');
-  MapView = maps.default;
-  Marker  = maps.Marker;
-}
 
 export default function ParkingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -45,17 +16,54 @@ export default function ParkingDetailScreen() {
   }
 
   const badgeColor = getBadgeColor(item.gruppe);
-  const darkBadge  = badgeColor === '#6b7280' || badgeColor === '#f87171';
-  const hasCoords  = item.lat !== null && item.lon !== null;
+  const darkBadge = badgeColor === '#6b7280' || badgeColor === '#f87171';
+  const hasCoords = item.lat !== null && item.lon !== null;
 
   const openOSM = () =>
     Linking.openURL(
       `https://www.openstreetmap.org/?mlat=${item.lat}&mlon=${item.lon}&zoom=17`,
     );
 
+  const cameraPosition: CameraPosition | undefined = hasCoords
+    ? {
+        coordinates: {
+          latitude: item.lat!,
+          longitude: item.lon!,
+        },
+        zoom: 17,
+      }
+    : undefined;
+
+  const appleMarkers: AppleMaps.Marker[] = hasCoords
+    ? [
+        {
+          id: String(id),
+          coordinates: {
+            latitude: item.lat!,
+            longitude: item.lon!,
+          },
+          title: item.strasse,
+        },
+      ]
+    : [];
+
+  const googleMarkers: GoogleMaps.Marker[] = hasCoords
+    ? [
+        {
+          id: String(id),
+          coordinates: {
+            latitude: item.lat!,
+            longitude: item.lon!,
+          },
+          title: item.strasse,
+          snippet: item.gruppe,
+          showCallout: true,
+        },
+      ]
+    : [];
+
   return (
     <>
-      {/* Override the Stack header with the street name as title */}
       <Stack.Screen
         options={{
           title: item.strasse,
@@ -66,32 +74,32 @@ export default function ParkingDetailScreen() {
       />
 
       <ScrollView className="flex-1 bg-surface" contentContainerClassName="pb-10">
-
-        {/* ── Map area ──────────────────────────────────────────────────── */}
         <View className="h-[260px] bg-sunken">
-          {Platform.OS !== 'web' && hasCoords && MapView ? (
-            // Native: inline map centred on the spot; scroll + zoom disabled
-            // so the detail card below is still reachable by swiping.
-            <MapView
+          {Platform.OS === 'ios' && cameraPosition ? (
+            <AppleMaps.View
               style={{ flex: 1 }}
-              initialRegion={{
-                latitude:       item.lat!,
-                longitude:      item.lon!,
-                latitudeDelta:  0.005, // ~500 m viewport
-                longitudeDelta: 0.005,
+              cameraPosition={cameraPosition}
+              markers={appleMarkers}
+              uiSettings={{
+                compassEnabled: false,
+                myLocationButtonEnabled: false,
               }}
-              scrollEnabled={false}
-              zoomEnabled={false}
-            >
-              <Marker
-                coordinate={{ latitude: item.lat!, longitude: item.lon! }}
-                title={item.strasse}
-                description={item.gruppe}
-                pinColor="#ffd33d"
-              />
-            </MapView>
+            />
+          ) : Platform.OS === 'android' && cameraPosition ? (
+            <GoogleMaps.View
+              style={{ flex: 1 }}
+              cameraPosition={cameraPosition}
+              markers={googleMarkers}
+              uiSettings={{
+                compassEnabled: false,
+                mapToolbarEnabled: false,
+                myLocationButtonEnabled: false,
+                scrollGesturesEnabled: false,
+                zoomControlsEnabled: false,
+                zoomGesturesEnabled: false,
+              }}
+            />
           ) : (
-            // Web / no-coords: tappable tile that opens OSM in the browser.
             <Pressable
               className="flex-1 items-center justify-center gap-2.5"
               onPress={hasCoords ? openOSM : undefined}
@@ -101,7 +109,13 @@ export default function ParkingDetailScreen() {
                 size={40}
                 color={hasCoords ? '#ffd33d' : '#374151'}
               />
-              <Text className={hasCoords ? 'text-gold text-[15px] font-semibold' : 'text-gray-600 text-[15px]'}>
+              <Text
+                className={
+                  hasCoords
+                    ? 'text-gold text-[15px] font-semibold'
+                    : 'text-gray-600 text-[15px]'
+                }
+              >
                 {hasCoords ? 'Open in OpenStreetMap' : 'No location data'}
               </Text>
               {hasCoords && (
@@ -113,7 +127,6 @@ export default function ParkingDetailScreen() {
           )}
         </View>
 
-        {/* ── Detail card ───────────────────────────────────────────────── */}
         <View className="m-4 bg-elevated rounded-2xl p-5">
           <View className="gap-2.5 mb-4">
             <Text className="text-[22px] font-bold text-white">{item.strasse}</Text>
@@ -130,26 +143,24 @@ export default function ParkingDetailScreen() {
             </View>
           </View>
 
-          {/* Divider */}
           <View className="h-px bg-gray-700 mb-4" />
 
-          <InfoRow icon="document-text-outline" label="Regulation"   value={item.beschreibung} />
+          <InfoRow icon="document-text-outline" label="Regulation" value={item.beschreibung} />
           {item.prm !== '' && (
-            <InfoRow icon="location-outline"    label="District"     value={item.prm} />
+            <InfoRow icon="location-outline" label="District" value={item.prm} />
           )}
           {item.angebot > 0 && (
-            <InfoRow icon="car-outline"         label="Spaces"       value={`${item.angebot} parking spots`} />
+            <InfoRow icon="car-outline" label="Spaces" value={`${item.angebot} parking spots`} />
           )}
           {hasCoords && (
             <InfoRow
               icon="navigate-outline"
               label="Coordinates"
-              value={`${item.lat?.toFixed(5)}° N, ${item.lon?.toFixed(5)}° E`}
+              value={`${item.lat?.toFixed(5)} deg N, ${item.lon?.toFixed(5)} deg E`}
             />
           )}
         </View>
 
-        {/* ── OSM button — web only (native has the interactive map above) ── */}
         {hasCoords && Platform.OS === 'web' && (
           <Pressable
             className="flex-row items-center justify-center gap-2 bg-gold mx-4 rounded-xl py-3.5"
@@ -159,7 +170,6 @@ export default function ParkingDetailScreen() {
             <Text className="text-surface font-bold text-[15px]">Open in OpenStreetMap</Text>
           </Pressable>
         )}
-
       </ScrollView>
     </>
   );
