@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppleMaps, GoogleMaps, type CameraPosition } from 'expo-maps';
 import type { ImageRef } from 'expo-image';
-import { Platform, Text, View } from 'react-native';
+import { Platform, Text, useWindowDimensions, View } from 'react-native';
 
 import { useParkingClusters } from '@/hooks/use-parking-clusters';
 import {
   loadMarkerImage,
   markerImageKey,
 } from '@/components/parking-map/marker-image-cache';
+import { selectSpatiallySeparatedMarkers } from '@/components/parking-map/marker-density';
 import type {
   ParkingCameraState,
   ParkingClusterResponse,
@@ -46,6 +47,7 @@ export function ParkingMap({
   onSelectedParkingItemChange,
 }: ParkingMapProps) {
   const {
+    currentRegion,
     currentZoom,
     onCameraMove,
     visibleClusters,
@@ -57,22 +59,46 @@ export function ParkingMap({
   const [markerImages, setMarkerImages] = useState<Map<string, ImageRef>>(
     () => new Map(),
   );
+  const { height, width } = useWindowDimensions();
+  const renderedClusters = useMemo(
+    () =>
+      selectSpatiallySeparatedMarkers(visibleClusters, {
+        camera: currentRegion,
+        width,
+        height,
+        selectedId: selectedParkingItem?.id,
+      }),
+    [currentRegion, height, selectedParkingItem?.id, visibleClusters, width],
+  );
 
   useEffect(() => {
     let cancelled = false;
-    const uniqueItems = new Map(
-      visibleClusters.map((item) => [markerImageKey(item), item]),
-    );
+    const uniqueItems = new Map<string, {
+      item: ParkingClusterResponse;
+      selected: boolean;
+    }>();
+    for (const item of renderedClusters) {
+      for (const selected of [false, true]) {
+        uniqueItems.set(markerImageKey(item, currentZoom, selected), {
+          item,
+          selected,
+        });
+      }
+    }
 
     Promise.all(
-      [...uniqueItems].map(async ([key, item]) => {
-        const image = await loadMarkerImage(item);
+      [...uniqueItems].map(async ([key, value]) => {
+        const image = await loadMarkerImage(
+          value.item,
+          currentZoom,
+          value.selected,
+        );
         return [key, image] as const;
       }),
     )
       .then((entries) => {
         if (!cancelled) {
-          setMarkerImages(new Map(entries));
+          setMarkerImages((current) => new Map([...current, ...entries]));
         }
       })
       .catch((caughtError) => {
@@ -82,17 +108,20 @@ export function ParkingMap({
     return () => {
       cancelled = true;
     };
-  }, [visibleClusters]);
+  }, [currentZoom, renderedClusters]);
 
   const clusterById = useMemo(
-    () => new Map(visibleClusters.map((item) => [item.id, item])),
-    [visibleClusters],
+    () => new Map(renderedClusters.map((item) => [item.id, item])),
+    [renderedClusters],
   );
 
   const googleMarkers = useMemo<GoogleMaps.Marker[]>(
     () =>
-      visibleClusters.flatMap((item) => {
-        const icon = markerImages.get(markerImageKey(item));
+      renderedClusters.flatMap((item) => {
+        const selected = selectedParkingItem?.id === item.id;
+        const icon = markerImages.get(
+          markerImageKey(item, currentZoom, selected),
+        );
         const price =
           item.minPrice === null
             ? 'Free'
@@ -117,8 +146,8 @@ export function ParkingMap({
                 showCallout: true,
                 anchor: { x: 0.5, y: 0.5 },
                 zIndex:
-                  selectedParkingItem?.id === item.id
-                    ? 10
+                  selected
+                    ? 20
                     : item.type === 'spot'
                       ? 2
                       : 1,
@@ -126,13 +155,16 @@ export function ParkingMap({
             ]
           : [];
       }),
-    [markerImages, selectedParkingItem?.id, visibleClusters],
+    [currentZoom, markerImages, renderedClusters, selectedParkingItem?.id],
   );
 
   const appleMarkers = useMemo<AppleMaps.Marker[]>(
     () =>
-      visibleClusters.flatMap((item) => {
-        const icon = markerImages.get(markerImageKey(item));
+      renderedClusters.flatMap((item) => {
+        const selected = selectedParkingItem?.id === item.id;
+        const icon = markerImages.get(
+          markerImageKey(item, currentZoom, selected),
+        );
         return icon
           ? [
               {
@@ -150,7 +182,7 @@ export function ParkingMap({
             ]
           : [];
       }),
-    [markerImages, visibleClusters],
+    [currentZoom, markerImages, renderedClusters, selectedParkingItem?.id],
   );
 
   const handleMarkerClick = useCallback(

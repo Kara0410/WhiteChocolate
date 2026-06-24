@@ -1,45 +1,42 @@
 import { Image as ExpoImage, type ImageRef } from 'expo-image';
 
-import type {
-  AvailabilityColorStatus,
-  ParkingClusterResponse,
-} from '@/types/parking-map';
-
-const MARKER_ASSETS: Record<
-  ParkingClusterResponse['type'],
-  Record<AvailabilityColorStatus, number>
-> = {
-  cluster: {
-    green: require('../../../assets/images/parking-markers/cluster-green.png'),
-    orange: require('../../../assets/images/parking-markers/cluster-orange.png'),
-    red: require('../../../assets/images/parking-markers/cluster-red.png'),
-  },
-  spot: {
-    green: require('../../../assets/images/parking-markers/spot-green.png'),
-    orange: require('../../../assets/images/parking-markers/spot-orange.png'),
-    red: require('../../../assets/images/parking-markers/spot-red.png'),
-  },
-};
+import { markerImageKey } from '@/components/parking-map/marker-visuals';
+import { PARKING_MARKER_ASSETS } from '@/components/parking-map/parking-marker-assets.generated';
+import type { ParkingClusterResponse } from '@/types/parking-map';
 
 const imagePromises = new Map<string, Promise<ImageRef>>();
+const MAX_MARKER_IMAGE_CACHE_ENTRIES = 160;
 
-export function markerImageKey(item: ParkingClusterResponse) {
-  return `mock-marker:${item.type}:${item.colorStatus}`;
-}
+export { markerImageKey };
 
-export function loadMarkerImage(item: ParkingClusterResponse) {
-  const key = markerImageKey(item);
+export function loadMarkerImage(
+  item: ParkingClusterResponse,
+  zoom: number,
+  selected = false,
+) {
+  const key = markerImageKey(item, zoom, selected);
   const existing = imagePromises.get(key);
   if (existing) {
     return existing;
   }
 
-  const promise = ExpoImage.loadAsync(
-    MARKER_ASSETS[item.type][item.colorStatus],
-  ).catch((error) => {
+  const asset = PARKING_MARKER_ASSETS[key];
+  if (!asset) {
+    throw new Error(`Missing bundled parking marker asset: ${key}`);
+  }
+
+  const promise = ExpoImage.loadAsync(asset).catch((error) => {
     imagePromises.delete(key);
     throw error;
   });
   imagePromises.set(key, promise);
+
+  if (imagePromises.size > MAX_MARKER_IMAGE_CACHE_ENTRIES) {
+    const oldestKey = imagePromises.keys().next().value;
+    if (oldestKey && oldestKey !== key) {
+      imagePromises.delete(oldestKey);
+    }
+  }
+
   return promise;
 }
