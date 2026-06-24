@@ -2,17 +2,39 @@ export type AvailabilityColorStatus = 'green' | 'orange' | 'red';
 
 export type ParkingItemType = 'zone' | 'spot';
 
+export type ParkingCoordinates = {
+  latitude: number;
+  longitude: number;
+};
+
+export type WalkingCategory = 'close' | 'acceptable' | 'far';
+
+export type ParkingBestSpot = {
+  id: string;
+  zoneName: string;
+  availableSpots: number;
+  availabilityPercent: number;
+  pricePerHour: number | null;
+};
+
 export type ParkingClusterResponse = {
   id: string;
   type: 'cluster' | 'spot';
   latitude: number;
   longitude: number;
   availabilityPercent: number;
+  count: number;
   zoneCount?: number;
   spotCount?: number;
   totalCapacity: number;
   availableSpots: number;
   colorStatus: AvailabilityColorStatus;
+  minPrice: number | null;
+  avgPrice: number | null;
+  bestSpot: ParkingBestSpot;
+  expansionZoom?: number;
+  distanceToDestination?: number;
+  walkingCategory?: WalkingCategory;
 };
 
 export type ParkingMapRecord = {
@@ -50,4 +72,5 @@ export type ParkingClusterRequest = {
   bbox: ParkingBoundingBox;
   zoom: number;
   tileKey: string;
+  destination?: ParkingCoordinates;
 };

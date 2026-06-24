@@ -1,0 +1,121 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+
+import { getMockParkingClusters } from '@/services/parking-clusters';
+import type {
+  ParkingCameraState,
+  ParkingClusterResponse,
+  ParkingCoordinates,
+} from '@/types/parking-map';
+import {
+  getParkingClusterRequest,
+  zoomFromLongitudeDelta,
+} from '@/utils/parking-map-geo';
+
+const CAMERA_DEBOUNCE_MS = 350;
+const MAX_CLIENT_CACHE_ENTRIES = 80;
+const clusterCache = new Map<string, ParkingClusterResponse[]>();
+
+function cacheClusters(key: string, clusters: ParkingClusterResponse[]) {
+  clusterCache.delete(key);
+  clusterCache.set(key, clusters);
+
+  if (clusterCache.size > MAX_CLIENT_CACHE_ENTRIES) {
+    const oldestKey = clusterCache.keys().next().value;
+    if (oldestKey) {
+      clusterCache.delete(oldestKey);
+    }
+  }
+}
+
+type CameraMoveEvent = {
+  coordinates: {
+    latitude?: number;
+    longitude?: number;
+  };
+  zoom?: number;
+  latitudeDelta?: number;
+  longitudeDelta?: number;
+};
+
+export function useParkingClusters(
+  initialCamera: ParkingCameraState,
+  destination?: ParkingCoordinates,
+) {
+  const [currentRegion, setCurrentRegion] = useState(initialCamera);
+  const [currentZoom, setCurrentZoom] = useState(initialCamera.zoom);
+  const [visibleClusters, setVisibleClusters] = useState<
+    ParkingClusterResponse[]
+  >([]);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const requestKeyRef = useRef<string | null>(null);
+
+  const loadClusters = useCallback((camera: ParkingCameraState) => {
+    const request = getParkingClusterRequest(camera, destination);
+    if (request.tileKey === requestKeyRef.current) {
+      return;
+    }
+
+    requestKeyRef.current = request.tileKey;
+    setCurrentRegion(camera);
+    setCurrentZoom(request.zoom);
+
+    const cached = clusterCache.get(request.tileKey);
+    if (cached) {
+      setVisibleClusters(cached);
+      return;
+    }
+
+    const clusters = getMockParkingClusters(request);
+    cacheClusters(request.tileKey, clusters);
+    setVisibleClusters(clusters);
+  }, [destination]);
+
+  useEffect(() => {
+    loadClusters(initialCamera);
+
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
+  }, [initialCamera, loadClusters]);
+
+  const onCameraMove = useCallback(
+    (event: CameraMoveEvent) => {
+      const latitude = event.coordinates.latitude;
+      const longitude = event.coordinates.longitude;
+      if (latitude === undefined || longitude === undefined) {
+        return;
+      }
+
+      const zoom =
+        event.zoom ??
+        (event.longitudeDelta
+          ? zoomFromLongitudeDelta(event.longitudeDelta)
+          : currentZoom);
+      const camera: ParkingCameraState = {
+        latitude,
+        longitude,
+        zoom,
+        latitudeDelta: event.latitudeDelta,
+        longitudeDelta: event.longitudeDelta,
+      };
+
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+      debounceRef.current = setTimeout(
+        () => loadClusters(camera),
+        CAMERA_DEBOUNCE_MS,
+      );
+    },
+    [currentZoom, loadClusters],
+  );
+
+  return {
+    currentRegion,
+    currentZoom,
+    onCameraMove,
+    visibleClusters,
+  };
+}
