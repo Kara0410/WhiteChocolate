@@ -11,6 +11,14 @@ type MarkerDensityOptions = {
   selectedId?: string;
 };
 
+export type ProjectedParkingMarker = {
+  item: ParkingClusterResponse;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
 function markerLimitForZoom(zoom: number) {
   if (zoom <= 10) {
     return 20;
@@ -40,18 +48,10 @@ export function selectSpatiallySeparatedMarkers(
   const latitudeDelta =
     options.camera.latitudeDelta ?? Math.max(0.000001, longitudeDelta * 1.6);
   const limit = markerLimitForZoom(options.camera.zoom);
-  const projected: {
-    item: ParkingClusterResponse;
-    x: number;
-    y: number;
-    collisionRadius: number;
-  }[] = items
+  const projected: ProjectedParkingMarker[] = items
     .map((item) => {
       const tier = getMarkerSizeTier(item.type, options.camera.zoom);
-      const dimensions = getMarkerDimensions(
-        tier,
-        item.id === options.selectedId,
-      );
+      const dimensions = getMarkerDimensions(tier);
       return {
         item,
         x:
@@ -63,7 +63,8 @@ export function selectSpatiallySeparatedMarkers(
           ((options.camera.latitude + latitudeDelta / 2 - item.latitude) /
             latitudeDelta) *
           options.height,
-        collisionRadius: dimensions.visualSize / 2 + 6,
+        width: dimensions.width + 12,
+        height: dimensions.height + 12,
       };
     })
     .sort((first, second) => {
@@ -86,11 +87,12 @@ export function selectSpatiallySeparatedMarkers(
       break;
     }
     const overlaps = accepted.some((existing) => {
-      const xDistance = candidate.x - existing.x;
-      const yDistance = candidate.y - existing.y;
-      const requiredDistance =
-        candidate.collisionRadius + existing.collisionRadius;
-      return xDistance ** 2 + yDistance ** 2 < requiredDistance ** 2;
+      return (
+        Math.abs(candidate.x - existing.x) <
+          (candidate.width + existing.width) / 2 &&
+        Math.abs(candidate.y - existing.y) <
+          (candidate.height + existing.height) / 2
+      );
     });
     if (!overlaps) {
       accepted.push(candidate);
@@ -98,4 +100,36 @@ export function selectSpatiallySeparatedMarkers(
   }
 
   return accepted.map(({ item }) => item);
+}
+
+export function projectParkingMarkers(
+  items: ParkingClusterResponse[],
+  options: MarkerDensityOptions,
+) {
+  const selected = selectSpatiallySeparatedMarkers(items, options);
+  const longitudeDelta =
+    options.camera.longitudeDelta ??
+    Math.max(0.000001, (360 / 2 ** options.camera.zoom) * 2);
+  const latitudeDelta =
+    options.camera.latitudeDelta ?? Math.max(0.000001, longitudeDelta * 1.6);
+
+  return selected.map((item): ProjectedParkingMarker => {
+    const dimensions = getMarkerDimensions(
+      getMarkerSizeTier(item.type, options.camera.zoom),
+    );
+    return {
+      item,
+      x:
+        ((item.longitude -
+          (options.camera.longitude - longitudeDelta / 2)) /
+          longitudeDelta) *
+        options.width,
+      y:
+        ((options.camera.latitude + latitudeDelta / 2 - item.latitude) /
+          latitudeDelta) *
+        options.height,
+      width: dimensions.width,
+      height: dimensions.height,
+    };
+  });
 }

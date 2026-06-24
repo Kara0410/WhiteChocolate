@@ -42,6 +42,7 @@ export function useParkingClusters(
   destination?: ParkingCoordinates,
 ) {
   const [currentRegion, setCurrentRegion] = useState(initialCamera);
+  const [displayCamera, setDisplayCamera] = useState(initialCamera);
   const [currentZoom, setCurrentZoom] = useState(initialCamera.zoom);
   const [visibleClusters, setVisibleClusters] = useState<
     ParkingClusterResponse[]
@@ -100,6 +101,7 @@ export function useParkingClusters(
         latitudeDelta: event.latitudeDelta,
         longitudeDelta: event.longitudeDelta,
       };
+      setDisplayCamera(camera);
 
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
@@ -114,6 +116,7 @@ export function useParkingClusters(
 
   return {
     currentRegion,
+    displayCamera,
     currentZoom,
     onCameraMove,
     visibleClusters,

@@ -50,23 +50,23 @@ export function getMarkerSizeTier(
   return 'small';
 }
 
-export function getMarkerDimensions(
-  tier: MarkerSizeTier,
-  selected = false,
-) {
-  const visualSize =
+export function getMarkerDimensions(tier: MarkerSizeTier) {
+  const base =
     tier === 'large'
-      ? 416
+      ? { width: 148, height: 72 }
       : tier === 'medium'
-        ? 360
+        ? { width: 124, height: 60 }
         : tier === 'small'
-          ? 312
-          : 256;
-  const scaledVisualSize = Math.round(visualSize * (selected ? 1.08 : 1));
-  const glowPadding = tier === 'spot' ? 40 : selected ? 68 : 56;
+          ? { width: 104, height: 48 }
+          : { width: 72, height: 72 };
+  const width = base.width;
+  const height = base.height;
+  const glowPadding = tier === 'spot' ? 10 : 14;
   return {
-    canvasSize: scaledVisualSize + glowPadding * 2,
-    visualSize: scaledVisualSize,
+    canvasSize: Math.max(width, height) + glowPadding * 2,
+    visualSize: width,
+    width,
+    height,
     glowPadding,
   };
 }
@@ -81,35 +81,8 @@ export function displayZoneCount(zoneCount: number) {
   return Math.round(zoneCount / 25) * 25;
 }
 
-export function displayAvailabilityPercent(availabilityPercent: number) {
-  return Math.max(0, Math.min(100, Math.round(availabilityPercent / 2) * 2));
-}
-
 export function zoneCountLabel(zoneCount: number) {
   const displayed = displayZoneCount(zoneCount);
   const suffix = zoneCount > displayed ? '+' : '';
   return `${displayed}${suffix} ${displayed === 1 ? 'zone' : 'zones'}`;
-}
-
-export function markerImageKey(
-  item: Pick<
-    ParkingClusterResponse,
-    'availabilityPercent' | 'colorStatus' | 'type' | 'zoneCount'
-  >,
-  zoom: number,
-  selected = false,
-) {
-  const tier = getMarkerSizeTier(item.type, zoom);
-  const percentage = displayAvailabilityPercent(item.availabilityPercent);
-  const zones =
-    item.type === 'cluster' ? displayZoneCount(item.zoneCount ?? 0) : 0;
-  return [
-    'parking-marker-v4',
-    item.type,
-    tier,
-    item.colorStatus,
-    percentage,
-    zones,
-    selected ? 'selected' : 'default',
-  ].join(':');
 }

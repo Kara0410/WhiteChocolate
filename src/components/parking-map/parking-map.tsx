@@ -1,14 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { AppleMaps, GoogleMaps, type CameraPosition } from 'expo-maps';
-import type { ImageRef } from 'expo-image';
-import { Platform, Text, useWindowDimensions, View } from 'react-native';
+import { Platform, Text, View, type LayoutChangeEvent } from 'react-native';
 
+import { projectParkingMarkers } from '@/components/parking-map/marker-density';
+import { ParkingMarkerCard } from '@/components/parking-map/parking-marker-card';
 import { useParkingClusters } from '@/hooks/use-parking-clusters';
-import {
-  loadMarkerImage,
-  markerImageKey,
-} from '@/components/parking-map/marker-image-cache';
-import { selectSpatiallySeparatedMarkers } from '@/components/parking-map/marker-density';
 import type {
   ParkingCameraState,
   ParkingClusterResponse,
@@ -47,7 +43,7 @@ export function ParkingMap({
   onSelectedParkingItemChange,
 }: ParkingMapProps) {
   const {
-    currentRegion,
+    displayCamera,
     currentZoom,
     onCameraMove,
     visibleClusters,
@@ -56,143 +52,34 @@ export function ParkingMap({
   const appleMapRef = useRef<AppleMaps.MapView | null>(null);
   const [selectedParkingItem, setSelectedParkingItem] =
     useState<ParkingClusterResponse | null>(null);
-  const [markerImages, setMarkerImages] = useState<Map<string, ImageRef>>(
-    () => new Map(),
-  );
-  const { height, width } = useWindowDimensions();
-  const renderedClusters = useMemo(
+  const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
+
+  const projectedMarkers = useMemo(
     () =>
-      selectSpatiallySeparatedMarkers(visibleClusters, {
-        camera: currentRegion,
-        width,
-        height,
-        selectedId: selectedParkingItem?.id,
-      }),
-    [currentRegion, height, selectedParkingItem?.id, visibleClusters, width],
+      mapSize.width > 0 && mapSize.height > 0
+        ? projectParkingMarkers(visibleClusters, {
+            camera: displayCamera,
+            width: mapSize.width,
+            height: mapSize.height,
+            selectedId: selectedParkingItem?.id,
+          })
+        : [],
+    [
+      displayCamera,
+      mapSize.height,
+      mapSize.width,
+      selectedParkingItem?.id,
+      visibleClusters,
+    ],
   );
 
-  useEffect(() => {
-    let cancelled = false;
-    const uniqueItems = new Map<string, {
-      item: ParkingClusterResponse;
-      selected: boolean;
-    }>();
-    for (const item of renderedClusters) {
-      for (const selected of [false, true]) {
-        uniqueItems.set(markerImageKey(item, currentZoom, selected), {
-          item,
-          selected,
-        });
-      }
-    }
-
-    Promise.all(
-      [...uniqueItems].map(async ([key, value]) => {
-        const image = await loadMarkerImage(
-          value.item,
-          currentZoom,
-          value.selected,
-        );
-        return [key, image] as const;
-      }),
-    )
-      .then((entries) => {
-        if (!cancelled) {
-          setMarkerImages((current) => new Map([...current, ...entries]));
-        }
-      })
-      .catch((caughtError) => {
-        console.warn('Parking marker images could not be generated', caughtError);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [currentZoom, renderedClusters]);
-
-  const clusterById = useMemo(
-    () => new Map(renderedClusters.map((item) => [item.id, item])),
-    [renderedClusters],
-  );
-
-  const googleMarkers = useMemo<GoogleMaps.Marker[]>(
-    () =>
-      renderedClusters.flatMap((item) => {
-        const selected = selectedParkingItem?.id === item.id;
-        const icon = markerImages.get(
-          markerImageKey(item, currentZoom, selected),
-        );
-        const price =
-          item.minPrice === null
-            ? 'Free'
-            : `From €${item.minPrice.toFixed(2)}/h`;
-        return icon
-          ? [
-              {
-                id: item.id,
-                coordinates: {
-                  latitude: item.latitude,
-                  longitude: item.longitude,
-                },
-                icon,
-                title:
-                  item.type === 'cluster'
-                    ? `${item.totalCapacity} parking spaces`
-                    : item.bestSpot.zoneName,
-                snippet:
-                  item.type === 'cluster'
-                    ? `${item.availableSpots} available · ${price}`
-                    : `${item.availableSpots} available · ${price}`,
-                showCallout: true,
-                anchor: { x: 0.5, y: 0.5 },
-                zIndex:
-                  selected
-                    ? 20
-                    : item.type === 'spot'
-                      ? 2
-                      : 1,
-              },
-            ]
-          : [];
-      }),
-    [currentZoom, markerImages, renderedClusters, selectedParkingItem?.id],
-  );
-
-  const appleMarkers = useMemo<AppleMaps.Marker[]>(
-    () =>
-      renderedClusters.flatMap((item) => {
-        const selected = selectedParkingItem?.id === item.id;
-        const icon = markerImages.get(
-          markerImageKey(item, currentZoom, selected),
-        );
-        return icon
-          ? [
-              {
-                id: item.id,
-                coordinates: {
-                  latitude: item.latitude,
-                  longitude: item.longitude,
-                },
-                icon,
-                title:
-                  item.type === 'cluster'
-                    ? `${item.totalCapacity} spaces · ${item.availableSpots} available`
-                    : item.bestSpot.zoneName,
-              },
-            ]
-          : [];
-      }),
-    [currentZoom, markerImages, renderedClusters, selectedParkingItem?.id],
-  );
-
-  const handleMarkerClick = useCallback(
-    (marker: { id?: string }) => {
-      const item = marker.id ? clusterById.get(marker.id) ?? null : null;
+  const handleMarkerPress = useCallback(
+    (item: ParkingClusterResponse) => {
       setSelectedParkingItem(item);
       onSelectedParkingItemChange?.(item);
 
       if (
-        item?.type === 'cluster' &&
+        item.type === 'cluster' &&
         item.expansionZoom !== undefined &&
         item.expansionZoom > currentZoom
       ) {
@@ -206,20 +93,25 @@ export function ParkingMap({
         if (Platform.OS === 'android') {
           googleMapRef.current?.setCameraPosition({
             ...nextCamera,
-            duration: 350,
+            duration: 320,
           });
         } else if (Platform.OS === 'ios') {
           appleMapRef.current?.setCameraPosition(nextCamera);
         }
       }
     },
-    [clusterById, currentZoom, onSelectedParkingItemChange],
+    [currentZoom, onSelectedParkingItemChange],
   );
 
   const clearSelection = useCallback(() => {
     setSelectedParkingItem(null);
     onSelectedParkingItemChange?.(null);
   }, [onSelectedParkingItemChange]);
+
+  const handleLayout = useCallback((event: LayoutChangeEvent) => {
+    const { width, height } = event.nativeEvent.layout;
+    setMapSize({ width, height });
+  }, []);
 
   const cameraPosition = useMemo<CameraPosition>(
     () => ({
@@ -228,20 +120,20 @@ export function ParkingMap({
         longitude: initialCamera.longitude,
       },
       zoom: initialCamera.zoom,
+      bearing: 0,
+      tilt: 0,
     }),
     [initialCamera],
   );
 
   return (
-    <View style={{ flex: 1 }}>
+    <View onLayout={handleLayout} style={{ flex: 1, overflow: 'hidden' }}>
       {Platform.OS === 'ios' ? (
         <AppleMaps.View
           ref={appleMapRef}
           cameraPosition={cameraPosition}
-          markers={appleMarkers}
           onCameraMove={onCameraMove}
           onMapClick={clearSelection}
-          onMarkerClick={handleMarkerClick}
           properties={{
             isMyLocationEnabled: false,
             pointsOfInterest: { including: [] },
@@ -250,16 +142,16 @@ export function ParkingMap({
           uiSettings={{
             compassEnabled: false,
             myLocationButtonEnabled: false,
+            scaleBarEnabled: false,
+            togglePitchEnabled: false,
           }}
         />
       ) : Platform.OS === 'android' ? (
         <GoogleMaps.View
           ref={googleMapRef}
           cameraPosition={cameraPosition}
-          markers={googleMarkers}
           onCameraMove={onCameraMove}
           onMapClick={clearSelection}
-          onMarkerClick={handleMarkerClick}
           properties={{
             isBuildingEnabled: false,
             isIndoorEnabled: false,
@@ -274,7 +166,9 @@ export function ParkingMap({
             indoorLevelPickerEnabled: false,
             mapToolbarEnabled: false,
             myLocationButtonEnabled: false,
+            rotationGesturesEnabled: false,
             scaleBarEnabled: false,
+            tiltGesturesEnabled: false,
             zoomControlsEnabled: false,
           }}
         />
@@ -284,6 +178,34 @@ export function ParkingMap({
         </View>
       )}
 
+      <View
+        pointerEvents="box-none"
+        style={{
+          position: 'absolute',
+          inset: 0,
+        }}
+      >
+        {projectedMarkers.map(({ item, x, y, width, height }) => (
+          <View
+            key={item.id}
+            pointerEvents="box-none"
+            style={{
+              position: 'absolute',
+              left: x - width / 2,
+              top: y - height / 2,
+              width,
+              height,
+            }}
+          >
+            <ParkingMarkerCard
+              item={item}
+              onPress={handleMarkerPress}
+              selected={selectedParkingItem?.id === item.id}
+              zoom={displayCamera.zoom}
+            />
+          </View>
+        ))}
+      </View>
     </View>
   );
 }

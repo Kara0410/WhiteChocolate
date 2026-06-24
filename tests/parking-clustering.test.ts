@@ -1,9 +1,6 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import test from 'node:test';
 
-import { markerImageKey } from '../src/components/parking-map/marker-visuals';
 import {
   createParkingClusterEngine,
   getClusterRadiusForZoom,
@@ -157,33 +154,4 @@ test('loads alpha map data synchronously from the bundled Munich mock data', () 
 
   assert.ok(results.length > 0);
   assert.ok(Array.isArray(results));
-});
-
-test('has bundled visual assets for mock clusters across zoom levels', () => {
-  const manifest = readFileSync(
-    resolve(
-      process.cwd(),
-      'src/components/parking-map/parking-marker-assets.generated.ts',
-    ),
-    'utf8',
-  );
-
-  for (const zoom of [8, 10, 12, 14, 16, 18]) {
-    const results = getMockParkingClusters({
-      bbox: {
-        minLng: 11.3,
-        minLat: 48,
-        maxLng: 11.8,
-        maxLat: 48.3,
-      },
-      zoom,
-      tileKey: `test-${zoom}`,
-    });
-    for (const item of results) {
-      assert.ok(manifest.includes(JSON.stringify(markerImageKey(item, zoom))));
-      assert.ok(
-        manifest.includes(JSON.stringify(markerImageKey(item, zoom, true))),
-      );
-    }
-  }
 });
