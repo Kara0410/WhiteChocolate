@@ -149,7 +149,7 @@ function getOuterStyle(
     alignItems: 'center',
     justifyContent: 'center',
     elevation: selected ? 16 : active ? 12 : 10,
-    shadowColor: selected ? '#1A1C1E' : theme.ring,
+    shadowColor: theme.ring,
     shadowOffset: {
       width: 0,
       height: selected ? 14 : active ? 8 : 12,
@@ -157,7 +157,7 @@ function getOuterStyle(
     shadowOpacity: selected ? 0.75 : active ? 0.65 : 0.55,
     shadowRadius: selected ? 32 : active ? 18 : 22,
     boxShadow: selected
-      ? `0 14px 32px 4px rgba(26, 28, 30, 0.75), 0 8px 24px 3px ${glow}`
+      ? `0 12px 30px 4px ${glow}, 0 4px 14px rgba(26, 28, 30, 0.12)`
       : active
         ? `0 12px 18px 3px ${glow}, 0 4px 12px rgba(26, 28, 30, 0.16)`
         : `0 12px 22px 4px ${glow}, 0 4px 14px rgba(26, 28, 30, 0.14)`,
@@ -178,7 +178,7 @@ function ParkingAvailabilityBubble({
   const selected = state === 'selected';
   const forcedPressed = state === 'pressed';
   const scale = useRef(
-    new Animated.Value(selected ? 1.12 : forcedPressed ? 0.96 : 1),
+    new Animated.Value(selected ? 1.06 : forcedPressed ? 0.96 : 1),
   ).current;
   const dimensions =
     type === 'cluster'
@@ -207,7 +207,7 @@ function ParkingAvailabilityBubble({
   );
 
   useEffect(() => {
-    animateScale(selected ? 1.12 : forcedPressed ? 0.96 : 1);
+    animateScale(selected ? 1.06 : forcedPressed ? 0.96 : 1);
   }, [animateScale, forcedPressed, selected]);
 
   const handlePressIn = useCallback(() => {
@@ -217,7 +217,7 @@ function ParkingAvailabilityBubble({
   }, [animateScale, selected]);
 
   const handlePressOut = useCallback(() => {
-    animateScale(selected ? 1.12 : forcedPressed ? 0.96 : 1);
+    animateScale(selected ? 1.06 : forcedPressed ? 0.96 : 1);
   }, [animateScale, forcedPressed, selected]);
 
   return (
@@ -257,6 +257,7 @@ function ParkingAvailabilityBubble({
               StyleSheet.absoluteFillObject,
               styles.selectedAura,
               {
+                borderColor: theme.glow,
                 borderRadius: dimensions.radius,
               },
             ]}
@@ -271,10 +272,10 @@ function ParkingAvailabilityBubble({
               width: dimensions.width,
               height: dimensions.height,
               borderColor: selected
-                ? 'rgba(255,255,255,0.95)'
+                ? theme.ring
                 : 'rgba(255,255,255,0.82)',
               borderRadius: dimensions.radius,
-              borderWidth: selected ? 2 : 1,
+              borderWidth: selected ? 1.5 : 1,
               backgroundColor: theme.backgroundTint,
             },
           ]}
@@ -392,10 +393,9 @@ const styles = StyleSheet.create({
     letterSpacing: -0.6,
   },
   selectedAura: {
-    borderColor: '#1A1C1E',
-    borderWidth: 6,
-    opacity: 0.4,
-    transform: [{ scale: 1.18 }],
+    borderWidth: 3,
+    opacity: 0.35,
+    transform: [{ scale: 1.14 }],
   },
   statusBorder: {
     borderWidth: 1,

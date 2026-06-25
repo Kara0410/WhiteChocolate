@@ -1,9 +1,12 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppleMaps, GoogleMaps, type CameraPosition } from 'expo-maps';
 import { Platform, Text, View, type LayoutChangeEvent } from 'react-native';
 
 import { projectParkingMarkers } from '@/components/parking-map/marker-density';
-import { ParkingBottomSheet } from '@/components/parking-map/ParkingBottomSheet';
+import {
+  ParkingBottomSheet,
+  type ParkingBottomSheetHandle,
+} from '@/components/parking-map/ParkingBottomSheet';
 import { ParkingMarkerCard } from '@/components/parking-map/parking-marker-card';
 import { useParkingClusters } from '@/hooks/use-parking-clusters';
 import type {
@@ -30,6 +33,10 @@ const LABEL_FREE_MAP_STYLE = JSON.stringify([
   },
 ]);
 
+const FULL_SHEET_RATIO = 0.5;
+const PROGRAMMATIC_CAMERA_GUARD_MS = 500;
+const MAP_DRAG_SETTLE_MS = 180;
+
 type ParkingMapProps = {
   initialCamera: ParkingCameraState;
   destination?: ParkingCoordinates;
@@ -45,12 +52,18 @@ export function ParkingMap({
 }: ParkingMapProps) {
   const {
     displayCamera,
-    currentZoom,
     onCameraMove,
     visibleClusters,
   } = useParkingClusters(initialCamera, destination);
   const googleMapRef = useRef<GoogleMaps.MapView | null>(null);
   const appleMapRef = useRef<AppleMaps.MapView | null>(null);
+  const bottomSheetRef = useRef<ParkingBottomSheetHandle>(null);
+  const programmaticCameraTimerRef =
+    useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mapDragSettleTimerRef =
+    useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isProgrammaticCameraMoveRef = useRef(false);
+  const hasCompactedForCurrentDragRef = useRef(false);
   const [selectedParkingItem, setSelectedParkingItem] =
     useState<ParkingClusterResponse | null>(null);
   const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
@@ -74,34 +87,57 @@ export function ParkingMap({
     ],
   );
 
+  const focusMarkerAboveSheet = useCallback(
+    (item: ParkingClusterResponse) => {
+      const longitudeDelta =
+        displayCamera.longitudeDelta ??
+        Math.max(0.000001, (360 / 2 ** displayCamera.zoom) * 2);
+      const latitudeDelta =
+        displayCamera.latitudeDelta ??
+        Math.max(0.000001, longitudeDelta * 1.6);
+      const visibleMapRatio = 1 - FULL_SHEET_RATIO;
+      const desiredMarkerYRatio = visibleMapRatio / 2;
+      const yOffsetRatio = 0.5 - desiredMarkerYRatio;
+      const nextCamera = {
+        coordinates: {
+          latitude: item.latitude - latitudeDelta * yOffsetRatio,
+          longitude: item.longitude,
+        },
+        zoom: displayCamera.zoom,
+      };
+
+      isProgrammaticCameraMoveRef.current = true;
+      if (programmaticCameraTimerRef.current) {
+        clearTimeout(programmaticCameraTimerRef.current);
+      }
+      programmaticCameraTimerRef.current = setTimeout(() => {
+        isProgrammaticCameraMoveRef.current = false;
+        programmaticCameraTimerRef.current = null;
+      }, PROGRAMMATIC_CAMERA_GUARD_MS);
+
+      if (Platform.OS === 'android') {
+        googleMapRef.current?.setCameraPosition({
+          ...nextCamera,
+          duration: 320,
+        });
+      } else if (Platform.OS === 'ios') {
+        appleMapRef.current?.setCameraPosition(nextCamera);
+      }
+    },
+    [
+      displayCamera.latitudeDelta,
+      displayCamera.longitudeDelta,
+      displayCamera.zoom,
+    ],
+  );
+
   const handleMarkerPress = useCallback(
     (item: ParkingClusterResponse) => {
       setSelectedParkingItem(item);
       onSelectedParkingItemChange?.(item);
-
-      if (
-        item.type === 'cluster' &&
-        item.expansionZoom !== undefined &&
-        item.expansionZoom > currentZoom
-      ) {
-        const nextCamera = {
-          coordinates: {
-            latitude: item.latitude,
-            longitude: item.longitude,
-          },
-          zoom: Math.min(20, item.expansionZoom),
-        };
-        if (Platform.OS === 'android') {
-          googleMapRef.current?.setCameraPosition({
-            ...nextCamera,
-            duration: 320,
-          });
-        } else if (Platform.OS === 'ios') {
-          appleMapRef.current?.setCameraPosition(nextCamera);
-        }
-      }
+      focusMarkerAboveSheet(item);
     },
-    [currentZoom, onSelectedParkingItemChange],
+    [focusMarkerAboveSheet, onSelectedParkingItemChange],
   );
 
   const clearSelection = useCallback(() => {
@@ -113,6 +149,42 @@ export function ParkingMap({
     const { width, height } = event.nativeEvent.layout;
     setMapSize({ width, height });
   }, []);
+
+  const handleCameraMove = useCallback(
+    (event: Parameters<typeof onCameraMove>[0]) => {
+      onCameraMove(event);
+
+      if (isProgrammaticCameraMoveRef.current || selectedParkingItem === null) {
+        return;
+      }
+
+      if (!hasCompactedForCurrentDragRef.current) {
+        hasCompactedForCurrentDragRef.current = true;
+        bottomSheetRef.current?.compact();
+      }
+
+      if (mapDragSettleTimerRef.current) {
+        clearTimeout(mapDragSettleTimerRef.current);
+      }
+      mapDragSettleTimerRef.current = setTimeout(() => {
+        hasCompactedForCurrentDragRef.current = false;
+        mapDragSettleTimerRef.current = null;
+      }, MAP_DRAG_SETTLE_MS);
+    },
+    [onCameraMove, selectedParkingItem],
+  );
+
+  useEffect(
+    () => () => {
+      if (programmaticCameraTimerRef.current) {
+        clearTimeout(programmaticCameraTimerRef.current);
+      }
+      if (mapDragSettleTimerRef.current) {
+        clearTimeout(mapDragSettleTimerRef.current);
+      }
+    },
+    [],
+  );
 
   const cameraPosition = useMemo<CameraPosition>(
     () => ({
@@ -133,7 +205,7 @@ export function ParkingMap({
         <AppleMaps.View
           ref={appleMapRef}
           cameraPosition={cameraPosition}
-          onCameraMove={onCameraMove}
+          onCameraMove={handleCameraMove}
           onMapClick={clearSelection}
           properties={{
             isMyLocationEnabled: false,
@@ -151,7 +223,7 @@ export function ParkingMap({
         <GoogleMaps.View
           ref={googleMapRef}
           cameraPosition={cameraPosition}
-          onCameraMove={onCameraMove}
+          onCameraMove={handleCameraMove}
           onMapClick={clearSelection}
           properties={{
             isBuildingEnabled: false,
@@ -209,6 +281,7 @@ export function ParkingMap({
       </View>
 
       <ParkingBottomSheet
+        ref={bottomSheetRef}
         item={selectedParkingItem}
         onClose={clearSelection}
       />
