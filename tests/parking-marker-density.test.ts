@@ -51,9 +51,12 @@ test('maps percentage thresholds to availability status', () => {
 test('keeps every marker at least as large as the parking action button', () => {
   assert.equal(getMarkerDimensions('spot').visualSize, 72);
   assert.equal(getMarkerDimensions('spot').height, 72);
-  assert.equal(getMarkerDimensions('small').visualSize, 104);
-  assert.equal(getMarkerDimensions('medium').visualSize, 124);
-  assert.equal(getMarkerDimensions('large').visualSize, 148);
+  assert.equal(getMarkerDimensions('small').visualSize, 108);
+  assert.equal(getMarkerDimensions('small').height, 52);
+  assert.equal(getMarkerDimensions('medium').visualSize, 136);
+  assert.equal(getMarkerDimensions('medium').height, 64);
+  assert.equal(getMarkerDimensions('large').visualSize, 164);
+  assert.equal(getMarkerDimensions('large').height, 78);
 });
 
 test('suppresses visually overlapping markers at the enlarged scale', () => {

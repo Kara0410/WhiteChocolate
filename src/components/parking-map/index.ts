@@ -6,4 +6,6 @@ export type {
   BubbleType,
   ParkingAvailabilityBubbleProps,
 } from './ParkingAvailabilityBubble';
+export { ParkingBottomSheet } from './ParkingBottomSheet';
+export type { ParkingBottomSheetProps } from './ParkingBottomSheet';
 export { ParkingMap } from './parking-map';

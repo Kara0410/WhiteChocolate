@@ -3,6 +3,7 @@ import { AppleMaps, GoogleMaps, type CameraPosition } from 'expo-maps';
 import { Platform, Text, View, type LayoutChangeEvent } from 'react-native';
 
 import { projectParkingMarkers } from '@/components/parking-map/marker-density';
+import { ParkingBottomSheet } from '@/components/parking-map/ParkingBottomSheet';
 import { ParkingMarkerCard } from '@/components/parking-map/parking-marker-card';
 import { useParkingClusters } from '@/hooks/use-parking-clusters';
 import type {
@@ -206,6 +207,11 @@ export function ParkingMap({
           </View>
         ))}
       </View>
+
+      <ParkingBottomSheet
+        item={selectedParkingItem}
+        onClose={clearSelection}
+      />
     </View>
   );
 }

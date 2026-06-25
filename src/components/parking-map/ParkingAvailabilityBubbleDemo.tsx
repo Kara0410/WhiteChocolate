@@ -22,7 +22,7 @@ function DemoSection({
 export default function ParkingAvailabilityBubbleDemo() {
   return (
     <ScrollView
-      className="flex-1 bg-pm-bg"
+      className="flex-1 bg-[#F3F5F8]"
       contentContainerClassName="gap-10 p-6 pb-16"
       contentInsetAdjustmentBehavior="automatic"
     >

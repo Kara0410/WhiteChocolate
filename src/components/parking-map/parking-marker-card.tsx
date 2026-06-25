@@ -20,8 +20,9 @@ export const ParkingMarkerCard = memo(function ParkingMarkerCard({
   selected,
   onPress,
 }: ParkingMarkerCardProps) {
-  const scale = useRef(new Animated.Value(0.88)).current;
+  const scale = useRef(new Animated.Value(0.92)).current;
   const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(10)).current;
   const tier = getMarkerSizeTier(item.type, zoom);
   const size: BubbleSize = tier === 'spot' ? 'large' : tier;
 
@@ -29,21 +30,30 @@ export const ParkingMarkerCard = memo(function ParkingMarkerCard({
     Animated.parallel([
       Animated.spring(scale, {
         toValue: 1,
-        damping: 18,
-        stiffness: 220,
-        mass: 0.72,
+        damping: 20,
+        stiffness: 240,
+        mass: 0.68,
         useNativeDriver: true,
       }),
       Animated.timing(opacity, {
         toValue: 1,
-        duration: 220,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+      Animated.spring(translateY, {
+        toValue: 0,
+        damping: 20,
+        stiffness: 220,
+        mass: 0.72,
         useNativeDriver: true,
       }),
     ]).start();
-  }, [opacity, scale]);
+  }, [opacity, scale, translateY]);
 
   return (
-    <Animated.View style={{ opacity, transform: [{ scale }] }}>
+    <Animated.View
+      style={{ opacity, transform: [{ translateY }, { scale }] }}
+    >
       <ParkingAvailabilityBubble
         onPress={() => onPress(item)}
         percentage={item.availabilityPercent}
