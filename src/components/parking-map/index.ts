@@ -15,5 +15,4 @@ export { ParkingAvailabilitySection } from './ParkingAvailabilitySection';
 export { ParkingDetailHeader } from './ParkingDetailHeader';
 export { ParkingDetailSection } from './ParkingDetailSection';
 export { ParkingInfoRow } from './ParkingInfoRow';
-export { ParkingTrendChart } from './ParkingTrendChart';
 export { ParkingMap } from './parking-map';

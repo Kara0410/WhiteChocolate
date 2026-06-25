@@ -33,7 +33,6 @@ import type { ParkingClusterResponse } from '@/types/parking-map';
 import { ParkingDetailHeader } from './ParkingDetailHeader';
 import { ParkingDetailSection } from './ParkingDetailSection';
 import { ParkingInfoRow } from './ParkingInfoRow';
-import { ParkingTrendChart } from './ParkingTrendChart';
 import { getAvailabilityTheme } from './parking-availability-status';
 
 export type ParkingBottomSheetProps = {
@@ -47,7 +46,6 @@ export type ParkingBottomSheetHandle = {
 };
 
 const ITEM_SWITCH_DELAY_MS = 150;
-const DEFAULT_TREND = [54, 58, 52, 63, 68, 66, 74, 72];
 const HISTORICAL_USAGE = [
   { day: 'Mon', value: 76, weekend: false },
   { day: 'Tue', value: 68, weekend: false },
@@ -88,15 +86,6 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
   );
   const theme = useMemo(
     () => getAvailabilityTheme(percentage),
-    [percentage],
-  );
-  const trendData = useMemo(
-    () =>
-      DEFAULT_TREND.map((value, index) =>
-        index === DEFAULT_TREND.length - 1
-          ? percentage
-          : Math.max(8, Math.min(96, value + Math.round((percentage - 72) / 3))),
-      ),
     [percentage],
   );
   const title = item.bestSpot.zoneName || 'Parking Area';
@@ -213,8 +202,24 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
         </View>
       </View>
 
-      <ParkingDetailSection actionLabel="Live" title="Today’s Trend">
-        <ParkingTrendChart data={trendData} />
+      <ParkingDetailSection title="Historical Usage">
+        <View className="h-40 flex-row items-end justify-between">
+          {HISTORICAL_USAGE.map(({ day, value, weekend }) => (
+            <View className="h-full flex-1 items-center justify-end" key={day}>
+              <View className="h-[112px] w-full items-center justify-end">
+                <View
+                  className={`w-5 rounded-t-lg ${
+                    weekend ? 'bg-slate-400' : 'bg-emerald-500'
+                  }`}
+                  style={{ height: `${value}%` }}
+                />
+              </View>
+              <Text className="mt-2 text-[10px] font-semibold text-slate-500">
+                {day}
+              </Text>
+            </View>
+          ))}
+        </View>
       </ParkingDetailSection>
 
       <ParkingDetailSection title="EV Chargers">
@@ -338,26 +343,6 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
         </View>
         <View className="mt-3 h-3 overflow-hidden rounded-full bg-orange-100">
           <View className="h-full w-[92%] rounded-full bg-orange-500" />
-        </View>
-      </ParkingDetailSection>
-
-      <ParkingDetailSection title="Historical Usage">
-        <View className="h-40 flex-row items-end justify-between">
-          {HISTORICAL_USAGE.map(({ day, value, weekend }) => (
-            <View className="h-full flex-1 items-center justify-end" key={day}>
-              <View className="h-[112px] w-full items-center justify-end">
-                <View
-                  className={`w-5 rounded-t-lg ${
-                    weekend ? 'bg-slate-400' : 'bg-emerald-500'
-                  }`}
-                  style={{ height: `${value}%` }}
-                />
-              </View>
-              <Text className="mt-2 text-[10px] font-semibold text-slate-500">
-                {day}
-              </Text>
-            </View>
-          ))}
         </View>
       </ParkingDetailSection>
 
