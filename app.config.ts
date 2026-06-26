@@ -14,6 +14,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     bundleIdentifier: 'com.whitechoclate.app',
     icon: './assets/expo.icon',
+    infoPlist: {
+      LSApplicationQueriesSchemes: ['comgooglemaps', 'waze'],
+    },
   },
   android: {
     package: 'com.whitechoclate.app',

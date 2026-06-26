@@ -138,6 +138,7 @@ export const ParkingDetailHeader = memo(function ParkingDetailHeader({
       </View>
 
       <Pressable
+        accessibilityLabel="Navigate to parking spot"
         accessibilityRole="button"
         className="mt-5 h-14 flex-row items-center justify-center rounded-2xl bg-blue-600 active:bg-blue-700"
         onPress={onNavigate}
@@ -145,7 +146,7 @@ export const ParkingDetailHeader = memo(function ParkingDetailHeader({
       >
         <Navigation color="#FFFFFF" fill="#FFFFFF" size={18} />
         <Text className="ml-2 text-[16px] font-bold text-white">
-          Navigate to Spot
+          Navigate to spot
         </Text>
       </Pressable>
     </View>

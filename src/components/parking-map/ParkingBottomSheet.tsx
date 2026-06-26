@@ -29,6 +29,7 @@ import { Share, StyleSheet, Text, View } from 'react-native';
 
 import { useFavoriteParking } from '@/context/FavoriteParkingContext';
 import type { ParkingClusterResponse } from '@/types/parking-map';
+import { openParkingNavigation } from '@/utils/openParkingNavigation';
 
 import { ParkingDetailHeader } from './ParkingDetailHeader';
 import { ParkingDetailSection } from './ParkingDetailSection';
@@ -159,6 +160,14 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
     toggleFavorite(item);
   }, [item, toggleFavorite]);
 
+  const handleNavigate = useCallback(() => {
+    void openParkingNavigation({
+      latitude: item.latitude,
+      longitude: item.longitude,
+      label: title,
+    });
+  }, [item.latitude, item.longitude, title]);
+
   return (
     <>
       <ParkingDetailHeader
@@ -166,6 +175,7 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
         isFavorite={itemIsFavorite}
         onClose={onClose}
         onFavorite={handleFavorite}
+        onNavigate={handleNavigate}
         onShare={handleShare}
         percentage={percentage}
         theme={theme}
