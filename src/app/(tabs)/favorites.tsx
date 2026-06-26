@@ -9,6 +9,10 @@ import type { ParkingClusterResponse } from '@/types/parking-map';
 export default function FavoritesScreen() {
   const router = useRouter();
 
+  const handleClose = useCallback(() => {
+    router.replace('/map');
+  }, [router]);
+
   const handleSpotPress = useCallback(
     (item: ParkingClusterResponse) => {
       router.replace({
@@ -22,7 +26,10 @@ export default function FavoritesScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <View className="absolute inset-0 bg-slate-200" />
-      <FavoriteParkingBottomSheet onSpotPress={handleSpotPress} />
+      <FavoriteParkingBottomSheet
+        onClose={handleClose}
+        onSpotPress={handleSpotPress}
+      />
     </View>
   );
 }

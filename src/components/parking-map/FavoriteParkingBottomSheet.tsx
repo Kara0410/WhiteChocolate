@@ -1,6 +1,12 @@
-import { memo, useCallback, useMemo } from 'react';
+import {
+  memo,
+  useCallback,
+  useMemo,
+  useRef,
+  type ComponentRef,
+} from 'react';
 import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
-import { Heart } from 'lucide-react-native';
+import { Heart, X } from 'lucide-react-native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,6 +17,7 @@ import type { ParkingClusterResponse } from '@/types/parking-map';
 import { getAvailabilityTheme } from './parking-availability-status';
 
 type FavoriteParkingBottomSheetProps = {
+  onClose: () => void;
   onSpotPress: (item: ParkingClusterResponse) => void;
 };
 
@@ -123,20 +130,50 @@ const FavoriteSpotRow = memo(function FavoriteSpotRow({
 });
 
 export function FavoriteParkingBottomSheet({
+  onClose,
   onSpotPress,
 }: FavoriteParkingBottomSheetProps) {
+  const sheetRef = useRef<ComponentRef<typeof BottomSheet>>(null);
+  const pendingSpotRef = useRef<ParkingClusterResponse | null>(null);
   const insets = useSafeAreaInsets();
   const { favoriteItems } = useFavoriteParking();
   const snapPoints = useMemo(() => ['82%'], []);
 
+  const closeSheet = useCallback(() => {
+    sheetRef.current?.close();
+  }, []);
+
+  const handleSheetClose = useCallback(() => {
+    const pendingSpot = pendingSpotRef.current;
+    pendingSpotRef.current = null;
+
+    if (pendingSpot) {
+      onSpotPress(pendingSpot);
+      return;
+    }
+
+    onClose();
+  }, [onClose, onSpotPress]);
+
+  const handleSpotPress = useCallback(
+    (item: ParkingClusterResponse) => {
+      pendingSpotRef.current = item;
+      closeSheet();
+    },
+    [closeSheet],
+  );
+
   return (
     <BottomSheet
+      ref={sheetRef}
       backgroundStyle={styles.background}
       enableDynamicSizing={false}
       enableOverDrag={false}
+      enablePanDownToClose
       handleIndicatorStyle={styles.handleIndicator}
       handleStyle={styles.handle}
       index={0}
+      onClose={handleSheetClose}
       overDragResistanceFactor={4}
       snapPoints={snapPoints}
       style={styles.sheet}
@@ -149,7 +186,7 @@ export function FavoriteParkingBottomSheet({
         showsVerticalScrollIndicator={false}
       >
         <View className="mb-5 flex-row items-center justify-between">
-          <View>
+          <View className="flex-1 pr-3">
             <Text className="text-[26px] font-extrabold text-slate-950">
               Favorite spots
             </Text>
@@ -159,9 +196,16 @@ export function FavoriteParkingBottomSheet({
                 : `${favoriteItems.length} favorited parking spots`}
             </Text>
           </View>
-          <View className="h-12 w-12 items-center justify-center rounded-full bg-rose-50">
-            <Heart color="#E11D48" fill="#E11D48" size={22} strokeWidth={2.4} />
-          </View>
+          <Pressable
+            accessibilityLabel="Close favorite spots"
+            accessibilityRole="button"
+            className="h-11 w-11 items-center justify-center rounded-full bg-white active:bg-slate-100"
+            hitSlop={8}
+            onPress={closeSheet}
+            style={styles.closeButton}
+          >
+            <X color="#475569" size={19} strokeWidth={2.5} />
+          </Pressable>
         </View>
 
         {favoriteItems.length === 0 ? (
@@ -178,7 +222,7 @@ export function FavoriteParkingBottomSheet({
           </View>
         ) : (
           favoriteItems.map((item) => (
-            <FavoriteSpotRow item={item} key={item.id} onPress={onSpotPress} />
+            <FavoriteSpotRow item={item} key={item.id} onPress={handleSpotPress} />
           ))
         )}
       </BottomSheetScrollView>
@@ -205,6 +249,11 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     height: 5,
     width: 42,
+  },
+  closeButton: {
+    borderCurve: 'continuous',
+    boxShadow: '0 8px 20px rgba(15,23,42,0.08)',
+    elevation: 2,
   },
   row: {
     borderCurve: 'continuous',

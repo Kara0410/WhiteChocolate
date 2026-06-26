@@ -67,9 +67,12 @@ export function ParkingMap({
     useRef<ReturnType<typeof setTimeout> | null>(null);
   const isProgrammaticCameraMoveRef = useRef(false);
   const hasCompactedForCurrentDragRef = useRef(false);
+  const hasInitialCameraEventRef = useRef(false);
+  const pendingFocusItemRef = useRef<ParkingClusterResponse | null>(null);
   const [selectedParkingItem, setSelectedParkingItem] =
     useState<ParkingClusterResponse | null>(null);
   const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
+  const [hasInitialCameraEvent, setHasInitialCameraEvent] = useState(false);
   const { favoriteItems } = useFavoriteParking();
   const lastFocusedFavoriteIdRef = useRef<string | null>(null);
 
@@ -92,8 +95,23 @@ export function ParkingMap({
     ],
   );
 
-  const focusMarkerAboveSheet = useCallback(
+  const canFocusCamera = useCallback(
+    () =>
+      mapSize.width > 0 &&
+      mapSize.height > 0 &&
+      hasInitialCameraEvent &&
+      ((Platform.OS === 'android' && googleMapRef.current !== null) ||
+        (Platform.OS === 'ios' && appleMapRef.current !== null)),
+    [hasInitialCameraEvent, mapSize.height, mapSize.width],
+  );
+
+  const focusMarkerAboveSheetSafely = useCallback(
     (item: ParkingClusterResponse) => {
+      if (!canFocusCamera()) {
+        pendingFocusItemRef.current = item;
+        return;
+      }
+
       const longitudeDelta =
         displayCamera.longitudeDelta ??
         Math.max(0.000001, (360 / 2 ** displayCamera.zoom) * 2);
@@ -121,15 +139,16 @@ export function ParkingMap({
       }, PROGRAMMATIC_CAMERA_GUARD_MS);
 
       if (Platform.OS === 'android') {
-        googleMapRef.current?.setCameraPosition({
+        googleMapRef.current!.setCameraPosition({
           ...nextCamera,
           duration: 320,
         });
       } else if (Platform.OS === 'ios') {
-        appleMapRef.current?.setCameraPosition(nextCamera);
+        appleMapRef.current!.setCameraPosition(nextCamera);
       }
     },
     [
+      canFocusCamera,
       displayCamera.latitudeDelta,
       displayCamera.longitudeDelta,
       displayCamera.zoom,
@@ -137,12 +156,19 @@ export function ParkingMap({
   );
 
   const selectParkingItem = useCallback(
-    (item: ParkingClusterResponse) => {
+    (
+      item: ParkingClusterResponse,
+      options: { focusCamera?: boolean } = {},
+    ) => {
+      const { focusCamera = true } = options;
+
       setSelectedParkingItem(item);
       onSelectedParkingItemChange?.(item);
-      focusMarkerAboveSheet(item);
+      if (focusCamera) {
+        focusMarkerAboveSheetSafely(item);
+      }
     },
-    [focusMarkerAboveSheet, onSelectedParkingItemChange],
+    [focusMarkerAboveSheetSafely, onSelectedParkingItemChange],
   );
 
   const handleMarkerPress = useCallback(
@@ -165,6 +191,10 @@ export function ParkingMap({
   const handleCameraMove = useCallback(
     (event: Parameters<typeof onCameraMove>[0]) => {
       onCameraMove(event);
+      if (!hasInitialCameraEventRef.current) {
+        hasInitialCameraEventRef.current = true;
+        setHasInitialCameraEvent(true);
+      }
 
       if (isProgrammaticCameraMoveRef.current || selectedParkingItem === null) {
         return;
@@ -217,6 +247,26 @@ export function ParkingMap({
     lastFocusedFavoriteIdRef.current = favoriteSpotId;
     selectParkingItem(favoriteItem);
   }, [favoriteItems, favoriteSpotId, selectParkingItem]);
+
+  useEffect(() => {
+    if (!canFocusCamera()) {
+      return;
+    }
+
+    const pendingFocusItem = pendingFocusItemRef.current;
+    if (pendingFocusItem === null) {
+      return;
+    }
+
+    pendingFocusItemRef.current = null;
+    focusMarkerAboveSheetSafely(pendingFocusItem);
+  }, [
+    canFocusCamera,
+    focusMarkerAboveSheetSafely,
+    hasInitialCameraEvent,
+    mapSize.height,
+    mapSize.width,
+  ]);
 
   const cameraPosition = useMemo<CameraPosition>(
     () => ({
