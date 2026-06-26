@@ -60,6 +60,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         locationPermission: 'Allow WhiteChoclate to use your location',
       },
     ],
+    [
+      'expo-location',
+      {
+        locationWhenInUsePermission:
+          'Allow WhiteChoclate to search nearby parking spots around places.',
+      },
+    ],
   ],
   experiments: {
     typedRoutes: true,

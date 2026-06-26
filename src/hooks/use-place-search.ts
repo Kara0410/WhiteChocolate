@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Platform } from 'react-native';
 import * as Location from 'expo-location';
 
 export type PlaceSearchResult = {
@@ -22,6 +23,30 @@ function normalizeQuery(query: string) {
 
 function resultTitle(query: string) {
   return query.replace(/\s+/g, ' ');
+}
+
+function isLocationAuthorizationError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+
+  return (
+    message.includes('Not authorized to use location services') ||
+    message.includes('location services')
+  );
+}
+
+async function ensureGeocodingPermission() {
+  if (Platform.OS !== 'android') {
+    return true;
+  }
+
+  const currentPermission = await Location.getForegroundPermissionsAsync();
+  if (currentPermission.granted) {
+    return true;
+  }
+
+  const requestedPermission =
+    await Location.requestForegroundPermissionsAsync();
+  return requestedPermission.granted;
 }
 
 export function usePlaceSearch() {
@@ -51,11 +76,28 @@ export function usePlaceSearch() {
       return;
     }
 
-    setIsLoading(true);
-    setError(null);
+    let isCancelled = false;
 
-    Location.geocodeAsync(searchQuery)
-      .then((locations) => {
+    async function searchPlaces() {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const hasPermission = await ensureGeocodingPermission();
+        if (
+          isCancelled ||
+          requestId !== requestIdRef.current
+        ) {
+          return;
+        }
+
+        if (!hasPermission) {
+          setResults([]);
+          setError('Location permission is required for address search.');
+          return;
+        }
+
+        const locations = await Location.geocodeAsync(searchQuery);
         if (requestId !== requestIdRef.current) {
           return;
         }
@@ -87,23 +129,32 @@ export function usePlaceSearch() {
         );
 
         setResults(nextResults);
-      })
-      .catch((searchError: unknown) => {
+      } catch (searchError: unknown) {
         if (requestId !== requestIdRef.current) {
           return;
         }
 
         setResults([]);
-        setError('Search failed. Try another place or address.');
-        if (__DEV__) {
+        setError(
+          isLocationAuthorizationError(searchError)
+            ? 'Location permission is required for address search.'
+            : 'Search failed. Try another place or address.',
+        );
+        if (__DEV__ && !isLocationAuthorizationError(searchError)) {
           console.warn('Unable to search places', searchError);
         }
-      })
-      .finally(() => {
+      } finally {
         if (requestId === requestIdRef.current) {
           setIsLoading(false);
         }
-      });
+      }
+    }
+
+    void searchPlaces();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [debouncedQuery]);
 
   const clear = useCallback(() => {
