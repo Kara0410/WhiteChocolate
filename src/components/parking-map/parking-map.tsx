@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppleMaps, GoogleMaps, type CameraPosition } from 'expo-maps';
-import { Platform, Text, View, type LayoutChangeEvent } from 'react-native';
+import {
+  InteractionManager,
+  Platform,
+  Text,
+  View,
+  type LayoutChangeEvent,
+} from 'react-native';
 
 import { projectParkingMarkers } from '@/components/parking-map/marker-density';
 import {
@@ -37,8 +43,6 @@ const LABEL_FREE_MAP_STYLE = JSON.stringify([
 const FULL_SHEET_RATIO = 0.5;
 const PROGRAMMATIC_CAMERA_GUARD_MS = 500;
 const MAP_DRAG_SETTLE_MS = 180;
-const CAMERA_FOCUS_RETRY_DELAY_MS = 140;
-const CAMERA_FOCUS_MAX_RETRIES = 3;
 
 type ParkingMapProps = {
   initialCamera: ParkingCameraState;
@@ -47,6 +51,19 @@ type ParkingMapProps = {
   onSelectedParkingItemChange?: (
     item: ParkingClusterResponse | null,
   ) => void;
+};
+
+type ParkingSelectionSource = 'marker' | 'favorite';
+
+type SelectParkingItemOptions = {
+  source?: ParkingSelectionSource;
+  focusCamera?: boolean;
+};
+
+type CameraFocusSource = ParkingSelectionSource;
+
+type CameraFocusOptions = {
+  source?: CameraFocusSource;
 };
 
 function isCameraCancellationError(error: unknown) {
@@ -61,6 +78,18 @@ function isCameraCancellationError(error: unknown) {
 
 function hasValidCoordinates(item: ParkingClusterResponse) {
   return Number.isFinite(item.latitude) && Number.isFinite(item.longitude);
+}
+
+function safelyHandleCameraUpdate(update: unknown, context: string) {
+  void Promise.resolve(update).catch((error: unknown) => {
+    if (isCameraCancellationError(error)) {
+      return;
+    }
+
+    if (__DEV__) {
+      console.warn(context, error);
+    }
+  });
 }
 
 export function ParkingMap({
@@ -81,14 +110,17 @@ export function ParkingMap({
     useRef<ReturnType<typeof setTimeout> | null>(null);
   const mapDragSettleTimerRef =
     useRef<ReturnType<typeof setTimeout> | null>(null);
-  const focusRetryTimerRef =
+  const favoriteFocusTimerRef =
     useRef<ReturnType<typeof setTimeout> | null>(null);
+  const favoriteFocusInteractionRef =
+    useRef<ReturnType<typeof InteractionManager.runAfterInteractions> | null>(
+      null,
+    );
   const isProgrammaticCameraMoveRef = useRef(false);
   const hasCompactedForCurrentDragRef = useRef(false);
   const hasInitialCameraEventRef = useRef(false);
   const pendingFocusItemRef = useRef<ParkingClusterResponse | null>(null);
   const cameraFocusRequestIdRef = useRef(0);
-  const cameraFocusRetryCountRef = useRef(0);
   const [selectedParkingItem, setSelectedParkingItem] =
     useState<ParkingClusterResponse | null>(null);
   const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
@@ -125,11 +157,27 @@ export function ParkingMap({
     [hasInitialCameraEvent, mapSize.height, mapSize.width],
   );
 
+  const cancelPendingCameraFocus = useCallback(() => {
+    cameraFocusRequestIdRef.current += 1;
+    pendingFocusItemRef.current = null;
+
+    if (favoriteFocusTimerRef.current) {
+      clearTimeout(favoriteFocusTimerRef.current);
+      favoriteFocusTimerRef.current = null;
+    }
+    if (favoriteFocusInteractionRef.current) {
+      favoriteFocusInteractionRef.current.cancel();
+      favoriteFocusInteractionRef.current = null;
+    }
+  }, []);
+
   const focusMarkerAboveSheetSafely = useCallback(
     (
       item: ParkingClusterResponse,
-      options: { requestId?: number; retryCount?: number } = {},
+      options: CameraFocusOptions & { requestId?: number } = {},
     ) => {
+      const source = options.source ?? 'marker';
+
       if (!hasValidCoordinates(item)) {
         return;
       }
@@ -143,6 +191,10 @@ export function ParkingMap({
 
       if (!canFocusCamera()) {
         pendingFocusItemRef.current = item;
+        return;
+      }
+
+      if (Platform.OS === 'android' && source === 'favorite') {
         return;
       }
 
@@ -177,80 +229,29 @@ export function ParkingMap({
           Platform.OS === 'android'
             ? googleMapRef.current!.setCameraPosition({
                 ...nextCamera,
-                duration: 320,
+                duration: source === 'favorite' ? 0 : 320,
               })
             : appleMapRef.current!.setCameraPosition(nextCamera);
 
-        void Promise.resolve(cameraUpdate).catch((error: unknown) => {
-          if (requestId !== cameraFocusRequestIdRef.current) {
-            return;
-          }
-
-          if (
-            isCameraCancellationError(error) &&
-            (options.retryCount ?? 0) < CAMERA_FOCUS_MAX_RETRIES
-          ) {
-            pendingFocusItemRef.current = item;
-            cameraFocusRetryCountRef.current = (options.retryCount ?? 0) + 1;
-            if (focusRetryTimerRef.current) {
-              clearTimeout(focusRetryTimerRef.current);
-            }
-            focusRetryTimerRef.current = setTimeout(() => {
-              focusRetryTimerRef.current = null;
-              const pendingItem = pendingFocusItemRef.current;
-
-              if (
-                pendingItem === null ||
-                requestId !== cameraFocusRequestIdRef.current
-              ) {
-                return;
-              }
-
-              pendingFocusItemRef.current = null;
-              focusMarkerAboveSheetSafely(pendingItem, {
-                requestId,
-                retryCount: cameraFocusRetryCountRef.current,
-              });
-            }, CAMERA_FOCUS_RETRY_DELAY_MS);
-            return;
-          }
-
-          if (!isCameraCancellationError(error)) {
-            console.warn('Unable to focus parking map camera', error);
-          }
-        });
+        safelyHandleCameraUpdate(
+          cameraUpdate,
+          source === 'favorite'
+            ? 'Favorite camera focus failed'
+            : 'Unable to focus parking map camera',
+        );
       } catch (error) {
-        if (
-          isCameraCancellationError(error) &&
-          requestId === cameraFocusRequestIdRef.current &&
-          (options.retryCount ?? 0) < CAMERA_FOCUS_MAX_RETRIES
-        ) {
-          pendingFocusItemRef.current = item;
-          cameraFocusRetryCountRef.current = (options.retryCount ?? 0) + 1;
-          if (focusRetryTimerRef.current) {
-            clearTimeout(focusRetryTimerRef.current);
-          }
-          focusRetryTimerRef.current = setTimeout(() => {
-            focusRetryTimerRef.current = null;
-            const pendingItem = pendingFocusItemRef.current;
-
-            if (
-              pendingItem === null ||
-              requestId !== cameraFocusRequestIdRef.current
-            ) {
-              return;
-            }
-
-            pendingFocusItemRef.current = null;
-            focusMarkerAboveSheetSafely(pendingItem, {
-              requestId,
-              retryCount: cameraFocusRetryCountRef.current,
-            });
-          }, CAMERA_FOCUS_RETRY_DELAY_MS);
+        if (isCameraCancellationError(error)) {
           return;
         }
 
-        console.warn('Unable to focus parking map camera', error);
+        if (__DEV__) {
+          console.warn(
+            source === 'favorite'
+              ? 'Favorite camera focus failed'
+              : 'Unable to focus parking map camera',
+            error,
+          );
+        }
       }
     },
     [
@@ -264,17 +265,37 @@ export function ParkingMap({
   const selectParkingItem = useCallback(
     (
       item: ParkingClusterResponse,
-      options: { focusCamera?: boolean } = {},
+      options: SelectParkingItemOptions = {},
     ) => {
-      const { focusCamera = true } = options;
+      const { source = 'marker' } = options;
+      const focusCamera = options.focusCamera ?? source === 'marker';
 
       setSelectedParkingItem(item);
       onSelectedParkingItemChange?.(item);
-      if (focusCamera) {
-        focusMarkerAboveSheetSafely(item);
+      if (!focusCamera) {
+        cancelPendingCameraFocus();
+        return;
       }
+
+      if (source === 'favorite') {
+        cancelPendingCameraFocus();
+        favoriteFocusInteractionRef.current =
+          InteractionManager.runAfterInteractions(() => {
+            favoriteFocusTimerRef.current = setTimeout(() => {
+              favoriteFocusTimerRef.current = null;
+              focusMarkerAboveSheetSafely(item, { source: 'favorite' });
+            }, 120);
+          });
+        return;
+      }
+
+      focusMarkerAboveSheetSafely(item, { source: 'marker' });
     },
-    [focusMarkerAboveSheetSafely, onSelectedParkingItemChange],
+    [
+      cancelPendingCameraFocus,
+      focusMarkerAboveSheetSafely,
+      onSelectedParkingItemChange,
+    ],
   );
 
   const handleMarkerPress = useCallback(
@@ -330,9 +351,13 @@ export function ParkingMap({
       if (mapDragSettleTimerRef.current) {
         clearTimeout(mapDragSettleTimerRef.current);
       }
-      if (focusRetryTimerRef.current) {
-        clearTimeout(focusRetryTimerRef.current);
+      if (favoriteFocusTimerRef.current) {
+        clearTimeout(favoriteFocusTimerRef.current);
       }
+      if (favoriteFocusInteractionRef.current) {
+        favoriteFocusInteractionRef.current.cancel();
+      }
+      pendingFocusItemRef.current = null;
     },
     [],
   );
@@ -354,7 +379,7 @@ export function ParkingMap({
     }
 
     lastFocusedFavoriteIdRef.current = favoriteSpotId;
-    selectParkingItem(favoriteItem);
+    selectParkingItem(favoriteItem, { source: 'favorite' });
   }, [favoriteItems, favoriteSpotId, selectParkingItem]);
 
   useEffect(() => {

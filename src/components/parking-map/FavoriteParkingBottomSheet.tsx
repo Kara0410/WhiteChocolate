@@ -7,7 +7,10 @@ import {
   useState,
   type ComponentRef,
 } from 'react';
-import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
+import BottomSheet, {
+  BottomSheetScrollView,
+  useBottomSheetSpringConfigs,
+} from '@gorhom/bottom-sheet';
 import { Heart, Trash2, X } from 'lucide-react-native';
 import {
   Pressable,
@@ -18,6 +21,9 @@ import {
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
+  FadeInDown,
+  FadeOutUp,
+  LinearTransition,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
@@ -44,6 +50,7 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 const DELETE_ACTION_WIDTH = 82;
 const REVEAL_THRESHOLD = 44;
 const FULL_DELETE_DISTANCE = 138;
+const ROW_VERTICAL_GAP = 12;
 
 function clampPercentage(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)));
@@ -100,6 +107,7 @@ function FavoriteProgressRing({ percentage }: { percentage: number }) {
 }
 
 const FavoriteSpotRow = memo(function FavoriteSpotRow({
+  index,
   isAnyRowOpen,
   isOpen,
   item,
@@ -108,6 +116,7 @@ const FavoriteSpotRow = memo(function FavoriteSpotRow({
   onOpenRow,
   onPress,
 }: {
+  index: number;
   isAnyRowOpen: boolean;
   isOpen: boolean;
   item: ParkingClusterResponse;
@@ -123,7 +132,11 @@ const FavoriteSpotRow = memo(function FavoriteSpotRow({
   const startX = useSharedValue(0);
   const rowWidth = useSharedValue(0);
   const opacity = useSharedValue(1);
+  const pressedScale = useSharedValue(1);
+  const containerHeight = useSharedValue(0);
+  const containerMargin = useSharedValue(ROW_VERTICAL_GAP);
   const isDeleting = useSharedValue(false);
+  const [hasMeasured, setHasMeasured] = useState(false);
 
   const handlePress = useCallback(() => {
     if (isOpen || isAnyRowOpen) {
@@ -136,9 +149,16 @@ const FavoriteSpotRow = memo(function FavoriteSpotRow({
 
   const handleLayout = useCallback(
     (event: LayoutChangeEvent) => {
-      rowWidth.value = event.nativeEvent.layout.width;
+      if (isDeleting.value) {
+        return;
+      }
+
+      const { height, width } = event.nativeEvent.layout;
+      rowWidth.value = width;
+      containerHeight.value = height;
+      setHasMeasured(true);
     },
-    [rowWidth],
+    [containerHeight, isDeleting, rowWidth],
   );
 
   const handleDelete = useCallback(() => {
@@ -149,20 +169,39 @@ const FavoriteSpotRow = memo(function FavoriteSpotRow({
   const animateDelete = useCallback(() => {
     isDeleting.value = true;
     opacity.value = withTiming(0, { duration: 160 });
+    pressedScale.value = withTiming(0.98, { duration: 120 });
     translateX.value = withTiming(
-      -Math.max(rowWidth.value, FULL_DELETE_DISTANCE),
-      { duration: 190 },
+      -Math.max(rowWidth.value + DELETE_ACTION_WIDTH, FULL_DELETE_DISTANCE),
+      { duration: 210 },
+    );
+    containerMargin.value = withTiming(0, { duration: 180 });
+    containerHeight.value = withTiming(
+      0,
+      { duration: 210 },
       (finished) => {
         if (finished) {
           runOnJS(handleDelete)();
         }
       },
     );
-  }, [handleDelete, isDeleting, opacity, rowWidth, translateX]);
+  }, [
+    containerHeight,
+    containerMargin,
+    handleDelete,
+    isDeleting,
+    opacity,
+    pressedScale,
+    rowWidth,
+    translateX,
+  ]);
 
   useEffect(() => {
     if (!isOpen && !isDeleting.value) {
-      translateX.value = withSpring(0, { damping: 20, stiffness: 240 });
+      translateX.value = withSpring(0, {
+        damping: 24,
+        mass: 0.9,
+        stiffness: 260,
+      });
     }
   }, [isDeleting, isOpen, translateX]);
 
@@ -176,10 +215,12 @@ const FavoriteSpotRow = memo(function FavoriteSpotRow({
           runOnJS(onOpenRow)(item.id);
         })
         .onUpdate((event) => {
-          const nextX = Math.min(
-            0,
-            Math.max(-rowWidth.value, startX.value + event.translationX),
-          );
+          const rawX = Math.min(0, startX.value + event.translationX);
+          const maxOpenDistance = -Math.min(rowWidth.value, 168);
+          const nextX =
+            rawX < maxOpenDistance
+              ? maxOpenDistance + (rawX - maxOpenDistance) * 0.28
+              : rawX;
           translateX.value = nextX;
         })
         .onEnd(() => {
@@ -195,14 +236,19 @@ const FavoriteSpotRow = memo(function FavoriteSpotRow({
 
           if (Math.abs(translateX.value) >= REVEAL_THRESHOLD) {
             translateX.value = withSpring(-DELETE_ACTION_WIDTH, {
-              damping: 20,
-              stiffness: 260,
+              damping: 26,
+              mass: 0.9,
+              stiffness: 280,
             });
             runOnJS(onOpenRow)(item.id);
             return;
           }
 
-          translateX.value = withSpring(0, { damping: 20, stiffness: 260 });
+          translateX.value = withSpring(0, {
+            damping: 24,
+            mass: 0.9,
+            stiffness: 280,
+          });
           runOnJS(onCloseOpenRow)();
         }),
     [
@@ -218,15 +264,39 @@ const FavoriteSpotRow = memo(function FavoriteSpotRow({
 
   const rowAnimatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
-    transform: [{ translateX: translateX.value }],
+    transform: [
+      { translateX: translateX.value },
+      { scale: pressedScale.value },
+    ],
   }));
 
   const actionAnimatedStyle = useAnimatedStyle(() => ({
     opacity: Math.min(1, Math.abs(translateX.value) / REVEAL_THRESHOLD),
+    transform: [
+      {
+        scale: 0.92 + Math.min(1, Math.abs(translateX.value) / REVEAL_THRESHOLD) * 0.08,
+      },
+    ],
+  }));
+
+  const containerAnimatedStyle = useAnimatedStyle(() => ({
+    height: hasMeasured ? containerHeight.value : undefined,
+    marginBottom: hasMeasured ? containerMargin.value : ROW_VERTICAL_GAP,
   }));
 
   return (
-    <View className="mb-3 overflow-hidden rounded-3xl" onLayout={handleLayout}>
+    <Animated.View
+      entering={FadeInDown.delay(Math.min(index * 35, 180))
+        .duration(280)
+        .springify()
+        .damping(24)
+        .stiffness(260)}
+      exiting={FadeOutUp.duration(160)}
+      layout={LinearTransition.springify().damping(26).stiffness(260)}
+      onLayout={handleLayout}
+      style={containerAnimatedStyle}
+      className="overflow-hidden rounded-3xl"
+    >
       <Animated.View
         className="absolute bottom-0 right-0 top-0 w-[82px] items-center justify-center rounded-3xl bg-red-600"
         style={actionAnimatedStyle}
@@ -248,6 +318,15 @@ const FavoriteSpotRow = memo(function FavoriteSpotRow({
             accessibilityRole="button"
             className="flex-row items-center rounded-3xl border border-white/80 bg-white px-4 py-4 active:bg-slate-50"
             onPress={handlePress}
+            onPressIn={() => {
+              pressedScale.value = withTiming(0.985, { duration: 90 });
+            }}
+            onPressOut={() => {
+              pressedScale.value = withSpring(1, {
+                damping: 18,
+                stiffness: 260,
+              });
+            }}
             style={styles.row}
           >
             <FavoriteProgressRing percentage={percentage} />
@@ -280,7 +359,7 @@ const FavoriteSpotRow = memo(function FavoriteSpotRow({
           </Pressable>
         </Animated.View>
       </GestureDetector>
-    </View>
+    </Animated.View>
   );
 });
 
@@ -294,6 +373,12 @@ export function FavoriteParkingBottomSheet({
   const { favoriteItems, removeFavorite } = useFavoriteParking();
   const [openRowId, setOpenRowId] = useState<string | null>(null);
   const snapPoints = useMemo(() => ['82%'], []);
+  const animationConfigs = useBottomSheetSpringConfigs({
+    damping: 30,
+    mass: 0.9,
+    overshootClamping: false,
+    stiffness: 280,
+  });
 
   const closeOpenRow = useCallback(() => {
     setOpenRowId(null);
@@ -335,6 +420,7 @@ export function FavoriteParkingBottomSheet({
     <BottomSheet
       ref={sheetRef}
       backgroundStyle={styles.background}
+      animationConfigs={animationConfigs}
       enableDynamicSizing={false}
       enableOverDrag={false}
       enablePanDownToClose
@@ -377,7 +463,11 @@ export function FavoriteParkingBottomSheet({
         </View>
 
         {favoriteItems.length === 0 ? (
-          <View className="items-center justify-center rounded-[28px] border border-dashed border-slate-300 bg-white/80 px-6 py-12">
+          <Animated.View
+            entering={FadeInDown.duration(260).springify().damping(24)}
+            exiting={FadeOutUp.duration(150)}
+            className="items-center justify-center rounded-[28px] border border-dashed border-slate-300 bg-white/80 px-6 py-12"
+          >
             <View className="mb-4 h-16 w-16 items-center justify-center rounded-full bg-rose-50">
               <Heart color="#E11D48" size={28} strokeWidth={2.2} />
             </View>
@@ -387,10 +477,11 @@ export function FavoriteParkingBottomSheet({
             <Text className="mt-2 text-center text-[14px] font-medium leading-5 text-slate-500">
               Tap the heart on a parking spot to add it here.
             </Text>
-          </View>
+          </Animated.View>
         ) : (
-          favoriteItems.map((item) => (
+          favoriteItems.map((item, index) => (
             <FavoriteSpotRow
+              index={index}
               isAnyRowOpen={openRowId !== null}
               isOpen={openRowId === item.id}
               item={item}
