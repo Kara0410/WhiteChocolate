@@ -1,13 +1,29 @@
 import {
   memo,
   useCallback,
+  useEffect,
   useMemo,
   useRef,
+  useState,
   type ComponentRef,
 } from 'react';
 import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
-import { Heart, X } from 'lucide-react-native';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Heart, Trash2, X } from 'lucide-react-native';
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type LayoutChangeEvent,
+} from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, {
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import Svg, { Circle } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -25,6 +41,9 @@ const RING_SIZE = 42;
 const RING_STROKE = 5;
 const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+const DELETE_ACTION_WIDTH = 82;
+const REVEAL_THRESHOLD = 44;
+const FULL_DELETE_DISTANCE = 138;
 
 function clampPercentage(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)));
@@ -81,51 +100,187 @@ function FavoriteProgressRing({ percentage }: { percentage: number }) {
 }
 
 const FavoriteSpotRow = memo(function FavoriteSpotRow({
+  isAnyRowOpen,
+  isOpen,
   item,
+  onCloseOpenRow,
+  onDelete,
+  onOpenRow,
   onPress,
 }: {
+  isAnyRowOpen: boolean;
+  isOpen: boolean;
   item: ParkingClusterResponse;
+  onCloseOpenRow: () => void;
+  onDelete: (id: string) => void;
+  onOpenRow: (id: string) => void;
   onPress: (item: ParkingClusterResponse) => void;
 }) {
   const percentage = clampPercentage(item.availabilityPercent);
   const title = item.bestSpot.zoneName || 'Parking Area';
   const distanceLabel = formatDistance(item.distanceToDestination);
+  const translateX = useSharedValue(0);
+  const startX = useSharedValue(0);
+  const rowWidth = useSharedValue(0);
+  const opacity = useSharedValue(1);
+  const isDeleting = useSharedValue(false);
 
   const handlePress = useCallback(() => {
+    if (isOpen || isAnyRowOpen) {
+      onCloseOpenRow();
+      return;
+    }
+
     onPress(item);
-  }, [item, onPress]);
+  }, [isAnyRowOpen, isOpen, item, onCloseOpenRow, onPress]);
+
+  const handleLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      rowWidth.value = event.nativeEvent.layout.width;
+    },
+    [rowWidth],
+  );
+
+  const handleDelete = useCallback(() => {
+    onCloseOpenRow();
+    onDelete(item.id);
+  }, [item.id, onCloseOpenRow, onDelete]);
+
+  const animateDelete = useCallback(() => {
+    isDeleting.value = true;
+    opacity.value = withTiming(0, { duration: 160 });
+    translateX.value = withTiming(
+      -Math.max(rowWidth.value, FULL_DELETE_DISTANCE),
+      { duration: 190 },
+      (finished) => {
+        if (finished) {
+          runOnJS(handleDelete)();
+        }
+      },
+    );
+  }, [handleDelete, isDeleting, opacity, rowWidth, translateX]);
+
+  useEffect(() => {
+    if (!isOpen && !isDeleting.value) {
+      translateX.value = withSpring(0, { damping: 20, stiffness: 240 });
+    }
+  }, [isDeleting, isOpen, translateX]);
+
+  const panGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .activeOffsetX([-12, 12])
+        .failOffsetY([-12, 12])
+        .onBegin(() => {
+          startX.value = translateX.value;
+          runOnJS(onOpenRow)(item.id);
+        })
+        .onUpdate((event) => {
+          const nextX = Math.min(
+            0,
+            Math.max(-rowWidth.value, startX.value + event.translationX),
+          );
+          translateX.value = nextX;
+        })
+        .onEnd(() => {
+          const deleteThreshold = Math.min(
+            FULL_DELETE_DISTANCE,
+            Math.max(110, rowWidth.value * 0.5),
+          );
+
+          if (Math.abs(translateX.value) >= deleteThreshold) {
+            runOnJS(animateDelete)();
+            return;
+          }
+
+          if (Math.abs(translateX.value) >= REVEAL_THRESHOLD) {
+            translateX.value = withSpring(-DELETE_ACTION_WIDTH, {
+              damping: 20,
+              stiffness: 260,
+            });
+            runOnJS(onOpenRow)(item.id);
+            return;
+          }
+
+          translateX.value = withSpring(0, { damping: 20, stiffness: 260 });
+          runOnJS(onCloseOpenRow)();
+        }),
+    [
+      animateDelete,
+      item.id,
+      onCloseOpenRow,
+      onOpenRow,
+      rowWidth,
+      startX,
+      translateX,
+    ],
+  );
+
+  const rowAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateX: translateX.value }],
+  }));
+
+  const actionAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: Math.min(1, Math.abs(translateX.value) / REVEAL_THRESHOLD),
+  }));
 
   return (
-    <Pressable
-      accessibilityLabel={`Open ${title}`}
-      accessibilityRole="button"
-      className="mb-3 flex-row items-center rounded-3xl border border-white/80 bg-white px-4 py-4 active:bg-slate-50"
-      onPress={handlePress}
-      style={styles.row}
-    >
-      <FavoriteProgressRing percentage={percentage} />
-      <View className="ml-4 flex-1">
-        <Text
-          className="text-[16px] font-extrabold text-slate-950"
-          numberOfLines={1}
+    <View className="mb-3 overflow-hidden rounded-3xl" onLayout={handleLayout}>
+      <Animated.View
+        className="absolute bottom-0 right-0 top-0 w-[82px] items-center justify-center rounded-3xl bg-red-600"
+        style={actionAnimatedStyle}
+      >
+        <Pressable
+          accessibilityLabel={`Remove ${title} from favorites`}
+          accessibilityRole="button"
+          className="h-full w-full items-center justify-center active:bg-red-700"
+          onPress={animateDelete}
         >
-          {title}
-        </Text>
-        <View className="mt-1 flex-row items-center">
-          <Text className="text-[13px] font-bold text-slate-600">
-            {percentage}% available
-          </Text>
-          {distanceLabel ? (
-            <Text className="ml-2 text-[13px] font-semibold text-slate-400">
-              {distanceLabel}
-            </Text>
-          ) : null}
-        </View>
-      </View>
-      <View className="ml-3 h-9 w-9 items-center justify-center rounded-full bg-rose-50">
-        <Heart color="#E11D48" fill="#E11D48" size={17} strokeWidth={2.4} />
-      </View>
-    </Pressable>
+          <Trash2 color="#FFFFFF" size={22} strokeWidth={2.4} />
+        </Pressable>
+      </Animated.View>
+
+      <GestureDetector gesture={panGesture}>
+        <Animated.View style={rowAnimatedStyle}>
+          <Pressable
+            accessibilityLabel={`Open ${title}`}
+            accessibilityRole="button"
+            className="flex-row items-center rounded-3xl border border-white/80 bg-white px-4 py-4 active:bg-slate-50"
+            onPress={handlePress}
+            style={styles.row}
+          >
+            <FavoriteProgressRing percentage={percentage} />
+            <View className="ml-4 flex-1">
+              <Text
+                className="text-[16px] font-extrabold text-slate-950"
+                numberOfLines={1}
+              >
+                {title}
+              </Text>
+              <View className="mt-1 flex-row items-center">
+                <Text className="text-[13px] font-bold text-slate-600">
+                  {percentage}% available
+                </Text>
+                {distanceLabel ? (
+                  <Text className="ml-2 text-[13px] font-semibold text-slate-400">
+                    {distanceLabel}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+            <View className="ml-3 h-9 w-9 items-center justify-center rounded-full bg-rose-50">
+              <Heart
+                color="#E11D48"
+                fill="#E11D48"
+                size={17}
+                strokeWidth={2.4}
+              />
+            </View>
+          </Pressable>
+        </Animated.View>
+      </GestureDetector>
+    </View>
   );
 });
 
@@ -136,8 +291,13 @@ export function FavoriteParkingBottomSheet({
   const sheetRef = useRef<ComponentRef<typeof BottomSheet>>(null);
   const pendingSpotRef = useRef<ParkingClusterResponse | null>(null);
   const insets = useSafeAreaInsets();
-  const { favoriteItems } = useFavoriteParking();
+  const { favoriteItems, removeFavorite } = useFavoriteParking();
+  const [openRowId, setOpenRowId] = useState<string | null>(null);
   const snapPoints = useMemo(() => ['82%'], []);
+
+  const closeOpenRow = useCallback(() => {
+    setOpenRowId(null);
+  }, []);
 
   const closeSheet = useCallback(() => {
     sheetRef.current?.close();
@@ -161,6 +321,14 @@ export function FavoriteParkingBottomSheet({
       closeSheet();
     },
     [closeSheet],
+  );
+
+  const handleDelete = useCallback(
+    (id: string) => {
+      setOpenRowId((current) => (current === id ? null : current));
+      removeFavorite(id);
+    },
+    [removeFavorite],
   );
 
   return (
@@ -222,7 +390,16 @@ export function FavoriteParkingBottomSheet({
           </View>
         ) : (
           favoriteItems.map((item) => (
-            <FavoriteSpotRow item={item} key={item.id} onPress={handleSpotPress} />
+            <FavoriteSpotRow
+              isAnyRowOpen={openRowId !== null}
+              isOpen={openRowId === item.id}
+              item={item}
+              key={item.id}
+              onCloseOpenRow={closeOpenRow}
+              onDelete={handleDelete}
+              onOpenRow={setOpenRowId}
+              onPress={handleSpotPress}
+            />
           ))
         )}
       </BottomSheetScrollView>
