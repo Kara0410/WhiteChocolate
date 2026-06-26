@@ -158,7 +158,7 @@ function destinationMetadata(
   };
 }
 
-function recordToResponse(
+export function parkingRecordToResponse(
   record: ParkingMapRecord,
   destination?: ParkingCoordinates,
 ): ParkingClusterResponse {
@@ -275,7 +275,7 @@ export function createParkingClusterEngine(records: ParkingMapRecord[]) {
       return features.map((feature) =>
         isClusterFeature(feature)
           ? clusterToResponse(index, radius, feature, destination)
-          : recordToResponse(feature.properties.record, destination),
+          : parkingRecordToResponse(feature.properties.record, destination),
       );
     },
   };

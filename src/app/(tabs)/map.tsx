@@ -11,9 +11,11 @@ const INITIAL_CAMERA = {
 } as const;
 
 export default function MapScreen() {
-  const { favoriteFocusKey, favoriteSpotId } = useLocalSearchParams<{
+  const { favoriteFocusKey, favoriteSpotId, focusSearch } =
+    useLocalSearchParams<{
     favoriteFocusKey?: string;
     favoriteSpotId?: string;
+    focusSearch?: string;
   }>();
   const [, setSelectedParkingItem] =
     useState<ParkingClusterResponse | null>(null);
@@ -30,6 +32,7 @@ export default function MapScreen() {
       favoriteSpotId={favoriteSpotId}
       initialCamera={INITIAL_CAMERA}
       onSelectedParkingItemChange={handleSelectionChange}
+      searchFocusKey={focusSearch}
     />
   );
 }

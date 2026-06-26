@@ -13,6 +13,8 @@ export default function TabLayout() {
     ? 'profile'
     : pathname.endsWith('/favorites')
       ? 'favorite'
+    : pathname.endsWith('/map') && focusSearch
+      ? 'search'
     : pathname.endsWith('/list')
       ? focusSearch
         ? 'search'
@@ -31,7 +33,7 @@ export default function TabLayout() {
         <BottomNavBar
           activeKey={activeKey}
           onProfilePress={() => router.push('/account')}
-          onSearchPress={() => router.push({ pathname: '/list', params: { focusSearch: Date.now().toString() } })}
+          onSearchPress={() => router.push({ pathname: '/map', params: { focusSearch: Date.now().toString() } })}
           onCarPress={() => router.push('/list')}
           onFavoritePress={() => router.push('/favorites')}
           onParkingPress={() => router.push({ pathname: '/map', params: { locate: Date.now().toString() } })}

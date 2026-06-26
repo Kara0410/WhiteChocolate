@@ -14,13 +14,18 @@ import {
   type ParkingBottomSheetHandle,
 } from '@/components/parking-map/ParkingBottomSheet';
 import { ParkingMarkerCard } from '@/components/parking-map/parking-marker-card';
+import { PlaceSearchOverlay } from '@/components/parking-map/PlaceSearchOverlay';
+import { SearchNearestSpotsBottomSheet } from '@/components/parking-map/SearchNearestSpotsBottomSheet';
 import { useFavoriteParking } from '@/context/FavoriteParkingContext';
 import { useParkingClusters } from '@/hooks/use-parking-clusters';
+import type { PlaceSearchResult } from '@/hooks/use-place-search';
+import { getAllMockParkingSpots } from '@/services/parking-clusters';
 import type {
   ParkingCameraState,
   ParkingClusterResponse,
   ParkingCoordinates,
 } from '@/types/parking-map';
+import { getNearestParkingSpots } from '@/utils/parkingSearch';
 
 const LABEL_FREE_MAP_STYLE = JSON.stringify([
   {
@@ -49,12 +54,13 @@ type ParkingMapProps = {
   destination?: ParkingCoordinates;
   favoriteFocusKey?: string;
   favoriteSpotId?: string;
+  searchFocusKey?: string;
   onSelectedParkingItemChange?: (
     item: ParkingClusterResponse | null,
   ) => void;
 };
 
-type ParkingSelectionSource = 'marker' | 'favorite';
+type ParkingSelectionSource = 'marker' | 'favorite' | 'search';
 
 type SelectParkingItemOptions = {
   source?: ParkingSelectionSource;
@@ -81,6 +87,13 @@ function hasValidCoordinates(item: ParkingClusterResponse) {
   return Number.isFinite(item.latitude) && Number.isFinite(item.longitude);
 }
 
+function hasValidCoordinatePair(coordinates: ParkingCoordinates) {
+  return (
+    Number.isFinite(coordinates.latitude) &&
+    Number.isFinite(coordinates.longitude)
+  );
+}
+
 function safelyHandleCameraUpdate(update: unknown, context: string) {
   void Promise.resolve(update).catch((error: unknown) => {
     if (isCameraCancellationError(error)) {
@@ -98,6 +111,7 @@ export function ParkingMap({
   destination,
   favoriteFocusKey,
   favoriteSpotId,
+  searchFocusKey,
   onSelectedParkingItemChange,
 }: ParkingMapProps) {
   const {
@@ -123,13 +137,47 @@ export function ParkingMap({
   const hasInitialCameraEventRef = useRef(false);
   const pendingFocusItemRef = useRef<ParkingClusterResponse | null>(null);
   const pendingFocusSourceRef = useRef<CameraFocusSource>('marker');
+  const pendingCoordinateFocusRef = useRef<ParkingCoordinates | null>(null);
+  const pendingCoordinateFocusContextRef = useRef(
+    'Unable to focus searched place',
+  );
   const cameraFocusRequestIdRef = useRef(0);
   const [selectedParkingItem, setSelectedParkingItem] =
     useState<ParkingClusterResponse | null>(null);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [selectedSearchPlace, setSelectedSearchPlace] =
+    useState<PlaceSearchResult | null>(null);
   const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
   const [hasInitialCameraEvent, setHasInitialCameraEvent] = useState(false);
   const { favoriteItems } = useFavoriteParking();
   const lastFocusedFavoriteRequestRef = useRef<string | null>(null);
+  const lastSearchFocusKeyRef = useRef<string | null>(null);
+  const allParkingSpots = useMemo(
+    () =>
+      getAllMockParkingSpots(
+        selectedSearchPlace
+          ? {
+              latitude: selectedSearchPlace.latitude,
+              longitude: selectedSearchPlace.longitude,
+            }
+          : undefined,
+      ),
+    [selectedSearchPlace],
+  );
+  const nearestSearchSpots = useMemo(
+    () =>
+      selectedSearchPlace
+        ? getNearestParkingSpots({
+            origin: {
+              latitude: selectedSearchPlace.latitude,
+              longitude: selectedSearchPlace.longitude,
+            },
+            spots: allParkingSpots,
+            limit: 25,
+          })
+        : [],
+    [allParkingSpots, selectedSearchPlace],
+  );
 
   const projectedMarkers = useMemo(
     () =>
@@ -164,6 +212,7 @@ export function ParkingMap({
     cameraFocusRequestIdRef.current += 1;
     pendingFocusItemRef.current = null;
     pendingFocusSourceRef.current = 'marker';
+    pendingCoordinateFocusRef.current = null;
 
     if (favoriteFocusTimerRef.current) {
       clearTimeout(favoriteFocusTimerRef.current);
@@ -263,6 +312,72 @@ export function ParkingMap({
     ],
   );
 
+  const focusCoordinatesAboveSheetSafely = useCallback(
+    (coordinates: ParkingCoordinates, context: string) => {
+      if (!hasValidCoordinatePair(coordinates)) {
+        return;
+      }
+
+      if (!canFocusCamera()) {
+        pendingCoordinateFocusRef.current = coordinates;
+        pendingCoordinateFocusContextRef.current = context;
+        return;
+      }
+
+      const longitudeDelta =
+        displayCamera.longitudeDelta ??
+        Math.max(0.000001, (360 / 2 ** displayCamera.zoom) * 2);
+      const latitudeDelta =
+        displayCamera.latitudeDelta ??
+        Math.max(0.000001, longitudeDelta * 1.6);
+      const visibleMapRatio = 1 - FULL_SHEET_RATIO;
+      const desiredYRatio = visibleMapRatio / 2;
+      const yOffsetRatio = 0.5 - desiredYRatio;
+      const nextCamera = {
+        coordinates: {
+          latitude: coordinates.latitude - latitudeDelta * yOffsetRatio,
+          longitude: coordinates.longitude,
+        },
+        zoom: Math.max(displayCamera.zoom, 16),
+      };
+
+      isProgrammaticCameraMoveRef.current = true;
+      if (programmaticCameraTimerRef.current) {
+        clearTimeout(programmaticCameraTimerRef.current);
+      }
+      programmaticCameraTimerRef.current = setTimeout(() => {
+        isProgrammaticCameraMoveRef.current = false;
+        programmaticCameraTimerRef.current = null;
+      }, PROGRAMMATIC_CAMERA_GUARD_MS);
+
+      try {
+        const cameraUpdate =
+          Platform.OS === 'android'
+            ? googleMapRef.current!.setCameraPosition({
+                ...nextCamera,
+                duration: 360,
+              })
+            : appleMapRef.current!.setCameraPosition(nextCamera);
+
+        safelyHandleCameraUpdate(cameraUpdate, context);
+      } catch (error) {
+        if (isCameraCancellationError(error)) {
+          return;
+        }
+
+        if (__DEV__) {
+          console.warn(context, error);
+        }
+      }
+    },
+    [
+      canFocusCamera,
+      displayCamera.latitudeDelta,
+      displayCamera.longitudeDelta,
+      displayCamera.zoom,
+    ],
+  );
+
   const selectParkingItem = useCallback(
     (
       item: ParkingClusterResponse,
@@ -301,7 +416,47 @@ export function ParkingMap({
 
   const handleMarkerPress = useCallback(
     (item: ParkingClusterResponse) => {
+      setSelectedSearchPlace(null);
       selectParkingItem(item);
+    },
+    [selectParkingItem],
+  );
+
+  const openSearch = useCallback(() => {
+    setIsSearchOpen(true);
+  }, []);
+
+  const closeSearch = useCallback(() => {
+    setIsSearchOpen(false);
+  }, []);
+
+  const handleSelectSearchPlace = useCallback(
+    (place: PlaceSearchResult) => {
+      setIsSearchOpen(false);
+      setSelectedParkingItem(null);
+      onSelectedParkingItemChange?.(null);
+      cancelPendingCameraFocus();
+      setSelectedSearchPlace(place);
+      focusCoordinatesAboveSheetSafely(
+        { latitude: place.latitude, longitude: place.longitude },
+        'Unable to focus searched place',
+      );
+    },
+    [
+      cancelPendingCameraFocus,
+      focusCoordinatesAboveSheetSafely,
+      onSelectedParkingItemChange,
+    ],
+  );
+
+  const closeSearchResults = useCallback(() => {
+    setSelectedSearchPlace(null);
+  }, []);
+
+  const handleSearchSpotPress = useCallback(
+    (item: ParkingClusterResponse) => {
+      setSelectedSearchPlace(null);
+      selectParkingItem(item, { source: 'search', focusCamera: true });
     },
     [selectParkingItem],
   );
@@ -359,6 +514,7 @@ export function ParkingMap({
         favoriteFocusInteractionRef.current.cancel();
       }
       pendingFocusItemRef.current = null;
+      pendingCoordinateFocusRef.current = null;
     },
     [],
   );
@@ -390,21 +546,43 @@ export function ParkingMap({
   }, [favoriteFocusKey, favoriteItems, favoriteSpotId, selectParkingItem]);
 
   useEffect(() => {
+    if (
+      searchFocusKey === undefined ||
+      searchFocusKey === lastSearchFocusKeyRef.current
+    ) {
+      return;
+    }
+
+    lastSearchFocusKeyRef.current = searchFocusKey;
+    openSearch();
+  }, [openSearch, searchFocusKey]);
+
+  useEffect(() => {
     if (!canFocusCamera()) {
       return;
     }
 
     const pendingFocusItem = pendingFocusItemRef.current;
-    if (pendingFocusItem === null) {
+    if (pendingFocusItem !== null) {
+      pendingFocusItemRef.current = null;
+      focusMarkerAboveSheetSafely(pendingFocusItem, {
+        source: pendingFocusSourceRef.current,
+      });
+    }
+
+    const pendingCoordinateFocus = pendingCoordinateFocusRef.current;
+    if (pendingCoordinateFocus === null) {
       return;
     }
 
-    pendingFocusItemRef.current = null;
-    focusMarkerAboveSheetSafely(pendingFocusItem, {
-      source: pendingFocusSourceRef.current,
-    });
+    pendingCoordinateFocusRef.current = null;
+    focusCoordinatesAboveSheetSafely(
+      pendingCoordinateFocus,
+      pendingCoordinateFocusContextRef.current,
+    );
   }, [
     canFocusCamera,
+    focusCoordinatesAboveSheetSafely,
     focusMarkerAboveSheetSafely,
     hasInitialCameraEvent,
     mapSize.height,
@@ -509,6 +687,19 @@ export function ParkingMap({
         ref={bottomSheetRef}
         item={selectedParkingItem}
         onClose={clearSelection}
+      />
+
+      <SearchNearestSpotsBottomSheet
+        onClose={closeSearchResults}
+        onSpotPress={handleSearchSpotPress}
+        searchPlace={selectedSearchPlace}
+        spots={nearestSearchSpots}
+      />
+
+      <PlaceSearchOverlay
+        onClose={closeSearch}
+        onSelectPlace={handleSelectSearchPlace}
+        visible={isSearchOpen}
       />
     </View>
   );
