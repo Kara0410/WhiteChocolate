@@ -37,6 +37,8 @@ const LABEL_FREE_MAP_STYLE = JSON.stringify([
 const FULL_SHEET_RATIO = 0.5;
 const PROGRAMMATIC_CAMERA_GUARD_MS = 500;
 const MAP_DRAG_SETTLE_MS = 180;
+const CAMERA_FOCUS_RETRY_DELAY_MS = 140;
+const CAMERA_FOCUS_MAX_RETRIES = 3;
 
 type ParkingMapProps = {
   initialCamera: ParkingCameraState;
@@ -46,6 +48,20 @@ type ParkingMapProps = {
     item: ParkingClusterResponse | null,
   ) => void;
 };
+
+function isCameraCancellationError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+
+  return (
+    message.includes('CancellationException') ||
+    message.includes('Animation cancelled') ||
+    message.includes('setCameraPosition has been rejected')
+  );
+}
+
+function hasValidCoordinates(item: ParkingClusterResponse) {
+  return Number.isFinite(item.latitude) && Number.isFinite(item.longitude);
+}
 
 export function ParkingMap({
   initialCamera,
@@ -65,10 +81,14 @@ export function ParkingMap({
     useRef<ReturnType<typeof setTimeout> | null>(null);
   const mapDragSettleTimerRef =
     useRef<ReturnType<typeof setTimeout> | null>(null);
+  const focusRetryTimerRef =
+    useRef<ReturnType<typeof setTimeout> | null>(null);
   const isProgrammaticCameraMoveRef = useRef(false);
   const hasCompactedForCurrentDragRef = useRef(false);
   const hasInitialCameraEventRef = useRef(false);
   const pendingFocusItemRef = useRef<ParkingClusterResponse | null>(null);
+  const cameraFocusRequestIdRef = useRef(0);
+  const cameraFocusRetryCountRef = useRef(0);
   const [selectedParkingItem, setSelectedParkingItem] =
     useState<ParkingClusterResponse | null>(null);
   const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
@@ -106,7 +126,21 @@ export function ParkingMap({
   );
 
   const focusMarkerAboveSheetSafely = useCallback(
-    (item: ParkingClusterResponse) => {
+    (
+      item: ParkingClusterResponse,
+      options: { requestId?: number; retryCount?: number } = {},
+    ) => {
+      if (!hasValidCoordinates(item)) {
+        return;
+      }
+
+      const requestId =
+        options.requestId ?? (cameraFocusRequestIdRef.current += 1);
+
+      if (requestId !== cameraFocusRequestIdRef.current) {
+        return;
+      }
+
       if (!canFocusCamera()) {
         pendingFocusItemRef.current = item;
         return;
@@ -138,13 +172,85 @@ export function ParkingMap({
         programmaticCameraTimerRef.current = null;
       }, PROGRAMMATIC_CAMERA_GUARD_MS);
 
-      if (Platform.OS === 'android') {
-        googleMapRef.current!.setCameraPosition({
-          ...nextCamera,
-          duration: 320,
+      try {
+        const cameraUpdate =
+          Platform.OS === 'android'
+            ? googleMapRef.current!.setCameraPosition({
+                ...nextCamera,
+                duration: 320,
+              })
+            : appleMapRef.current!.setCameraPosition(nextCamera);
+
+        void Promise.resolve(cameraUpdate).catch((error: unknown) => {
+          if (requestId !== cameraFocusRequestIdRef.current) {
+            return;
+          }
+
+          if (
+            isCameraCancellationError(error) &&
+            (options.retryCount ?? 0) < CAMERA_FOCUS_MAX_RETRIES
+          ) {
+            pendingFocusItemRef.current = item;
+            cameraFocusRetryCountRef.current = (options.retryCount ?? 0) + 1;
+            if (focusRetryTimerRef.current) {
+              clearTimeout(focusRetryTimerRef.current);
+            }
+            focusRetryTimerRef.current = setTimeout(() => {
+              focusRetryTimerRef.current = null;
+              const pendingItem = pendingFocusItemRef.current;
+
+              if (
+                pendingItem === null ||
+                requestId !== cameraFocusRequestIdRef.current
+              ) {
+                return;
+              }
+
+              pendingFocusItemRef.current = null;
+              focusMarkerAboveSheetSafely(pendingItem, {
+                requestId,
+                retryCount: cameraFocusRetryCountRef.current,
+              });
+            }, CAMERA_FOCUS_RETRY_DELAY_MS);
+            return;
+          }
+
+          if (!isCameraCancellationError(error)) {
+            console.warn('Unable to focus parking map camera', error);
+          }
         });
-      } else if (Platform.OS === 'ios') {
-        appleMapRef.current!.setCameraPosition(nextCamera);
+      } catch (error) {
+        if (
+          isCameraCancellationError(error) &&
+          requestId === cameraFocusRequestIdRef.current &&
+          (options.retryCount ?? 0) < CAMERA_FOCUS_MAX_RETRIES
+        ) {
+          pendingFocusItemRef.current = item;
+          cameraFocusRetryCountRef.current = (options.retryCount ?? 0) + 1;
+          if (focusRetryTimerRef.current) {
+            clearTimeout(focusRetryTimerRef.current);
+          }
+          focusRetryTimerRef.current = setTimeout(() => {
+            focusRetryTimerRef.current = null;
+            const pendingItem = pendingFocusItemRef.current;
+
+            if (
+              pendingItem === null ||
+              requestId !== cameraFocusRequestIdRef.current
+            ) {
+              return;
+            }
+
+            pendingFocusItemRef.current = null;
+            focusMarkerAboveSheetSafely(pendingItem, {
+              requestId,
+              retryCount: cameraFocusRetryCountRef.current,
+            });
+          }, CAMERA_FOCUS_RETRY_DELAY_MS);
+          return;
+        }
+
+        console.warn('Unable to focus parking map camera', error);
       }
     },
     [
@@ -223,6 +329,9 @@ export function ParkingMap({
       }
       if (mapDragSettleTimerRef.current) {
         clearTimeout(mapDragSettleTimerRef.current);
+      }
+      if (focusRetryTimerRef.current) {
+        clearTimeout(focusRetryTimerRef.current);
       }
     },
     [],
