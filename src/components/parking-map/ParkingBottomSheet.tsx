@@ -60,6 +60,14 @@ const ICON_COLOR = '#334155';
 const POSITIVE_COLOR = '#059669';
 const NEGATIVE_COLOR = '#DC2626';
 
+function clampPercentage(value: number) {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
 function formatDistance(distance?: number) {
   if (distance === undefined) {
     return '3 min walk · 250 m';
@@ -69,8 +77,51 @@ function formatDistance(distance?: number) {
   return `${walkingMinutes} min walk · ${distance} m`;
 }
 
+function formatShareDistance(distance?: number) {
+  if (distance === undefined) {
+    return null;
+  }
+
+  const walkingMinutes = Math.max(1, Math.round(distance / 80));
+  return `${walkingMinutes} min walk (${distance} m)`;
+}
+
 function formatPrice(price: number | null) {
   return price === null ? 'Free' : `$${price.toFixed(2)} / hr`;
+}
+
+function getMapUrl(item: ParkingClusterResponse) {
+  if (!Number.isFinite(item.latitude) || !Number.isFinite(item.longitude)) {
+    return null;
+  }
+
+  const query = encodeURIComponent(`${item.latitude},${item.longitude}`);
+  return `https://www.google.com/maps/search/?api=1&query=${query}`;
+}
+
+function buildParkingShareMessage(
+  item: ParkingClusterResponse,
+  title: string,
+  percentage: number,
+) {
+  const lines = [
+    `Check this parking spot: ${title}`,
+    `Availability: ${percentage}%`,
+  ];
+  const distanceLabel = formatShareDistance(item.distanceToDestination);
+  const mapUrl = getMapUrl(item);
+
+  if (distanceLabel) {
+    lines.push(`Distance: ${distanceLabel}`);
+  }
+
+  if (mapUrl) {
+    lines.push(`Location: ${mapUrl}`);
+  } else if (item.bestSpot.zoneName) {
+    lines.push(`Location: ${item.bestSpot.zoneName}`);
+  }
+
+  return lines.join('\n');
 }
 
 const ParkingDetailContent = memo(function ParkingDetailContent({
@@ -80,10 +131,7 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
   item: ParkingClusterResponse;
   onClose: () => void;
 }) {
-  const percentage = Math.max(
-    0,
-    Math.min(100, Math.round(item.availabilityPercent)),
-  );
+  const percentage = clampPercentage(item.availabilityPercent);
   const theme = useMemo(
     () => getAvailabilityTheme(percentage),
     [percentage],
@@ -94,12 +142,18 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
   const { isFavorite, toggleFavorite } = useFavoriteParking();
   const itemIsFavorite = isFavorite(item.id);
 
-  const handleShare = useCallback(() => {
-    void Share.share({
-      message: `${title} · ${percentage}% available`,
-      title,
-    });
-  }, [percentage, title]);
+  const handleShare = useCallback(async () => {
+    try {
+      await Share.share({
+        message: buildParkingShareMessage(item, title, percentage),
+        title,
+      });
+    } catch (error) {
+      if (__DEV__) {
+        console.warn('Unable to share parking location', error);
+      }
+    }
+  }, [item, percentage, title]);
 
   const handleFavorite = useCallback(() => {
     toggleFavorite(item);
