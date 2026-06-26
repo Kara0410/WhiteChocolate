@@ -11,7 +11,8 @@ const INITIAL_CAMERA = {
 } as const;
 
 export default function MapScreen() {
-  const { favoriteSpotId } = useLocalSearchParams<{
+  const { favoriteFocusKey, favoriteSpotId } = useLocalSearchParams<{
+    favoriteFocusKey?: string;
     favoriteSpotId?: string;
   }>();
   const [, setSelectedParkingItem] =
@@ -25,6 +26,7 @@ export default function MapScreen() {
 
   return (
     <ParkingMap
+      favoriteFocusKey={favoriteFocusKey}
       favoriteSpotId={favoriteSpotId}
       initialCamera={INITIAL_CAMERA}
       onSelectedParkingItemChange={handleSelectionChange}

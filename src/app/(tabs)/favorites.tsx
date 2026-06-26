@@ -17,7 +17,10 @@ export default function FavoritesScreen() {
     (item: ParkingClusterResponse) => {
       router.replace({
         pathname: '/map',
-        params: { favoriteSpotId: item.id },
+        params: {
+          favoriteFocusKey: Date.now().toString(),
+          favoriteSpotId: item.id,
+        },
       });
     },
     [router],

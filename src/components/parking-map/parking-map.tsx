@@ -47,6 +47,7 @@ const MAP_DRAG_SETTLE_MS = 180;
 type ParkingMapProps = {
   initialCamera: ParkingCameraState;
   destination?: ParkingCoordinates;
+  favoriteFocusKey?: string;
   favoriteSpotId?: string;
   onSelectedParkingItemChange?: (
     item: ParkingClusterResponse | null,
@@ -95,6 +96,7 @@ function safelyHandleCameraUpdate(update: unknown, context: string) {
 export function ParkingMap({
   initialCamera,
   destination,
+  favoriteFocusKey,
   favoriteSpotId,
   onSelectedParkingItemChange,
 }: ParkingMapProps) {
@@ -120,13 +122,14 @@ export function ParkingMap({
   const hasCompactedForCurrentDragRef = useRef(false);
   const hasInitialCameraEventRef = useRef(false);
   const pendingFocusItemRef = useRef<ParkingClusterResponse | null>(null);
+  const pendingFocusSourceRef = useRef<CameraFocusSource>('marker');
   const cameraFocusRequestIdRef = useRef(0);
   const [selectedParkingItem, setSelectedParkingItem] =
     useState<ParkingClusterResponse | null>(null);
   const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
   const [hasInitialCameraEvent, setHasInitialCameraEvent] = useState(false);
   const { favoriteItems } = useFavoriteParking();
-  const lastFocusedFavoriteIdRef = useRef<string | null>(null);
+  const lastFocusedFavoriteRequestRef = useRef<string | null>(null);
 
   const projectedMarkers = useMemo(
     () =>
@@ -160,6 +163,7 @@ export function ParkingMap({
   const cancelPendingCameraFocus = useCallback(() => {
     cameraFocusRequestIdRef.current += 1;
     pendingFocusItemRef.current = null;
+    pendingFocusSourceRef.current = 'marker';
 
     if (favoriteFocusTimerRef.current) {
       clearTimeout(favoriteFocusTimerRef.current);
@@ -191,10 +195,7 @@ export function ParkingMap({
 
       if (!canFocusCamera()) {
         pendingFocusItemRef.current = item;
-        return;
-      }
-
-      if (Platform.OS === 'android' && source === 'favorite') {
+        pendingFocusSourceRef.current = source;
         return;
       }
 
@@ -268,7 +269,7 @@ export function ParkingMap({
       options: SelectParkingItemOptions = {},
     ) => {
       const { source = 'marker' } = options;
-      const focusCamera = options.focusCamera ?? source === 'marker';
+      const focusCamera = options.focusCamera ?? true;
 
       setSelectedParkingItem(item);
       onSelectedParkingItemChange?.(item);
@@ -365,7 +366,8 @@ export function ParkingMap({
   useEffect(() => {
     if (
       favoriteSpotId === undefined ||
-      favoriteSpotId === lastFocusedFavoriteIdRef.current
+      `${favoriteSpotId}:${favoriteFocusKey ?? ''}` ===
+        lastFocusedFavoriteRequestRef.current
     ) {
       return;
     }
@@ -378,9 +380,14 @@ export function ParkingMap({
       return;
     }
 
-    lastFocusedFavoriteIdRef.current = favoriteSpotId;
-    selectParkingItem(favoriteItem, { source: 'favorite' });
-  }, [favoriteItems, favoriteSpotId, selectParkingItem]);
+    lastFocusedFavoriteRequestRef.current = `${favoriteSpotId}:${
+      favoriteFocusKey ?? ''
+    }`;
+    selectParkingItem(favoriteItem, {
+      focusCamera: true,
+      source: 'favorite',
+    });
+  }, [favoriteFocusKey, favoriteItems, favoriteSpotId, selectParkingItem]);
 
   useEffect(() => {
     if (!canFocusCamera()) {
@@ -393,7 +400,9 @@ export function ParkingMap({
     }
 
     pendingFocusItemRef.current = null;
-    focusMarkerAboveSheetSafely(pendingFocusItem);
+    focusMarkerAboveSheetSafely(pendingFocusItem, {
+      source: pendingFocusSourceRef.current,
+    });
   }, [
     canFocusCamera,
     focusMarkerAboveSheetSafely,
