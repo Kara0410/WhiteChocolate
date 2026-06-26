@@ -8,6 +8,7 @@ import {
   type ParkingBottomSheetHandle,
 } from '@/components/parking-map/ParkingBottomSheet';
 import { ParkingMarkerCard } from '@/components/parking-map/parking-marker-card';
+import { useFavoriteParking } from '@/context/FavoriteParkingContext';
 import { useParkingClusters } from '@/hooks/use-parking-clusters';
 import type {
   ParkingCameraState,
@@ -40,6 +41,7 @@ const MAP_DRAG_SETTLE_MS = 180;
 type ParkingMapProps = {
   initialCamera: ParkingCameraState;
   destination?: ParkingCoordinates;
+  favoriteSpotId?: string;
   onSelectedParkingItemChange?: (
     item: ParkingClusterResponse | null,
   ) => void;
@@ -48,6 +50,7 @@ type ParkingMapProps = {
 export function ParkingMap({
   initialCamera,
   destination,
+  favoriteSpotId,
   onSelectedParkingItemChange,
 }: ParkingMapProps) {
   const {
@@ -67,6 +70,8 @@ export function ParkingMap({
   const [selectedParkingItem, setSelectedParkingItem] =
     useState<ParkingClusterResponse | null>(null);
   const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
+  const { favoriteItems } = useFavoriteParking();
+  const lastFocusedFavoriteIdRef = useRef<string | null>(null);
 
   const projectedMarkers = useMemo(
     () =>
@@ -131,13 +136,20 @@ export function ParkingMap({
     ],
   );
 
-  const handleMarkerPress = useCallback(
+  const selectParkingItem = useCallback(
     (item: ParkingClusterResponse) => {
       setSelectedParkingItem(item);
       onSelectedParkingItemChange?.(item);
       focusMarkerAboveSheet(item);
     },
     [focusMarkerAboveSheet, onSelectedParkingItemChange],
+  );
+
+  const handleMarkerPress = useCallback(
+    (item: ParkingClusterResponse) => {
+      selectParkingItem(item);
+    },
+    [selectParkingItem],
   );
 
   const clearSelection = useCallback(() => {
@@ -185,6 +197,26 @@ export function ParkingMap({
     },
     [],
   );
+
+  useEffect(() => {
+    if (
+      favoriteSpotId === undefined ||
+      favoriteSpotId === lastFocusedFavoriteIdRef.current
+    ) {
+      return;
+    }
+
+    const favoriteItem = favoriteItems.find(
+      (item) => item.id === favoriteSpotId,
+    );
+
+    if (favoriteItem === undefined) {
+      return;
+    }
+
+    lastFocusedFavoriteIdRef.current = favoriteSpotId;
+    selectParkingItem(favoriteItem);
+  }, [favoriteItems, favoriteSpotId, selectParkingItem]);
 
   const cameraPosition = useMemo<CameraPosition>(
     () => ({

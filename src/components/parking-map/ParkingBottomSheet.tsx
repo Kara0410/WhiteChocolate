@@ -2,11 +2,10 @@ import {
   forwardRef,
   memo,
   useCallback,
-  useEffect,
   useImperativeHandle,
   useMemo,
   useRef,
-  useState,
+  useEffect,
   type ComponentRef,
 } from 'react';
 import BottomSheet, {
@@ -28,6 +27,7 @@ import {
 } from 'lucide-react-native';
 import { Share, StyleSheet, Text, View } from 'react-native';
 
+import { useFavoriteParking } from '@/context/FavoriteParkingContext';
 import type { ParkingClusterResponse } from '@/types/parking-map';
 
 import { ParkingDetailHeader } from './ParkingDetailHeader';
@@ -91,11 +91,8 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
   const title = item.bestSpot.zoneName || 'Parking Area';
   const price = item.avgPrice ?? item.minPrice;
   const dailyPrice = price === null ? null : price * 7.2;
-  const [isFavourite, setIsFavourite] = useState(false);
-
-  useEffect(() => {
-    setIsFavourite(false);
-  }, [item.id]);
+  const { isFavorite, toggleFavorite } = useFavoriteParking();
+  const itemIsFavorite = isFavorite(item.id);
 
   const handleShare = useCallback(() => {
     void Share.share({
@@ -104,17 +101,17 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
     });
   }, [percentage, title]);
 
-  const handleFavourite = useCallback(() => {
-    setIsFavourite((current) => !current);
-  }, []);
+  const handleFavorite = useCallback(() => {
+    toggleFavorite(item);
+  }, [item, toggleFavorite]);
 
   return (
     <>
       <ParkingDetailHeader
         distanceLabel={formatDistance(item.distanceToDestination)}
-        isFavourite={isFavourite}
+        isFavorite={itemIsFavorite}
         onClose={onClose}
-        onFavourite={handleFavourite}
+        onFavorite={handleFavorite}
         onShare={handleShare}
         percentage={percentage}
         theme={theme}

@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { useLocalSearchParams } from 'expo-router';
 
 import { ParkingMap } from '@/components/parking-map/parking-map';
 import type { ParkingClusterResponse } from '@/types/parking-map';
@@ -10,6 +11,9 @@ const INITIAL_CAMERA = {
 } as const;
 
 export default function MapScreen() {
+  const { favoriteSpotId } = useLocalSearchParams<{
+    favoriteSpotId?: string;
+  }>();
   const [, setSelectedParkingItem] =
     useState<ParkingClusterResponse | null>(null);
   const handleSelectionChange = useCallback(
@@ -21,6 +25,7 @@ export default function MapScreen() {
 
   return (
     <ParkingMap
+      favoriteSpotId={favoriteSpotId}
       initialCamera={INITIAL_CAMERA}
       onSelectedParkingItemChange={handleSelectionChange}
     />

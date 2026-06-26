@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { Bookmark, Navigation, Share2, X } from 'lucide-react-native';
+import { Heart, Navigation, Share2, X } from 'lucide-react-native';
 import Svg, { Circle } from 'react-native-svg';
 
 import type { AvailabilityTheme } from './parking-availability-status';
@@ -13,8 +13,8 @@ export type ParkingDetailHeaderProps = {
   onClose: () => void;
   onNavigate?: () => void;
   onShare?: () => void;
-  onFavourite?: () => void;
-  isFavourite?: boolean;
+  onFavorite?: () => void;
+  isFavorite?: boolean;
 };
 
 const RING_SIZE = 72;
@@ -30,8 +30,8 @@ export const ParkingDetailHeader = memo(function ParkingDetailHeader({
   onClose,
   onNavigate,
   onShare,
-  onFavourite,
-  isFavourite = false,
+  onFavorite,
+  isFavorite = false,
 }: ParkingDetailHeaderProps) {
   const ringOffset =
     RING_CIRCUMFERENCE * (1 - Math.max(0, Math.min(100, percentage)) / 100);
@@ -57,18 +57,18 @@ export const ParkingDetailHeader = memo(function ParkingDetailHeader({
           </Pressable>
           <Pressable
             accessibilityLabel={
-              isFavourite
-                ? 'Remove parking location from favourites'
-                : 'Add parking location to favourites'
+              isFavorite
+                ? 'Remove parking location from favorites'
+                : 'Add parking location to favorites'
             }
             accessibilityRole="button"
             className="h-9 w-9 items-center justify-center rounded-full bg-blue-50 active:bg-blue-100"
             hitSlop={6}
-            onPress={onFavourite}
+            onPress={onFavorite}
           >
-            <Bookmark
+            <Heart
               color="#2563EB"
-              fill={isFavourite ? '#2563EB' : 'transparent'}
+              fill={isFavorite ? '#2563EB' : 'transparent'}
               size={17}
               strokeWidth={2.3}
             />

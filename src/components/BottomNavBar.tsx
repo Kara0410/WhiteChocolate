@@ -274,7 +274,7 @@ export default function BottomNavBar({
   const items: NavItem[] = [
     { key: 'search', label: 'SEARCH', icon: Search, onPress: onSearchPress },
     { key: 'car', label: 'PARKING', icon: Car, onPress: onCarPress },
-    { key: 'favorite', label: 'SAVED', icon: Heart, onPress: onFavoritePress },
+    { key: 'favorite', label: 'FAVORITES', icon: Heart, onPress: onFavoritePress },
     { key: 'profile', label: 'YOU', icon: UserRound, onPress: onProfilePress },
   ];
   const toggleParkingMode = () => {
