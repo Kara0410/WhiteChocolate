@@ -9,7 +9,7 @@ import type { ParkingClusterResponse } from '@/types/parking-map';
 
 type ParkingMarkerCardProps = {
   item: ParkingClusterResponse;
-  moving: boolean;
+  performanceMode: 'normal' | 'moving';
   tier: MarkerSizeTier;
   selected: boolean;
   onPress: (item: ParkingClusterResponse) => void;
@@ -17,7 +17,7 @@ type ParkingMarkerCardProps = {
 
 export const ParkingMarkerCard = memo(function ParkingMarkerCard({
   item,
-  moving,
+  performanceMode,
   tier,
   selected,
   onPress,
@@ -30,7 +30,7 @@ export const ParkingMarkerCard = memo(function ParkingMarkerCard({
       <ParkingAvailabilityBubble
         onPress={handlePress}
         percentage={item.availabilityPercent}
-        performanceMode={moving ? 'moving' : 'normal'}
+        performanceMode={performanceMode}
         size={size}
         state={selected ? 'selected' : 'default'}
         type={item.type}

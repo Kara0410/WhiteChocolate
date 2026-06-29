@@ -934,8 +934,8 @@ export function ParkingMap({
           >
             <ParkingMarkerCard
               item={item}
-              moving={isMapMoving}
               onPress={handleMarkerPress}
+              performanceMode={isMapMoving ? 'moving' : 'normal'}
               selected={selectedParkingItem?.id === item.id}
               tier={tier}
             />
