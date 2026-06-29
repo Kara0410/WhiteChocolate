@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  projectMapCoordinate,
   projectParkingMarkers,
   selectSpatiallySeparatedMarkers,
 } from '../src/components/parking-map/marker-density';
@@ -118,4 +119,44 @@ test('projects a marker at the camera center into the overlay center', () => {
 
   assert.ok(Math.abs(result[0].x - 200) < 0.001);
   assert.ok(Math.abs(result[0].y - 400) < 0.001);
+});
+
+test('projects a user coordinate from zoom when map events omit deltas', () => {
+  const camera = {
+    latitude: 48.1351,
+    longitude: 11.5824,
+    zoom: 17,
+  };
+  const center = projectMapCoordinate(camera, {
+    camera,
+    width: 400,
+    height: 800,
+  });
+  const east = projectMapCoordinate(
+    { latitude: camera.latitude, longitude: camera.longitude + 0.001 },
+    { camera, width: 400, height: 800 },
+  );
+  const north = projectMapCoordinate(
+    { latitude: camera.latitude + 0.001, longitude: camera.longitude },
+    { camera, width: 400, height: 800 },
+  );
+
+  assert.ok(Math.abs(center.x - 200) < 0.001);
+  assert.ok(Math.abs(center.y - 400) < 0.001);
+  assert.ok(east.x > center.x);
+  assert.ok(north.y < center.y);
+});
+
+test('keeps projection stable across the antimeridian', () => {
+  const projected = projectMapCoordinate(
+    { latitude: 0, longitude: -179.999 },
+    {
+      camera: { latitude: 0, longitude: 179.999, zoom: 10 },
+      width: 400,
+      height: 800,
+    },
+  );
+
+  assert.ok(projected.x > 200);
+  assert.ok(projected.x < 204);
 });

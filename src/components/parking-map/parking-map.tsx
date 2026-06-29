@@ -1,14 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppleMaps, GoogleMaps, type CameraPosition } from 'expo-maps';
 import {
+  ActivityIndicator,
   InteractionManager,
   Platform,
+  Pressable,
   Text,
   View,
   type LayoutChangeEvent,
 } from 'react-native';
+import { FlaskConical, LocateFixed } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { projectParkingMarkers } from '@/components/parking-map/marker-density';
+import {
+  projectMapCoordinate,
+  projectParkingMarkers,
+} from '@/components/parking-map/marker-density';
 import {
   ParkingBottomSheet,
   type ParkingBottomSheetHandle,
@@ -18,9 +25,11 @@ import { ParkingListBottomSheet } from '@/components/parking-map/ParkingListBott
 import { ParkingMarkerCard } from '@/components/parking-map/parking-marker-card';
 import { SearchNearestSpotsBottomSheet } from '@/components/parking-map/SearchNearestSpotsBottomSheet';
 import { YouBottomSheet } from '@/components/parking-map/YouBottomSheet';
+import { UserLocationMarker } from '@/components/parking-map/user-location-marker';
 import { useFavoriteParking } from '@/context/FavoriteParkingContext';
 import { useMapOverlay } from '@/context/MapOverlayContext';
 import { useParkingClusters } from '@/hooks/use-parking-clusters';
+import { MUNICH_MOCK_LOCATION } from '@/hooks/use-map-location';
 import type { PlaceSearchResult } from '@/hooks/use-google-place-search';
 import { getAllMockParkingSpots } from '@/services/parking-clusters';
 import type {
@@ -54,10 +63,15 @@ const MAP_DRAG_SETTLE_MS = 180;
 
 type ParkingMapProps = {
   initialCamera: ParkingCameraState;
+  currentLocationFocusKey?: string;
   destination?: ParkingCoordinates;
   favoriteFocusKey?: string;
   favoriteSpotId?: string;
   searchFocusKey?: string;
+  isLocationLoading?: boolean;
+  locationMessage?: string | null;
+  onRequestUserLocation?: () => Promise<ParkingCoordinates | null>;
+  userLocation?: ParkingCoordinates | null;
   onSelectedParkingItemChange?: (
     item: ParkingClusterResponse | null,
   ) => void;
@@ -93,7 +107,11 @@ function hasValidCoordinates(item: ParkingClusterResponse) {
 function hasValidCoordinatePair(coordinates: ParkingCoordinates) {
   return (
     Number.isFinite(coordinates.latitude) &&
-    Number.isFinite(coordinates.longitude)
+    Number.isFinite(coordinates.longitude) &&
+    coordinates.latitude >= -90 &&
+    coordinates.latitude <= 90 &&
+    coordinates.longitude >= -180 &&
+    coordinates.longitude <= 180
   );
 }
 
@@ -111,12 +129,18 @@ function safelyHandleCameraUpdate(update: unknown, context: string) {
 
 export function ParkingMap({
   initialCamera,
+  currentLocationFocusKey,
   destination,
   favoriteFocusKey,
   favoriteSpotId,
   searchFocusKey,
+  isLocationLoading = false,
+  locationMessage,
+  onRequestUserLocation,
+  userLocation,
   onSelectedParkingItemChange,
 }: ParkingMapProps) {
+  const insets = useSafeAreaInsets();
   const {
     displayCamera,
     onCameraMove,
@@ -144,7 +168,9 @@ export function ParkingMap({
   const pendingCoordinateFocusContextRef = useRef(
     'Unable to focus searched place',
   );
+  const pendingLocationFocusRef = useRef<ParkingCoordinates | null>(null);
   const cameraFocusRequestIdRef = useRef(0);
+  const locationActionRequestIdRef = useRef(0);
   const [selectedParkingItem, setSelectedParkingItem] =
     useState<ParkingClusterResponse | null>(null);
   const [selectedSearchPlace, setSelectedSearchPlace] =
@@ -162,6 +188,7 @@ export function ParkingMap({
   const lastFocusedFavoriteRequestRef = useRef<string | null>(null);
   const lastSearchFocusKeyRef = useRef<string | null>(null);
   const lastSearchSelectionIdRef = useRef<number | null>(null);
+  const lastLocationFocusKeyRef = useRef<string | null>(null);
   const allParkingSpots = useMemo(
     () =>
       getAllMockParkingSpots(
@@ -207,6 +234,33 @@ export function ParkingMap({
       visibleClusters,
     ],
   );
+  const projectedUserLocation = useMemo(() => {
+    if (
+      userLocation == null ||
+      !hasValidCoordinatePair(userLocation) ||
+      mapSize.width <= 0 ||
+      mapSize.height <= 0
+    ) {
+      return null;
+    }
+
+    const position = projectMapCoordinate(userLocation, {
+      camera: displayCamera,
+      height: mapSize.height,
+      width: mapSize.width,
+    });
+
+    if (
+      position.x < -28 ||
+      position.x > mapSize.width + 28 ||
+      position.y < -28 ||
+      position.y > mapSize.height + 28
+    ) {
+      return null;
+    }
+
+    return position;
+  }, [displayCamera, mapSize.height, mapSize.width, userLocation]);
 
   const canFocusCamera = useCallback(
     () =>
@@ -220,9 +274,11 @@ export function ParkingMap({
 
   const cancelPendingCameraFocus = useCallback(() => {
     cameraFocusRequestIdRef.current += 1;
+    locationActionRequestIdRef.current += 1;
     pendingFocusItemRef.current = null;
     pendingFocusSourceRef.current = 'marker';
     pendingCoordinateFocusRef.current = null;
+    pendingLocationFocusRef.current = null;
 
     if (favoriteFocusTimerRef.current) {
       clearTimeout(favoriteFocusTimerRef.current);
@@ -388,6 +444,52 @@ export function ParkingMap({
     ],
   );
 
+  const focusLocationSafely = useCallback(
+    (coordinates: ParkingCoordinates, context: string) => {
+      if (!hasValidCoordinatePair(coordinates)) {
+        return;
+      }
+
+      if (!canFocusCamera()) {
+        pendingLocationFocusRef.current = coordinates;
+        return;
+      }
+
+      const nextCamera = {
+        coordinates,
+        zoom: 17,
+        bearing: 0,
+        tilt: 0,
+      };
+
+      isProgrammaticCameraMoveRef.current = true;
+      if (programmaticCameraTimerRef.current) {
+        clearTimeout(programmaticCameraTimerRef.current);
+      }
+      programmaticCameraTimerRef.current = setTimeout(() => {
+        isProgrammaticCameraMoveRef.current = false;
+        programmaticCameraTimerRef.current = null;
+      }, PROGRAMMATIC_CAMERA_GUARD_MS);
+
+      try {
+        const cameraUpdate =
+          Platform.OS === 'android'
+            ? googleMapRef.current!.setCameraPosition({
+                ...nextCamera,
+                duration: 360,
+              })
+            : appleMapRef.current!.setCameraPosition(nextCamera);
+
+        safelyHandleCameraUpdate(cameraUpdate, context);
+      } catch (error) {
+        if (!isCameraCancellationError(error) && __DEV__) {
+          console.warn(context, error);
+        }
+      }
+    },
+    [canFocusCamera],
+  );
+
   const selectParkingItem = useCallback(
     (
       item: ParkingClusterResponse,
@@ -466,6 +568,46 @@ export function ParkingMap({
     setSelectedParkingItem(null);
     onSelectedParkingItemChange?.(null);
   }, [onSelectedParkingItemChange]);
+
+  const prepareForLocationFocus = useCallback(() => {
+    closeOverlay();
+    setSelectedSearchPlace(null);
+    clearSelection();
+    cancelPendingCameraFocus();
+  }, [cancelPendingCameraFocus, clearSelection, closeOverlay]);
+
+  const handleCurrentLocationPress = useCallback(async () => {
+    if (!onRequestUserLocation || isLocationLoading) {
+      return;
+    }
+
+    prepareForLocationFocus();
+    const requestId = ++locationActionRequestIdRef.current;
+    const coordinates = await onRequestUserLocation();
+    if (
+      coordinates &&
+      requestId === locationActionRequestIdRef.current
+    ) {
+      focusLocationSafely(
+        coordinates,
+        'Unable to focus the map on your location',
+      );
+    }
+  }, [
+    focusLocationSafely,
+    isLocationLoading,
+    onRequestUserLocation,
+    prepareForLocationFocus,
+  ]);
+
+  const handleMockLocationPress = useCallback(() => {
+    prepareForLocationFocus();
+    locationActionRequestIdRef.current += 1;
+    focusLocationSafely(
+      MUNICH_MOCK_LOCATION,
+      'Unable to focus the Munich test location',
+    );
+  }, [focusLocationSafely, prepareForLocationFocus]);
 
   const handleOverlaySpotPress = useCallback(
     (item: ParkingClusterResponse, source: ParkingSelectionSource) => {
@@ -548,6 +690,7 @@ export function ParkingMap({
       }
       pendingFocusItemRef.current = null;
       pendingCoordinateFocusRef.current = null;
+      pendingLocationFocusRef.current = null;
     },
     [],
   );
@@ -601,6 +744,18 @@ export function ParkingMap({
 
   useEffect(() => {
     if (
+      currentLocationFocusKey === undefined ||
+      currentLocationFocusKey === lastLocationFocusKeyRef.current
+    ) {
+      return;
+    }
+
+    lastLocationFocusKeyRef.current = currentLocationFocusKey;
+    void handleCurrentLocationPress();
+  }, [currentLocationFocusKey, handleCurrentLocationPress]);
+
+  useEffect(() => {
+    if (
       selection === null ||
       selection.id === lastSearchSelectionIdRef.current
     ) {
@@ -626,18 +781,26 @@ export function ParkingMap({
     }
 
     const pendingCoordinateFocus = pendingCoordinateFocusRef.current;
-    if (pendingCoordinateFocus === null) {
-      return;
+    if (pendingCoordinateFocus !== null) {
+      pendingCoordinateFocusRef.current = null;
+      focusCoordinatesAboveSheetSafely(
+        pendingCoordinateFocus,
+        pendingCoordinateFocusContextRef.current,
+      );
     }
 
-    pendingCoordinateFocusRef.current = null;
-    focusCoordinatesAboveSheetSafely(
-      pendingCoordinateFocus,
-      pendingCoordinateFocusContextRef.current,
-    );
+    const pendingLocationFocus = pendingLocationFocusRef.current;
+    if (pendingLocationFocus !== null) {
+      pendingLocationFocusRef.current = null;
+      focusLocationSafely(
+        pendingLocationFocus,
+        'Unable to focus the requested map location',
+      );
+    }
   }, [
     canFocusCamera,
     focusCoordinatesAboveSheetSafely,
+    focusLocationSafely,
     focusMarkerAboveSheetSafely,
     hasInitialCameraEvent,
     mapSize.height,
@@ -736,7 +899,73 @@ export function ParkingMap({
             />
           </View>
         ))}
+        {projectedUserLocation ? (
+          <View
+            collapsable={false}
+            pointerEvents="none"
+            style={{
+              height: 28,
+              left: projectedUserLocation.x - 14,
+              position: 'absolute',
+              top: projectedUserLocation.y - 14,
+              width: 28,
+              zIndex: 100,
+            }}
+          >
+            <UserLocationMarker />
+          </View>
+        ) : null}
       </View>
+
+      {activeOverlay === 'none' &&
+      selectedParkingItem === null &&
+      selectedSearchPlace === null ? (
+        <View
+          className="absolute right-4 items-end gap-2"
+          pointerEvents="box-none"
+          style={{ bottom: Math.max(insets.bottom, 10) + 104 }}
+        >
+          {locationMessage ? (
+            <View
+              className="max-w-64 rounded-2xl bg-slate-950/90 px-3 py-2"
+              style={{ boxShadow: '0 5px 16px rgba(15,23,42,0.18)' }}
+            >
+              <Text className="text-right text-xs font-semibold leading-4 text-white">
+                {locationMessage}
+              </Text>
+            </View>
+          ) : null}
+          <Pressable
+            accessibilityLabel="Center map on current location"
+            accessibilityRole="button"
+            className="h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white active:bg-slate-100"
+            disabled={isLocationLoading}
+            onPress={handleCurrentLocationPress}
+            style={{ boxShadow: '0 4px 14px rgba(15,23,42,0.2)' }}
+          >
+            {isLocationLoading ? (
+              <ActivityIndicator color="#2563EB" size="small" />
+            ) : (
+              <LocateFixed color="#2563EB" size={22} strokeWidth={2.4} />
+            )}
+          </Pressable>
+          {__DEV__ ? (
+            <Pressable
+              accessibilityHint="Centers the map on the Munich test coordinates"
+              accessibilityLabel="Use Munich mock location"
+              accessibilityRole="button"
+              className="h-12 w-12 items-center justify-center rounded-full border border-amber-200 bg-amber-50 active:bg-amber-100"
+              onPress={handleMockLocationPress}
+              style={{ boxShadow: '0 4px 14px rgba(15,23,42,0.16)' }}
+            >
+              <FlaskConical color="#B45309" size={18} strokeWidth={2.3} />
+              <Text className="mt-0.5 text-[8px] font-black tracking-wide text-amber-700">
+                TEST
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
 
       <ParkingBottomSheet
         ref={bottomSheetRef}

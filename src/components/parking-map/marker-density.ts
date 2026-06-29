@@ -1,6 +1,7 @@
 import type {
   ParkingCameraState,
   ParkingClusterResponse,
+  ParkingCoordinates,
 } from '@/types/parking-map';
 import { getMarkerDimensions, getMarkerSizeTier } from './marker-visuals';
 
@@ -11,6 +12,9 @@ type MarkerDensityOptions = {
   selectedId?: string;
 };
 
+const MAX_MERCATOR_LATITUDE = 85.05112878;
+const TILE_SIZE = 256;
+
 export type ProjectedParkingMarker = {
   item: ParkingClusterResponse;
   x: number;
@@ -18,6 +22,60 @@ export type ProjectedParkingMarker = {
   width: number;
   height: number;
 };
+
+export function projectMapCoordinate(
+  coordinates: ParkingCoordinates,
+  options: Pick<MarkerDensityOptions, 'camera' | 'height' | 'width'>,
+) {
+  const { camera, height, width } = options;
+
+  if (camera.longitudeDelta && camera.latitudeDelta) {
+    return {
+      x:
+        ((coordinates.longitude -
+          (camera.longitude - camera.longitudeDelta / 2)) /
+          camera.longitudeDelta) *
+        width,
+      y:
+        ((camera.latitude + camera.latitudeDelta / 2 -
+          coordinates.latitude) /
+          camera.latitudeDelta) *
+        height,
+    };
+  }
+
+  const worldSize = TILE_SIZE * 2 ** camera.zoom;
+  const coordinateWorldX = ((coordinates.longitude + 180) / 360) * worldSize;
+  const cameraWorldX = ((camera.longitude + 180) / 360) * worldSize;
+  let worldXDelta = coordinateWorldX - cameraWorldX;
+
+  if (worldXDelta > worldSize / 2) {
+    worldXDelta -= worldSize;
+  } else if (worldXDelta < -worldSize / 2) {
+    worldXDelta += worldSize;
+  }
+
+  const latitudeToWorldY = (latitude: number) => {
+    const clampedLatitude = Math.max(
+      -MAX_MERCATOR_LATITUDE,
+      Math.min(MAX_MERCATOR_LATITUDE, latitude),
+    );
+    const radians = (clampedLatitude * Math.PI) / 180;
+
+    return (
+      ((1 - Math.asinh(Math.tan(radians)) / Math.PI) / 2) *
+      worldSize
+    );
+  };
+
+  return {
+    x: width / 2 + worldXDelta,
+    y:
+      height / 2 +
+      latitudeToWorldY(coordinates.latitude) -
+      latitudeToWorldY(camera.latitude),
+  };
+}
 
 function markerLimitForZoom(zoom: number) {
   if (zoom <= 10) {
@@ -42,27 +100,16 @@ export function selectSpatiallySeparatedMarkers(
   items: ParkingClusterResponse[],
   options: MarkerDensityOptions,
 ) {
-  const longitudeDelta =
-    options.camera.longitudeDelta ??
-    Math.max(0.000001, (360 / 2 ** options.camera.zoom) * 2);
-  const latitudeDelta =
-    options.camera.latitudeDelta ?? Math.max(0.000001, longitudeDelta * 1.6);
   const limit = markerLimitForZoom(options.camera.zoom);
   const projected: ProjectedParkingMarker[] = items
     .map((item) => {
       const tier = getMarkerSizeTier(item.type, options.camera.zoom);
       const dimensions = getMarkerDimensions(tier);
+      const position = projectMapCoordinate(item, options);
       return {
         item,
-        x:
-          ((item.longitude -
-            (options.camera.longitude - longitudeDelta / 2)) /
-            longitudeDelta) *
-          options.width,
-        y:
-          ((options.camera.latitude + latitudeDelta / 2 - item.latitude) /
-            latitudeDelta) *
-          options.height,
+        x: position.x,
+        y: position.y,
         width: dimensions.width + 12,
         height: dimensions.height + 12,
       };
@@ -107,27 +154,15 @@ export function projectParkingMarkers(
   options: MarkerDensityOptions,
 ) {
   const selected = selectSpatiallySeparatedMarkers(items, options);
-  const longitudeDelta =
-    options.camera.longitudeDelta ??
-    Math.max(0.000001, (360 / 2 ** options.camera.zoom) * 2);
-  const latitudeDelta =
-    options.camera.latitudeDelta ?? Math.max(0.000001, longitudeDelta * 1.6);
-
   return selected.map((item): ProjectedParkingMarker => {
     const dimensions = getMarkerDimensions(
       getMarkerSizeTier(item.type, options.camera.zoom),
     );
+    const position = projectMapCoordinate(item, options);
     return {
       item,
-      x:
-        ((item.longitude -
-          (options.camera.longitude - longitudeDelta / 2)) /
-          longitudeDelta) *
-        options.width,
-      y:
-        ((options.camera.latitude + latitudeDelta / 2 - item.latitude) /
-          latitudeDelta) *
-        options.height,
+      x: position.x,
+      y: position.y,
       width: dimensions.width,
       height: dimensions.height,
     };
