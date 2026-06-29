@@ -14,9 +14,9 @@ import {
   type ParkingBottomSheetHandle,
 } from '@/components/parking-map/ParkingBottomSheet';
 import { ParkingMarkerCard } from '@/components/parking-map/parking-marker-card';
-import { PlaceSearchOverlay } from '@/components/parking-map/PlaceSearchOverlay';
 import { SearchNearestSpotsBottomSheet } from '@/components/parking-map/SearchNearestSpotsBottomSheet';
 import { useFavoriteParking } from '@/context/FavoriteParkingContext';
+import { useMapSearch } from '@/context/MapSearchContext';
 import { useParkingClusters } from '@/hooks/use-parking-clusters';
 import type { PlaceSearchResult } from '@/hooks/use-google-place-search';
 import { getAllMockParkingSpots } from '@/services/parking-clusters';
@@ -144,14 +144,15 @@ export function ParkingMap({
   const cameraFocusRequestIdRef = useRef(0);
   const [selectedParkingItem, setSelectedParkingItem] =
     useState<ParkingClusterResponse | null>(null);
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [selectedSearchPlace, setSelectedSearchPlace] =
     useState<PlaceSearchResult | null>(null);
   const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
   const [hasInitialCameraEvent, setHasInitialCameraEvent] = useState(false);
   const { favoriteItems } = useFavoriteParking();
+  const { consumeSelection, openSearch, selection } = useMapSearch();
   const lastFocusedFavoriteRequestRef = useRef<string | null>(null);
   const lastSearchFocusKeyRef = useRef<string | null>(null);
+  const lastSearchSelectionIdRef = useRef<number | null>(null);
   const allParkingSpots = useMemo(
     () =>
       getAllMockParkingSpots(
@@ -422,17 +423,8 @@ export function ParkingMap({
     [selectParkingItem],
   );
 
-  const openSearch = useCallback(() => {
-    setIsSearchOpen(true);
-  }, []);
-
-  const closeSearch = useCallback(() => {
-    setIsSearchOpen(false);
-  }, []);
-
   const handleSelectSearchPlace = useCallback(
     (place: PlaceSearchResult) => {
-      setIsSearchOpen(false);
       setSelectedParkingItem(null);
       onSelectedParkingItemChange?.(null);
       cancelPendingCameraFocus();
@@ -556,6 +548,19 @@ export function ParkingMap({
     lastSearchFocusKeyRef.current = searchFocusKey;
     openSearch();
   }, [openSearch, searchFocusKey]);
+
+  useEffect(() => {
+    if (
+      selection === null ||
+      selection.id === lastSearchSelectionIdRef.current
+    ) {
+      return;
+    }
+
+    lastSearchSelectionIdRef.current = selection.id;
+    handleSelectSearchPlace(selection.place);
+    consumeSelection(selection.id);
+  }, [consumeSelection, handleSelectSearchPlace, selection]);
 
   useEffect(() => {
     if (!canFocusCamera()) {
@@ -696,11 +701,6 @@ export function ParkingMap({
         spots={nearestSearchSpots}
       />
 
-      <PlaceSearchOverlay
-        onClose={closeSearch}
-        onSelectPlace={handleSelectSearchPlace}
-        visible={isSearchOpen}
-      />
     </View>
   );
 }
