@@ -18,7 +18,7 @@ import { PlaceSearchOverlay } from '@/components/parking-map/PlaceSearchOverlay'
 import { SearchNearestSpotsBottomSheet } from '@/components/parking-map/SearchNearestSpotsBottomSheet';
 import { useFavoriteParking } from '@/context/FavoriteParkingContext';
 import { useParkingClusters } from '@/hooks/use-parking-clusters';
-import type { PlaceSearchResult } from '@/hooks/use-place-search';
+import type { PlaceSearchResult } from '@/hooks/use-google-place-search';
 import { getAllMockParkingSpots } from '@/services/parking-clusters';
 import type {
   ParkingCameraState,

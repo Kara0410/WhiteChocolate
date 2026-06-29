@@ -22,7 +22,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     package: 'com.whitechoclate.app',
     config: {
       googleMaps: {
-        apiKey: 'AIzaSyBEWjoMb_1aEHjJYpZBJitANZ5yQJ0fVYA',
+        apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_ANDROID_API_KEY,
       },
     },
     adaptiveIcon: {

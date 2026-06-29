@@ -8,7 +8,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { PlaceSearchResult } from '@/hooks/use-place-search';
+import type { PlaceSearchResult } from '@/hooks/use-google-place-search';
 import type { ParkingClusterResponse } from '@/types/parking-map';
 import {
   formatSearchDistance,
@@ -190,7 +190,7 @@ export function SearchNearestSpotsBottomSheet({
                 className="ml-1 flex-1 text-[13px] font-semibold text-slate-500"
                 numberOfLines={1}
               >
-                {searchPlace?.title ?? 'Selected place'}
+                {searchPlace?.address ?? searchPlace?.title ?? 'Selected place'}
               </Text>
             </View>
           </View>

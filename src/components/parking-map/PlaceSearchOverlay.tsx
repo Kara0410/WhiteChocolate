@@ -13,8 +13,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   type PlaceSearchResult,
-  usePlaceSearch,
-} from '@/hooks/use-place-search';
+  type PlaceSearchSuggestion,
+  useGooglePlaceSearch,
+} from '@/hooks/use-google-place-search';
 
 type PlaceSearchOverlayProps = {
   visible: boolean;
@@ -25,15 +26,18 @@ type PlaceSearchOverlayProps = {
 const SearchResultRow = memo(function SearchResultRow({
   item,
   onPress,
+  disabled,
 }: {
-  item: PlaceSearchResult;
-  onPress: (item: PlaceSearchResult) => void;
+  item: PlaceSearchSuggestion;
+  disabled: boolean;
+  onPress: (item: PlaceSearchSuggestion) => void;
 }) {
   return (
     <Pressable
-      accessibilityLabel={`Search for ${item.title}`}
+      accessibilityLabel={`Search for ${item.primaryText}`}
       accessibilityRole="button"
       className="flex-row items-center border-t border-slate-100 px-4 py-4 active:bg-slate-50"
+      disabled={disabled}
       onPress={() => onPress(item)}
     >
       <View className="h-10 w-10 items-center justify-center rounded-full bg-blue-50">
@@ -44,17 +48,18 @@ const SearchResultRow = memo(function SearchResultRow({
           className="text-[15px] font-extrabold text-slate-950"
           numberOfLines={1}
         >
-          {item.title}
+          {item.primaryText}
         </Text>
-        {item.subtitle ? (
+        {item.secondaryText ? (
           <Text
             className="mt-1 text-[12px] font-semibold text-slate-500"
             numberOfLines={1}
           >
-            {item.subtitle}
+            {item.secondaryText}
           </Text>
         ) : null}
       </View>
+      {disabled ? <ActivityIndicator color="#2563EB" size="small" /> : null}
     </Pressable>
   );
 });
@@ -67,24 +72,28 @@ export function PlaceSearchOverlay({
   const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
   const {
-    clear,
     error,
     hasSearched,
     isLoading,
+    isResolvingPlace,
     query,
     results,
+    beginSearchSession,
+    resetSearch,
+    selectSuggestion,
     setQuery,
-  } = usePlaceSearch();
+  } = useGooglePlaceSearch();
 
   useEffect(() => {
     if (!visible) {
-      clear();
+      resetSearch();
       return;
     }
 
+    beginSearchSession();
     const focusTimer = setTimeout(() => inputRef.current?.focus(), 120);
     return () => clearTimeout(focusTimer);
-  }, [clear, visible]);
+  }, [beginSearchSession, resetSearch, visible]);
 
   const closeSearch = useCallback(() => {
     Keyboard.dismiss();
@@ -92,11 +101,14 @@ export function PlaceSearchOverlay({
   }, [onClose]);
 
   const handleSelectPlace = useCallback(
-    (result: PlaceSearchResult) => {
+    async (result: PlaceSearchSuggestion) => {
       Keyboard.dismiss();
-      onSelectPlace(result);
+      const place = await selectSuggestion(result);
+      if (place) {
+        onSelectPlace(place);
+      }
     },
-    [onSelectPlace],
+    [onSelectPlace, selectSuggestion],
   );
 
   if (!visible) {
@@ -158,7 +170,14 @@ export function PlaceSearchOverlay({
                 <View className="flex-row items-center">
                   <ActivityIndicator color="#2563EB" />
                   <Text className="ml-3 text-[14px] font-semibold text-slate-500">
-                    Searching places...
+                    Searching Google Places...
+                  </Text>
+                </View>
+              ) : isResolvingPlace ? (
+                <View className="flex-row items-center">
+                  <ActivityIndicator color="#2563EB" />
+                  <Text className="ml-3 text-[14px] font-semibold text-slate-500">
+                    Loading place...
                   </Text>
                 </View>
               ) : error ? (
@@ -177,7 +196,11 @@ export function PlaceSearchOverlay({
             </View>
           }
           renderItem={({ item }) => (
-            <SearchResultRow item={item} onPress={handleSelectPlace} />
+            <SearchResultRow
+              disabled={isResolvingPlace}
+              item={item}
+              onPress={handleSelectPlace}
+            />
           )}
           style={{ maxHeight: 360 }}
         />
