@@ -13,10 +13,13 @@ import {
   ParkingBottomSheet,
   type ParkingBottomSheetHandle,
 } from '@/components/parking-map/ParkingBottomSheet';
+import { FavoriteParkingBottomSheet } from '@/components/parking-map/FavoriteParkingBottomSheet';
+import { ParkingListBottomSheet } from '@/components/parking-map/ParkingListBottomSheet';
 import { ParkingMarkerCard } from '@/components/parking-map/parking-marker-card';
 import { SearchNearestSpotsBottomSheet } from '@/components/parking-map/SearchNearestSpotsBottomSheet';
+import { YouBottomSheet } from '@/components/parking-map/YouBottomSheet';
 import { useFavoriteParking } from '@/context/FavoriteParkingContext';
-import { useMapSearch } from '@/context/MapSearchContext';
+import { useMapOverlay } from '@/context/MapOverlayContext';
 import { useParkingClusters } from '@/hooks/use-parking-clusters';
 import type { PlaceSearchResult } from '@/hooks/use-google-place-search';
 import { getAllMockParkingSpots } from '@/services/parking-clusters';
@@ -149,7 +152,13 @@ export function ParkingMap({
   const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
   const [hasInitialCameraEvent, setHasInitialCameraEvent] = useState(false);
   const { favoriteItems } = useFavoriteParking();
-  const { consumeSelection, openSearch, selection } = useMapSearch();
+  const {
+    activeOverlay,
+    closeOverlay,
+    consumeSelection,
+    openSearch,
+    selection,
+  } = useMapOverlay();
   const lastFocusedFavoriteRequestRef = useRef<string | null>(null);
   const lastSearchFocusKeyRef = useRef<string | null>(null);
   const lastSearchSelectionIdRef = useRef<number | null>(null);
@@ -458,6 +467,38 @@ export function ParkingMap({
     onSelectedParkingItemChange?.(null);
   }, [onSelectedParkingItemChange]);
 
+  const handleOverlaySpotPress = useCallback(
+    (item: ParkingClusterResponse, source: ParkingSelectionSource) => {
+      closeOverlay();
+      setSelectedSearchPlace(null);
+      selectParkingItem(item, { source, focusCamera: true });
+    },
+    [closeOverlay, selectParkingItem],
+  );
+
+  const handleParkingOverlaySpotPress = useCallback(
+    (item: ParkingClusterResponse) => {
+      handleOverlaySpotPress(item, 'marker');
+    },
+    [handleOverlaySpotPress],
+  );
+
+  const handleFavoriteOverlaySpotPress = useCallback(
+    (item: ParkingClusterResponse) => {
+      handleOverlaySpotPress(item, 'favorite');
+    },
+    [handleOverlaySpotPress],
+  );
+
+  const handleMapPress = useCallback(() => {
+    if (activeOverlay !== 'none') {
+      closeOverlay();
+      return;
+    }
+
+    clearSelection();
+  }, [activeOverlay, clearSelection, closeOverlay]);
+
   const handleLayout = useCallback((event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
     setMapSize({ width, height });
@@ -538,6 +579,15 @@ export function ParkingMap({
   }, [favoriteFocusKey, favoriteItems, favoriteSpotId, selectParkingItem]);
 
   useEffect(() => {
+    if (activeOverlay === 'none') {
+      return;
+    }
+
+    setSelectedSearchPlace(null);
+    clearSelection();
+  }, [activeOverlay, clearSelection]);
+
+  useEffect(() => {
     if (
       searchFocusKey === undefined ||
       searchFocusKey === lastSearchFocusKeyRef.current
@@ -614,7 +664,7 @@ export function ParkingMap({
           ref={appleMapRef}
           cameraPosition={cameraPosition}
           onCameraMove={handleCameraMove}
-          onMapClick={clearSelection}
+          onMapClick={handleMapPress}
           properties={{
             isMyLocationEnabled: false,
             pointsOfInterest: { including: [] },
@@ -632,7 +682,7 @@ export function ParkingMap({
           ref={googleMapRef}
           cameraPosition={cameraPosition}
           onCameraMove={handleCameraMove}
-          onMapClick={clearSelection}
+          onMapClick={handleMapPress}
           properties={{
             isBuildingEnabled: false,
             isIndoorEnabled: false,
@@ -700,6 +750,25 @@ export function ParkingMap({
         searchPlace={selectedSearchPlace}
         spots={nearestSearchSpots}
       />
+
+      {activeOverlay === 'parking' ? (
+        <ParkingListBottomSheet
+          onClose={closeOverlay}
+          onSpotPress={handleParkingOverlaySpotPress}
+          spots={allParkingSpots}
+        />
+      ) : null}
+
+      {activeOverlay === 'favorites' ? (
+        <FavoriteParkingBottomSheet
+          onClose={closeOverlay}
+          onSpotPress={handleFavoriteOverlaySpotPress}
+        />
+      ) : null}
+
+      {activeOverlay === 'you' ? (
+        <YouBottomSheet onClose={closeOverlay} />
+      ) : null}
 
     </View>
   );

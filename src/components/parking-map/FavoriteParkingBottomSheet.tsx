@@ -372,7 +372,7 @@ export function FavoriteParkingBottomSheet({
   const insets = useSafeAreaInsets();
   const { favoriteItems, removeFavorite } = useFavoriteParking();
   const [openRowId, setOpenRowId] = useState<string | null>(null);
-  const snapPoints = useMemo(() => ['82%'], []);
+  const snapPoints = useMemo(() => ['18%', '70%'], []);
   const animationConfigs = useBottomSheetSpringConfigs({
     damping: 30,
     mass: 0.9,
@@ -426,7 +426,7 @@ export function FavoriteParkingBottomSheet({
       enablePanDownToClose
       handleIndicatorStyle={styles.handleIndicator}
       handleStyle={styles.handle}
-      index={0}
+      index={1}
       onClose={handleSheetClose}
       overDragResistanceFactor={4}
       snapPoints={snapPoints}

@@ -10,7 +10,6 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { BlurView } from 'expo-blur';
 import {
   ArrowLeft,
   Car,
@@ -21,14 +20,8 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react-native';
-import Svg, {
-  Defs,
-  LinearGradient as SvgLinearGradient,
-  Rect,
-  Stop,
-} from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useMapSearch } from '@/context/MapSearchContext';
+import { useMapOverlay } from '@/context/MapOverlayContext';
 import {
   type PlaceSearchSuggestion,
   useGooglePlaceSearch,
@@ -41,9 +34,6 @@ import Animated, {
   interpolateColor,
   useAnimatedStyle,
   useSharedValue,
-  withDelay,
-  withRepeat,
-  withSequence,
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
@@ -68,11 +58,11 @@ type NavItem = {
   onPress?: () => void;
 };
 
-const BLUE = '#3B82F6';
-const ACTIVE_BLUE = '#78B4FF';
-const INACTIVE = 'rgba(255,255,255,0.46)';
+const ACTIVE_COLOR = '#FFFFFF';
+const INACTIVE_COLOR = 'rgba(255,255,255,0.52)';
 const MORPH_DURATION = 320;
 const SEARCH_BAR_HEIGHT = 56;
+const NAVBAR_HEIGHT = 76;
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const SearchResultRow = memo(function SearchResultRow({
@@ -116,45 +106,6 @@ const SearchResultRow = memo(function SearchResultRow({
   );
 });
 
-function ActionGradient() {
-  return (
-    <Svg height="100%" pointerEvents="none" style={StyleSheet.absoluteFill} width="100%">
-      <Defs>
-        <SvgLinearGradient id="parking-action-gradient" x1="0" x2="1" y1="0" y2="1">
-          <Stop offset="0" stopColor="#55BCFF" />
-          <Stop offset="0.52" stopColor="#246BEE" />
-          <Stop offset="1" stopColor="#1648C7" />
-        </SvgLinearGradient>
-      </Defs>
-      <Rect fill="url(#parking-action-gradient)" height="100%" width="100%" />
-    </Svg>
-  );
-}
-
-function AmbientGradient({ warm }: { warm: boolean }) {
-  const gradientId = warm ? 'parking-ambient-warm' : 'parking-ambient-cool';
-
-  return (
-    <Svg height="100%" pointerEvents="none" style={StyleSheet.absoluteFill} width="100%">
-      <Defs>
-        <SvgLinearGradient id={gradientId} x1="0" x2="1" y1="0.5" y2="0.5">
-          <Stop
-            offset="0"
-            stopColor={warm ? '#E9A44F' : '#2877FF'}
-            stopOpacity={warm ? 0.16 : 0}
-          />
-          <Stop
-            offset="1"
-            stopColor={warm ? '#E9A44F' : '#2877FF'}
-            stopOpacity={warm ? 0 : 0.2}
-          />
-        </SvgLinearGradient>
-      </Defs>
-      <Rect fill={`url(#${gradientId})`} height="100%" width="100%" />
-    </Svg>
-  );
-}
-
 function NavigationItem({
   item,
   active,
@@ -164,7 +115,7 @@ function NavigationItem({
 }) {
   const pressedScale = useSharedValue(1);
   const Icon = item.icon;
-  const color = active ? ACTIVE_BLUE : INACTIVE;
+  const color = active ? ACTIVE_COLOR : INACTIVE_COLOR;
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pressedScale.value }],
@@ -186,118 +137,71 @@ function NavigationItem({
       style={styles.navigationItem}
     >
       <Animated.View style={[styles.navigationItemContent, animatedStyle]}>
-        <Icon color={color} size={22} strokeWidth={2.05} />
+        <View
+          style={[
+            styles.navigationIcon,
+            active ? styles.navigationIconActive : null,
+          ]}
+        >
+          <Icon color={color} size={20} strokeWidth={active ? 2.4 : 2.05} />
+        </View>
         <Text numberOfLines={1} style={[styles.navigationLabel, { color }]}>
           {item.label}
         </Text>
+        <View
+          style={[
+            styles.activeDot,
+            { opacity: active ? 1 : 0 },
+          ]}
+        />
       </Animated.View>
     </Pressable>
   );
 }
 
-function Twinkle({
-  active,
-  delay,
-  style,
-}: {
-  active: boolean;
-  delay: number;
-  style: { left?: number; right?: number; top: number; width: number; height: number };
-}) {
-  const opacity = useSharedValue(0.28);
-
-  useEffect(() => {
-    opacity.value = withDelay(
-      delay,
-      withRepeat(
-        withSequence(
-          withTiming(0.3, { duration: active ? 220 : 420 }),
-          withTiming(0.1, { duration: active ? 360 : 720 }),
-        ),
-        -1,
-        true,
-      ),
-    );
-  }, [active, delay, opacity]);
-
-  const animatedStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
-
-  return <Animated.View pointerEvents="none" style={[styles.twinkle, style, animatedStyle]} />;
-}
-
 function ParkingAction({
+  expandedWidth,
   formattedTime,
   isActive,
   onPress,
 }: {
+  expandedWidth: number;
   formattedTime: string;
   isActive: boolean;
   onPress: () => void;
 }) {
   const pressedScale = useSharedValue(1);
-  const pulse = useSharedValue(1);
-  const pulseOpacity = useSharedValue(0.28);
   const activeProgress = useSharedValue(isActive ? 1 : 0);
-  const actionWidth = useSharedValue(isActive ? 136 : 72);
+  const actionWidth = useSharedValue(isActive ? expandedWidth : 60);
 
   useEffect(() => {
-    activeProgress.value = withTiming(isActive ? 1 : 0, { duration: 240 });
-    actionWidth.value = withSpring(isActive ? 136 : 72, {
-      damping: 16,
-      stiffness: 180,
+    activeProgress.value = withTiming(isActive ? 1 : 0, { duration: 200 });
+    actionWidth.value = withSpring(isActive ? expandedWidth : 60, {
+      damping: 20,
+      stiffness: 240,
     });
-    pulse.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: isActive ? 700 : 2200 }),
-        withTiming(isActive ? 1.08 : 1.18, { duration: isActive ? 320 : 520 }),
-        withTiming(1, { duration: isActive ? 220 : 280 }),
-      ),
-      -1,
-      false,
-    );
-    pulseOpacity.value = withRepeat(
-      withSequence(
-        withTiming(isActive ? 0.18 : 0.12, { duration: isActive ? 700 : 2200 }),
-        withTiming(0, { duration: isActive ? 540 : 800 }),
-      ),
-      -1,
-      false,
-    );
-  }, [actionWidth, activeProgress, isActive, pulse, pulseOpacity]);
+  }, [actionWidth, activeProgress, expandedWidth, isActive]);
 
   const buttonStyle = useAnimatedStyle(() => ({
     width: actionWidth.value,
     backgroundColor: interpolateColor(
       activeProgress.value,
       [0, 1],
-      ['#246BEE', '#E1D8C6'],
+      ['#2563EB', '#172554'],
     ),
     transform: [{ scale: pressedScale.value }],
   }));
-  const pulseStyle = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(
-      activeProgress.value,
-      [0, 1],
-      ['#3B82F6', '#E1D8C6'],
-    ),
-    opacity: pulseOpacity.value,
-    transform: [{ scale: pulse.value }],
-  }));
-  const gradientStyle = useAnimatedStyle(() => ({
-    opacity: 1 - activeProgress.value,
-  }));
   const parkingMarkStyle = useAnimatedStyle(() => ({
     opacity: 1 - activeProgress.value,
-    transform: [{ scale: 1 - activeProgress.value * 0.15 }],
+    transform: [{ scale: 1 - activeProgress.value * 0.08 }],
   }));
   const stopwatchStyle = useAnimatedStyle(() => ({
     opacity: activeProgress.value,
-    transform: [{ scale: 0.9 + activeProgress.value * 0.1 }],
+    transform: [{ scale: 0.94 + activeProgress.value * 0.06 }],
   }));
 
   return (
     <Animated.View style={[styles.actionContainer, buttonStyle]}>
-      <Animated.View pointerEvents="none" style={[styles.actionPulse, pulseStyle]} />
       <Pressable
         accessibilityLabel={isActive ? `Stop parking timer at ${formattedTime}` : 'Start parking timer'}
         accessibilityRole="button"
@@ -313,12 +217,6 @@ function ParkingAction({
         style={styles.actionPressable}
       >
         <View style={styles.actionButton}>
-          <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, gradientStyle]}>
-            <ActionGradient />
-          </Animated.View>
-          <Twinkle active={isActive} delay={120} style={{ left: 16, top: 13, width: 3, height: 3 }} />
-          <Twinkle active={isActive} delay={760} style={{ right: 14, top: 20, width: 4, height: 4 }} />
-          <Twinkle active={isActive} delay={1380} style={{ right: 21, top: 10, width: 2, height: 2 }} />
           <Animated.View pointerEvents="none" style={[styles.actionContent, parkingMarkStyle]}>
             <Text style={styles.parkingMark}>P</Text>
           </Animated.View>
@@ -349,7 +247,7 @@ export default function BottomNavBar({
   const [isParkingActive, setIsParkingActive] = useState(false);
   const stopwatch = useStopwatch();
   const morphProgress = useSharedValue(isSearchActive ? 1 : 0);
-  const { selectPlace } = useMapSearch();
+  const { selectPlace } = useMapOverlay();
   const {
     beginSearchSession,
     error,
@@ -364,8 +262,12 @@ export default function BottomNavBar({
   } = useGooglePlaceSearch();
   const normalWidth = Math.min(windowWidth - 24, 420);
   const searchWidth = Math.min(windowWidth - 32, 420);
+  const expandedActionWidth = Math.max(
+    96,
+    Math.min(124, normalWidth - 220),
+  );
   const bottomOffset = Math.max(insets.bottom, 10) + 10;
-  const normalTop = windowHeight - bottomOffset - 80;
+  const normalTop = windowHeight - bottomOffset - NAVBAR_HEIGHT;
   const searchTop = insets.top + 12;
   const searchTranslateY = searchTop - normalTop;
   const suggestionMaxHeight = Math.max(
@@ -374,7 +276,7 @@ export default function BottomNavBar({
   );
   const items: NavItem[] = [
     { key: 'search', label: 'SEARCH', icon: Search, onPress: onSearchPress },
-    { key: 'car', label: 'PARKING', icon: Car, onPress: onCarPress },
+    { key: 'car', label: 'GARAGE', icon: Car, onPress: onCarPress },
     { key: 'favorite', label: 'FAVORITES', icon: Heart, onPress: onFavoritePress },
     { key: 'profile', label: 'YOU', icon: UserRound, onPress: onProfilePress },
   ];
@@ -471,7 +373,7 @@ export default function BottomNavBar({
     height: interpolate(
       morphProgress.value,
       [0, 1],
-      [80, SEARCH_BAR_HEIGHT],
+      [NAVBAR_HEIGHT, SEARCH_BAR_HEIGHT],
       Extrapolation.CLAMP,
     ),
     borderRadius: interpolate(
@@ -483,7 +385,7 @@ export default function BottomNavBar({
     backgroundColor: interpolateColor(
       morphProgress.value,
       [0, 0.18, 1],
-      ['rgba(16,16,18,0.62)', '#FFFFFF', '#FFFFFF'],
+      ['rgba(18,18,20,0.92)', '#FFFFFF', '#FFFFFF'],
     ),
     borderColor: interpolateColor(
       morphProgress.value,
@@ -493,20 +395,6 @@ export default function BottomNavBar({
         'rgba(255,255,255,0.72)',
         'rgba(255,255,255,0.8)',
       ],
-    ),
-    elevation: interpolate(
-      morphProgress.value,
-      [0, 1],
-      [8, 12],
-      Extrapolation.CLAMP,
-    ),
-  }));
-  const glassStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(
-      morphProgress.value,
-      [0, 0.22],
-      [1, 0],
-      Extrapolation.CLAMP,
     ),
   }));
   const navStyle = useAnimatedStyle(() => ({
@@ -587,26 +475,6 @@ export default function BottomNavBar({
         <Animated.View style={[styles.morphSurface, surfaceStyle]}>
           <Animated.View
             pointerEvents={isSearchActive ? 'none' : 'auto'}
-            style={[StyleSheet.absoluteFill, glassStyle]}
-          >
-            <BlurView intensity={80} style={styles.glassBackground} tint="dark">
-              <View
-                pointerEvents="none"
-                style={[styles.ambientGlow, styles.amberGlow]}
-              >
-                <AmbientGradient warm />
-              </View>
-              <View
-                pointerEvents="none"
-                style={[styles.ambientGlow, styles.blueGlow]}
-              >
-                <AmbientGradient warm={false} />
-              </View>
-            </BlurView>
-          </Animated.View>
-
-          <Animated.View
-            pointerEvents={isSearchActive ? 'none' : 'auto'}
             style={[styles.normalContent, navStyle]}
           >
             <View style={styles.navigationGroup}>
@@ -620,6 +488,7 @@ export default function BottomNavBar({
             </View>
 
             <ParkingAction
+              expandedWidth={expandedActionWidth}
               formattedTime={stopwatch.formattedTime}
               isActive={isParkingActive}
               onPress={toggleParkingMode}
@@ -748,7 +617,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 40,
-    height: 80,
+    height: NAVBAR_HEIGHT,
     alignItems: 'center',
   },
   morphSurface: {
@@ -756,11 +625,7 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
-    boxShadow: '0 14px 34px rgba(0,0,0,0.22)',
-    overflow: 'hidden',
-  },
-  glassBackground: {
-    flex: 1,
+    boxShadow: '0 14px 36px rgba(0,0,0,0.28)',
     overflow: 'hidden',
   },
   normalContent: {
@@ -768,7 +633,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingLeft: 8,
-    paddingRight: 12,
+    paddingRight: 8,
   },
   searchContent: {
     ...StyleSheet.absoluteFillObject,
@@ -788,25 +653,12 @@ const styles = StyleSheet.create({
     boxShadow: '0 16px 38px rgba(15,23,42,0.18)',
     elevation: 10,
   },
-  ambientGlow: {
-    position: 'absolute',
-    bottom: -42,
-    width: 150,
-    height: 110,
-    borderRadius: 75,
-  },
-  amberGlow: {
-    left: -46,
-  },
-  blueGlow: {
-    right: -30,
-  },
   navigationGroup: {
     flex: 1,
     height: '100%',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingRight: 7,
+    paddingRight: 6,
   },
   navigationItem: {
     flex: 1,
@@ -819,41 +671,52 @@ const styles = StyleSheet.create({
     minWidth: 46,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 7,
+    gap: 3,
+  },
+  navigationIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  navigationIconActive: {
+    backgroundColor: 'rgba(59,130,246,0.22)',
+    borderWidth: 1,
+    borderColor: 'rgba(147,197,253,0.22)',
   },
   navigationLabel: {
-    fontSize: 9,
-    lineHeight: 10,
-    fontWeight: '700',
-    letterSpacing: 0.35,
+    fontSize: 8,
+    lineHeight: 9,
+    fontWeight: '800',
+    letterSpacing: 0.45,
+  },
+  activeDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#60A5FA',
   },
   actionContainer: {
-    width: 72,
-    height: 64,
-    borderRadius: 24,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     borderCurve: 'continuous',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  actionPulse: {
-    position: 'absolute',
-    left: 4,
-    right: 4,
-    height: 56,
-    borderRadius: 24,
-    borderCurve: 'continuous',
-    backgroundColor: BLUE,
+    boxShadow: '0 8px 24px rgba(37,99,235,0.38)',
   },
   actionButton: {
     width: '100%',
-    height: 64,
-    borderRadius: 24,
+    height: 60,
+    borderRadius: 30,
     borderCurve: 'continuous',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.28)',
-    boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.34), 0 8px 24px rgba(32,42,55,0.32)',
+    borderColor: 'rgba(255,255,255,0.24)',
+    boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.28)',
     overflow: 'hidden',
   },
   actionPressable: {
@@ -867,32 +730,26 @@ const styles = StyleSheet.create({
   },
   parkingMark: {
     color: '#FFFFFF',
-    fontSize: 29,
-    lineHeight: 33,
+    fontSize: 27,
+    lineHeight: 31,
     fontWeight: '900',
     letterSpacing: -1,
     includeFontPadding: false,
   },
   stopwatchLabel: {
-    color: 'rgba(44,38,29,0.62)',
+    color: 'rgba(255,255,255,0.65)',
     fontSize: 8,
     lineHeight: 10,
     fontWeight: '800',
     letterSpacing: 1.05,
   },
   stopwatchTime: {
-    color: '#2C261D',
+    color: '#FFFFFF',
     fontFamily: process.env.EXPO_OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 19,
-    lineHeight: 24,
+    fontSize: 18,
+    lineHeight: 23,
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
     letterSpacing: -0.5,
-  },
-  twinkle: {
-    position: 'absolute',
-    zIndex: 2,
-    borderRadius: 99,
-    backgroundColor: '#FFFFFF',
   },
 });

@@ -1,38 +1,14 @@
-import { useCallback } from 'react';
-import { useRouter } from 'expo-router';
-import { View } from 'react-native';
+import { useEffect } from 'react';
+import { Redirect } from 'expo-router';
 
-import { FavoriteParkingBottomSheet } from '@/components/parking-map/FavoriteParkingBottomSheet';
-import { C } from '@/constants/theme';
-import type { ParkingClusterResponse } from '@/types/parking-map';
+import { useMapOverlay } from '@/context/MapOverlayContext';
 
-export default function FavoritesScreen() {
-  const router = useRouter();
+export default function FavoritesDeepLink() {
+  const { openOverlay } = useMapOverlay();
 
-  const handleClose = useCallback(() => {
-    router.replace('/map');
-  }, [router]);
+  useEffect(() => {
+    openOverlay('favorites');
+  }, [openOverlay]);
 
-  const handleSpotPress = useCallback(
-    (item: ParkingClusterResponse) => {
-      router.replace({
-        pathname: '/map',
-        params: {
-          favoriteFocusKey: Date.now().toString(),
-          favoriteSpotId: item.id,
-        },
-      });
-    },
-    [router],
-  );
-
-  return (
-    <View style={{ flex: 1, backgroundColor: C.bg }}>
-      <View className="absolute inset-0 bg-slate-200" />
-      <FavoriteParkingBottomSheet
-        onClose={handleClose}
-        onSpotPress={handleSpotPress}
-      />
-    </View>
-  );
+  return <Redirect href="/map" />;
 }

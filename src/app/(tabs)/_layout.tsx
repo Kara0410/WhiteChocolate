@@ -1,43 +1,73 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect } from 'react';
 import { Stack, usePathname, useRouter } from 'expo-router';
-import { View } from 'react-native';
+import { BackHandler, View } from 'react-native';
 import BottomNavBar from '@/components/BottomNavBar';
 import { FavoriteParkingProvider } from '@/context/FavoriteParkingContext';
-import { MapSearchProvider, useMapSearch } from '@/context/MapSearchContext';
+import { VehicleProvider } from '@/context/VehicleContext';
+import {
+  MapOverlayProvider,
+  useMapOverlay,
+  type MapOverlayMode,
+} from '@/context/MapOverlayContext';
 import { C } from '@/constants/theme';
 
 function TabNavigation() {
   const router = useRouter();
   const pathname = usePathname();
-  const { closeSearch, isSearchActive, openSearch } = useMapSearch();
+  const {
+    activeOverlay,
+    closeOverlay,
+    closeSearch,
+    isSearchActive,
+    openSearch,
+    toggleOverlay,
+  } = useMapOverlay();
   const isMapRoute = pathname.endsWith('/map');
-  const previousPathnameRef = useRef(pathname);
 
   useEffect(() => {
-    if (
-      previousPathnameRef.current !== pathname &&
-      !isMapRoute &&
-      isSearchActive
-    ) {
-      closeSearch();
-    }
-    previousPathnameRef.current = pathname;
-  }, [closeSearch, isMapRoute, isSearchActive, pathname]);
+    const subscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => {
+        if (activeOverlay === 'none') {
+          return false;
+        }
 
-  const activeKey = pathname.endsWith('/account')
-    ? 'profile'
-    : pathname.endsWith('/favorites')
-      ? 'favorite'
-    : isMapRoute && isSearchActive
-      ? 'search'
-    : pathname.endsWith('/list')
+        closeOverlay();
+        return true;
+      },
+    );
+
+    return () => subscription.remove();
+  }, [activeOverlay, closeOverlay]);
+
+  const showOverlay = useCallback(
+    (mode: Exclude<MapOverlayMode, 'none' | 'search'>) => {
+      toggleOverlay(mode);
+      if (!isMapRoute) {
+        router.replace('/map');
+      }
+    },
+    [isMapRoute, router, toggleOverlay],
+  );
+
+  const activeKey =
+    pathname.endsWith('/garage')
       ? 'car'
-      : 'parking';
+      : activeOverlay === 'you'
+      ? 'profile'
+      : activeOverlay === 'favorites'
+        ? 'favorite'
+        : activeOverlay === 'search'
+          ? 'search'
+          : activeOverlay === 'parking'
+            ? 'car'
+            : 'parking';
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="map"       />
+        <Stack.Screen name="garage"    />
         <Stack.Screen name="list"      />
         <Stack.Screen name="favorites" />
         <Stack.Screen name="account"   />
@@ -45,17 +75,26 @@ function TabNavigation() {
       <BottomNavBar
         activeKey={activeKey}
         isSearchActive={isSearchActive}
-        onProfilePress={() => router.push('/account')}
+        onProfilePress={() => showOverlay('you')}
         onSearchCancel={closeSearch}
         onSearchPress={() => {
           openSearch();
           if (!isMapRoute) {
-            router.push('/map');
+            router.replace('/map');
           }
         }}
-        onCarPress={() => router.push('/list')}
-        onFavoritePress={() => router.push('/favorites')}
-        onParkingPress={() => router.push({ pathname: '/map', params: { locate: Date.now().toString() } })}
+        onCarPress={() => {
+          closeOverlay();
+          router.push('/garage');
+        }}
+        onFavoritePress={() => showOverlay('favorites')}
+        onParkingPress={() => {
+          closeOverlay();
+          router.replace({
+            pathname: '/map',
+            params: { locate: Date.now().toString() },
+          });
+        }}
       />
     </View>
   );
@@ -64,9 +103,11 @@ function TabNavigation() {
 export default function TabLayout() {
   return (
     <FavoriteParkingProvider>
-      <MapSearchProvider>
-        <TabNavigation />
-      </MapSearchProvider>
+      <VehicleProvider>
+        <MapOverlayProvider>
+          <TabNavigation />
+        </MapOverlayProvider>
+      </VehicleProvider>
     </FavoriteParkingProvider>
   );
 }
