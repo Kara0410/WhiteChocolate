@@ -425,7 +425,7 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
   );
 });
 
-export const ParkingBottomSheet = forwardRef<
+const ParkingBottomSheetComponent = forwardRef<
   ParkingBottomSheetHandle,
   ParkingBottomSheetProps
 >(function ParkingBottomSheet({ item, onClose, onCompact }, ref) {
@@ -555,6 +555,8 @@ export const ParkingBottomSheet = forwardRef<
   );
 });
 
+export const ParkingBottomSheet = memo(ParkingBottomSheetComponent);
+
 const styles = StyleSheet.create({
   background: {
     backgroundColor: '#F3F5F8',
@@ -575,12 +577,7 @@ const styles = StyleSheet.create({
   sheet: {
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
-    boxShadow: '0 -8px 24px rgba(0,0,0,0.12)',
-    elevation: 14,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: -8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 24,
+    boxShadow: '0 -4px 14px rgba(0,0,0,0.1)',
   },
   scrollContent: {
     paddingBottom: 120,

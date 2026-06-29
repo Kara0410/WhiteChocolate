@@ -55,14 +55,15 @@ export function useParkingClusters(
 
   const loadClusters = useCallback((camera: ParkingCameraState) => {
     const request = getParkingClusterRequest(camera, destination);
+    setCurrentRegion(camera);
+    setCurrentZoom(request.zoom);
+    currentZoomRef.current = request.zoom;
+
     if (request.tileKey === requestKeyRef.current) {
       return;
     }
 
     requestKeyRef.current = request.tileKey;
-    setCurrentRegion(camera);
-    setCurrentZoom(request.zoom);
-    currentZoomRef.current = request.zoom;
 
     const cached = clusterCache.get(request.tileKey);
     if (cached) {
@@ -81,9 +82,11 @@ export function useParkingClusters(
     return () => {
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
+        debounceRef.current = null;
       }
       if (displayCameraFrameRef.current !== null) {
         cancelAnimationFrame(displayCameraFrameRef.current);
+        displayCameraFrameRef.current = null;
       }
     };
   }, [initialCamera, loadClusters]);
@@ -129,7 +132,17 @@ export function useParkingClusters(
         clearTimeout(debounceRef.current);
       }
       debounceRef.current = setTimeout(
-        () => loadClusters(camera),
+        () => {
+          debounceRef.current = null;
+
+          if (displayCameraFrameRef.current !== null) {
+            cancelAnimationFrame(displayCameraFrameRef.current);
+            displayCameraFrameRef.current = null;
+          }
+
+          setDisplayCamera(latestCameraRef.current);
+          loadClusters(latestCameraRef.current);
+        },
         CAMERA_DEBOUNCE_MS,
       );
     },

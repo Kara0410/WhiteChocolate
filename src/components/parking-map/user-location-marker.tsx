@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { memo, useEffect } from 'react';
 import { View } from 'react-native';
 import Animated, {
   cancelAnimation,
@@ -9,7 +9,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-export function UserLocationMarker() {
+export const UserLocationMarker = memo(function UserLocationMarker() {
   const pulse = useSharedValue(0);
 
   useEffect(() => {
@@ -61,4 +61,4 @@ export function UserLocationMarker() {
       />
     </View>
   );
-}
+});

@@ -121,7 +121,7 @@ const NearestSpotRow = memo(function NearestSpotRow({
   );
 });
 
-export function SearchNearestSpotsBottomSheet({
+function SearchNearestSpotsBottomSheetComponent({
   searchPlace,
   spots,
   onClose,
@@ -213,6 +213,7 @@ export function SearchNearestSpotsBottomSheet({
           { paddingBottom: Math.max(insets.bottom, 10) + 118 },
         ]}
         data={spots}
+        initialNumToRender={8}
         keyExtractor={(item) => item.id}
         keyboardShouldPersistTaps="handled"
         ListEmptyComponent={
@@ -225,12 +226,19 @@ export function SearchNearestSpotsBottomSheet({
             </Text>
           </View>
         }
+        maxToRenderPerBatch={8}
         renderItem={renderSpot}
         showsVerticalScrollIndicator={false}
+        updateCellsBatchingPeriod={50}
+        windowSize={5}
       />
     </BottomSheet>
   );
 }
+
+export const SearchNearestSpotsBottomSheet = memo(
+  SearchNearestSpotsBottomSheetComponent,
+);
 
 const styles = StyleSheet.create({
   background: {
@@ -240,8 +248,7 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     borderCurve: 'continuous',
-    boxShadow: '0 8px 20px rgba(15,23,42,0.08)',
-    elevation: 2,
+    boxShadow: '0 4px 12px rgba(15,23,42,0.07)',
   },
   handle: {
     paddingBottom: 10,
@@ -259,17 +266,11 @@ const styles = StyleSheet.create({
   },
   row: {
     borderCurve: 'continuous',
-    boxShadow: '0 10px 26px rgba(15,23,42,0.08)',
-    elevation: 3,
+    boxShadow: '0 4px 12px rgba(15,23,42,0.07)',
   },
   sheet: {
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
-    boxShadow: '0 -8px 24px rgba(0,0,0,0.12)',
-    elevation: 14,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: -8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 24,
+    boxShadow: '0 -4px 14px rgba(0,0,0,0.1)',
   },
 });

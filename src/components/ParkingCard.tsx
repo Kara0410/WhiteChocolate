@@ -39,7 +39,6 @@ function ParkingCard({ item, showDist }: Props) {
         height:        showDist ? CARD_H_DIST : CARD_H,
         marginBottom:  ITEM_MARGIN,
         opacity:       pressed ? 0.75 : 1,
-        elevation:     3, // Android drop shadow
       })}
       className="bg-elevated rounded-[14px] px-3.5 justify-between shadow-sm"
       onPress={onPress}

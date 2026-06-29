@@ -57,6 +57,35 @@ const LABEL_FREE_MAP_STYLE = JSON.stringify([
     stylers: [{ visibility: 'off' }],
   },
 ]);
+const MAP_VIEW_STYLE = { flex: 1 } as const;
+const APPLE_MAP_PROPERTIES = {
+  isMyLocationEnabled: false,
+  pointsOfInterest: { including: [] },
+};
+const APPLE_MAP_UI_SETTINGS = {
+  compassEnabled: false,
+  myLocationButtonEnabled: false,
+  scaleBarEnabled: false,
+  togglePitchEnabled: false,
+};
+const GOOGLE_MAP_PROPERTIES = {
+  isBuildingEnabled: false,
+  isIndoorEnabled: false,
+  isMyLocationEnabled: false,
+  isTrafficEnabled: false,
+  selectionEnabled: false,
+  mapStyleOptions: { json: LABEL_FREE_MAP_STYLE },
+};
+const GOOGLE_MAP_UI_SETTINGS = {
+  compassEnabled: false,
+  indoorLevelPickerEnabled: false,
+  mapToolbarEnabled: false,
+  myLocationButtonEnabled: false,
+  rotationGesturesEnabled: false,
+  scaleBarEnabled: false,
+  tiltGesturesEnabled: false,
+  zoomControlsEnabled: false,
+};
 
 const FULL_SHEET_RATIO = 0.5;
 const PROGRAMMATIC_CAMERA_GUARD_MS = 500;
@@ -74,9 +103,6 @@ type ParkingMapProps = {
   locationMessage?: string | null;
   onRequestUserLocation?: () => Promise<ParkingCoordinates | null>;
   userLocation?: ParkingCoordinates | null;
-  onSelectedParkingItemChange?: (
-    item: ParkingClusterResponse | null,
-  ) => void;
 };
 
 type ParkingSelectionSource = 'marker' | 'favorite' | 'search';
@@ -140,7 +166,6 @@ export function ParkingMap({
   locationMessage,
   onRequestUserLocation,
   userLocation,
-  onSelectedParkingItemChange,
 }: ParkingMapProps) {
   const insets = useSafeAreaInsets();
   const {
@@ -520,7 +545,6 @@ export function ParkingMap({
       const focusCamera = options.focusCamera ?? true;
 
       setSelectedParkingItem(item);
-      onSelectedParkingItemChange?.(item);
       if (!focusCamera) {
         cancelPendingCameraFocus();
         return;
@@ -543,7 +567,6 @@ export function ParkingMap({
     [
       cancelPendingCameraFocus,
       focusMarkerAboveSheetSafely,
-      onSelectedParkingItemChange,
     ],
   );
 
@@ -558,7 +581,6 @@ export function ParkingMap({
   const handleSelectSearchPlace = useCallback(
     (place: PlaceSearchResult) => {
       setSelectedParkingItem(null);
-      onSelectedParkingItemChange?.(null);
       cancelPendingCameraFocus();
       setSelectedSearchPlace(place);
       focusCoordinatesAboveSheetSafely(
@@ -569,7 +591,6 @@ export function ParkingMap({
     [
       cancelPendingCameraFocus,
       focusCoordinatesAboveSheetSafely,
-      onSelectedParkingItemChange,
     ],
   );
 
@@ -587,8 +608,7 @@ export function ParkingMap({
 
   const clearSelection = useCallback(() => {
     setSelectedParkingItem(null);
-    onSelectedParkingItemChange?.(null);
-  }, [onSelectedParkingItemChange]);
+  }, []);
 
   const prepareForLocationFocus = useCallback(() => {
     closeOverlay();
@@ -664,7 +684,11 @@ export function ParkingMap({
 
   const handleLayout = useCallback((event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
-    setMapSize({ width, height });
+    setMapSize((current) =>
+      current.width === width && current.height === height
+        ? current
+        : { width, height },
+    );
   }, []);
 
   const handleCameraMove = useCallback(
@@ -865,17 +889,9 @@ export function ParkingMap({
           cameraPosition={cameraPosition}
           onCameraMove={handleCameraMove}
           onMapClick={handleMapPress}
-          properties={{
-            isMyLocationEnabled: false,
-            pointsOfInterest: { including: [] },
-          }}
-          style={{ flex: 1 }}
-          uiSettings={{
-            compassEnabled: false,
-            myLocationButtonEnabled: false,
-            scaleBarEnabled: false,
-            togglePitchEnabled: false,
-          }}
+          properties={APPLE_MAP_PROPERTIES}
+          style={MAP_VIEW_STYLE}
+          uiSettings={APPLE_MAP_UI_SETTINGS}
         />
       ) : Platform.OS === 'android' ? (
         <GoogleMaps.View
@@ -883,25 +899,9 @@ export function ParkingMap({
           cameraPosition={cameraPosition}
           onCameraMove={handleCameraMove}
           onMapClick={handleMapPress}
-          properties={{
-            isBuildingEnabled: false,
-            isIndoorEnabled: false,
-            isMyLocationEnabled: false,
-            isTrafficEnabled: false,
-            selectionEnabled: false,
-            mapStyleOptions: { json: LABEL_FREE_MAP_STYLE },
-          }}
-          style={{ flex: 1 }}
-          uiSettings={{
-            compassEnabled: false,
-            indoorLevelPickerEnabled: false,
-            mapToolbarEnabled: false,
-            myLocationButtonEnabled: false,
-            rotationGesturesEnabled: false,
-            scaleBarEnabled: false,
-            tiltGesturesEnabled: false,
-            zoomControlsEnabled: false,
-          }}
+          properties={GOOGLE_MAP_PROPERTIES}
+          style={MAP_VIEW_STYLE}
+          uiSettings={GOOGLE_MAP_UI_SETTINGS}
         />
       ) : (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>

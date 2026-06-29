@@ -74,6 +74,21 @@ export function useGooglePlaceSearch() {
   const detailsRequestIdRef = useRef(0);
   const autocompleteAbortRef = useRef<AbortController | null>(null);
   const detailsAbortRef = useRef<AbortController | null>(null);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+
+    return () => {
+      isMountedRef.current = false;
+      autocompleteRequestIdRef.current += 1;
+      detailsRequestIdRef.current += 1;
+      autocompleteAbortRef.current?.abort();
+      detailsAbortRef.current?.abort();
+      autocompleteAbortRef.current = null;
+      detailsAbortRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -106,7 +121,10 @@ export function useGooglePlaceSearch() {
       signal: abortController.signal,
     })
       .then((nextSuggestions) => {
-        if (requestId !== autocompleteRequestIdRef.current) {
+        if (
+          !isMountedRef.current ||
+          requestId !== autocompleteRequestIdRef.current
+        ) {
           return;
         }
 
@@ -114,6 +132,7 @@ export function useGooglePlaceSearch() {
       })
       .catch((searchError: unknown) => {
         if (
+          !isMountedRef.current ||
           requestId !== autocompleteRequestIdRef.current ||
           abortController.signal.aborted
         ) {
@@ -127,7 +146,10 @@ export function useGooglePlaceSearch() {
         }
       })
       .finally(() => {
-        if (requestId === autocompleteRequestIdRef.current) {
+        if (
+          isMountedRef.current &&
+          requestId === autocompleteRequestIdRef.current
+        ) {
           setIsLoading(false);
         }
       });
@@ -174,7 +196,10 @@ export function useGooglePlaceSearch() {
           signal: abortController.signal,
         });
 
-        if (requestId !== detailsRequestIdRef.current) {
+        if (
+          !isMountedRef.current ||
+          requestId !== detailsRequestIdRef.current
+        ) {
           return null;
         }
 
@@ -183,6 +208,7 @@ export function useGooglePlaceSearch() {
         return place;
       } catch (detailsError: unknown) {
         if (
+          !isMountedRef.current ||
           requestId !== detailsRequestIdRef.current ||
           abortController.signal.aborted
         ) {
@@ -195,7 +221,10 @@ export function useGooglePlaceSearch() {
         }
         return null;
       } finally {
-        if (requestId === detailsRequestIdRef.current) {
+        if (
+          isMountedRef.current &&
+          requestId === detailsRequestIdRef.current
+        ) {
           setIsResolvingPlace(false);
         }
       }

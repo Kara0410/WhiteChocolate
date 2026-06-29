@@ -28,9 +28,9 @@ export const ParkingMarkerCard = memo(function ParkingMarkerCard({
   return (
     <View>
       <ParkingAvailabilityBubble
-        moving={moving}
         onPress={handlePress}
         percentage={item.availabilityPercent}
+        performanceMode={moving ? 'moving' : 'normal'}
         size={size}
         state={selected ? 'selected' : 'default'}
         type={item.type}

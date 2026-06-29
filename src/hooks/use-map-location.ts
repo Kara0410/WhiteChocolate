@@ -78,6 +78,7 @@ async function getDeviceLocation(): Promise<LocationResult> {
 
 export function useMapLocation() {
   const bootstrapPromiseRef = useRef<Promise<LocationResult> | null>(null);
+  const isMountedRef = useRef(true);
   const requestIdRef = useRef(0);
   const [initialCamera, setInitialCamera] =
     useState<ParkingCameraState | null>(null);
@@ -98,12 +99,25 @@ export function useMapLocation() {
   }, []);
 
   useEffect(() => {
+    isMountedRef.current = true;
+
+    return () => {
+      isMountedRef.current = false;
+      requestIdRef.current += 1;
+    };
+  }, []);
+
+  useEffect(() => {
     let isActive = true;
     const requestId = ++requestIdRef.current;
     bootstrapPromiseRef.current ??= getDeviceLocation();
 
     void bootstrapPromiseRef.current.then((result) => {
-      if (!isActive || requestId !== requestIdRef.current) {
+      if (
+        !isActive ||
+        !isMountedRef.current ||
+        requestId !== requestIdRef.current
+      ) {
         return;
       }
 
@@ -121,10 +135,12 @@ export function useMapLocation() {
 
   const requestCurrentLocation = useCallback(async () => {
     const requestId = ++requestIdRef.current;
-    setIsLocationLoading(true);
+    if (isMountedRef.current) {
+      setIsLocationLoading(true);
+    }
     const result = await getDeviceLocation();
 
-    if (requestId !== requestIdRef.current) {
+    if (!isMountedRef.current || requestId !== requestIdRef.current) {
       return null;
     }
 

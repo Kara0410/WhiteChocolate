@@ -1,11 +1,8 @@
-import { useCallback, useState } from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, Text, View } from 'react-native';
 
 import { ParkingMap } from '@/components/parking-map/parking-map';
 import { useMapLocation } from '@/hooks/use-map-location';
-import type { ParkingClusterResponse } from '@/types/parking-map';
-
 export default function MapScreen() {
   const { favoriteFocusKey, favoriteSpotId, focusSearch, locate } =
     useLocalSearchParams<{
@@ -21,15 +18,6 @@ export default function MapScreen() {
     requestCurrentLocation,
     userLocation,
   } = useMapLocation();
-  const [, setSelectedParkingItem] =
-    useState<ParkingClusterResponse | null>(null);
-  const handleSelectionChange = useCallback(
-    (item: ParkingClusterResponse | null) => {
-      setSelectedParkingItem(item);
-    },
-    [],
-  );
-
   if (initialCamera === null) {
     return (
       <View className="flex-1 items-center justify-center bg-slate-100">
@@ -51,7 +39,6 @@ export default function MapScreen() {
       initialCamera={initialCamera}
       isLocationLoading={isLocationLoading}
       locationMessage={locationMessage}
-      onSelectedParkingItemChange={handleSelectionChange}
       onRequestUserLocation={requestCurrentLocation}
       searchFocusKey={focusSearch}
       userLocation={userLocation}

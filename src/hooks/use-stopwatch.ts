@@ -19,6 +19,7 @@ export function useStopwatch() {
   const [isRunning, setIsRunning] = useState(false);
   const startedAtRef = useRef<number | null>(null);
   const accumulatedSecondsRef = useRef(0);
+  const elapsedSecondsRef = useRef(0);
 
   useEffect(() => {
     if (!isRunning || startedAtRef.current === null) {
@@ -31,7 +32,10 @@ export function useStopwatch() {
       }
 
       const currentSessionSeconds = Math.floor((Date.now() - startedAtRef.current) / 1000);
-      setElapsedSeconds(accumulatedSecondsRef.current + currentSessionSeconds);
+      const nextElapsedSeconds =
+        accumulatedSecondsRef.current + currentSessionSeconds;
+      elapsedSecondsRef.current = nextElapsedSeconds;
+      setElapsedSeconds(nextElapsedSeconds);
     };
 
     updateElapsedTime();
@@ -43,26 +47,39 @@ export function useStopwatch() {
   const start = useCallback((reset = false) => {
     if (reset) {
       accumulatedSecondsRef.current = 0;
+      elapsedSecondsRef.current = 0;
       setElapsedSeconds(0);
     } else {
-      accumulatedSecondsRef.current = elapsedSeconds;
+      accumulatedSecondsRef.current = elapsedSecondsRef.current;
     }
 
     startedAtRef.current = Date.now();
     setIsRunning(true);
-  }, [elapsedSeconds]);
+  }, []);
 
   const stop = useCallback(() => {
-    accumulatedSecondsRef.current = elapsedSeconds;
+    if (startedAtRef.current !== null) {
+      const currentSessionSeconds = Math.floor(
+        (Date.now() - startedAtRef.current) / 1000,
+      );
+      const nextElapsedSeconds =
+        accumulatedSecondsRef.current + currentSessionSeconds;
+      accumulatedSecondsRef.current = nextElapsedSeconds;
+      elapsedSecondsRef.current = nextElapsedSeconds;
+      setElapsedSeconds(nextElapsedSeconds);
+    }
+
     startedAtRef.current = null;
     setIsRunning(false);
-  }, [elapsedSeconds]);
+  }, []);
 
   const reset = useCallback(() => {
     accumulatedSecondsRef.current = 0;
-    startedAtRef.current = isRunning ? Date.now() : null;
+    elapsedSecondsRef.current = 0;
+    startedAtRef.current =
+      startedAtRef.current === null ? null : Date.now();
     setElapsedSeconds(0);
-  }, [isRunning]);
+  }, []);
 
   return {
     elapsedSeconds,

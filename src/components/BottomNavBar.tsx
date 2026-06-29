@@ -1,4 +1,11 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -106,7 +113,7 @@ const SearchResultRow = memo(function SearchResultRow({
   );
 });
 
-function NavigationItem({
+const NavigationItem = memo(function NavigationItem({
   item,
   active,
 }: {
@@ -157,9 +164,9 @@ function NavigationItem({
       </Animated.View>
     </Pressable>
   );
-}
+});
 
-function ParkingAction({
+const ParkingAction = memo(function ParkingAction({
   expandedWidth,
   formattedTime,
   isActive,
@@ -228,6 +235,10 @@ function ParkingAction({
       </Pressable>
     </Animated.View>
   );
+});
+
+function searchSuggestionKeyExtractor(item: PlaceSearchSuggestion) {
+  return item.id;
 }
 
 export default function BottomNavBar({
@@ -245,7 +256,11 @@ export default function BottomNavBar({
   const inputRef = useRef<TextInput>(null);
   const focusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isParkingActive, setIsParkingActive] = useState(false);
-  const stopwatch = useStopwatch();
+  const {
+    formattedTime,
+    start: startStopwatch,
+    stop: stopStopwatch,
+  } = useStopwatch();
   const morphProgress = useSharedValue(isSearchActive ? 1 : 0);
   const { selectPlace } = useMapOverlay();
   const {
@@ -274,23 +289,41 @@ export default function BottomNavBar({
     120,
     Math.min(360, windowHeight - searchTop - SEARCH_BAR_HEIGHT - 28),
   );
-  const items: NavItem[] = [
-    { key: 'search', label: 'SEARCH', icon: Search, onPress: onSearchPress },
-    { key: 'car', label: 'GARAGE', icon: Car, onPress: onCarPress },
-    { key: 'favorite', label: 'FAVORITES', icon: Heart, onPress: onFavoritePress },
-    { key: 'profile', label: 'YOU', icon: UserRound, onPress: onProfilePress },
-  ];
-  const toggleParkingMode = () => {
+  const items = useMemo<NavItem[]>(
+    () => [
+      { key: 'search', label: 'SEARCH', icon: Search, onPress: onSearchPress },
+      { key: 'car', label: 'GARAGE', icon: Car, onPress: onCarPress },
+      {
+        key: 'favorite',
+        label: 'FAVORITES',
+        icon: Heart,
+        onPress: onFavoritePress,
+      },
+      {
+        key: 'profile',
+        label: 'YOU',
+        icon: UserRound,
+        onPress: onProfilePress,
+      },
+    ],
+    [onCarPress, onFavoritePress, onProfilePress, onSearchPress],
+  );
+  const toggleParkingMode = useCallback(() => {
     if (isParkingActive) {
-      stopwatch.stop();
+      stopStopwatch();
       setIsParkingActive(false);
       return;
     }
 
-    stopwatch.start(true);
+    startStopwatch(true);
     setIsParkingActive(true);
     onParkingPress?.();
-  };
+  }, [
+    isParkingActive,
+    onParkingPress,
+    startStopwatch,
+    stopStopwatch,
+  ]);
 
   useEffect(() => {
     if (focusTimerRef.current) {
@@ -349,6 +382,16 @@ export default function BottomNavBar({
       }
     },
     [selectPlace, selectSuggestion],
+  );
+  const renderSearchResult = useCallback(
+    ({ item }: { item: PlaceSearchSuggestion }) => (
+      <SearchResultRow
+        disabled={isResolvingPlace}
+        item={item}
+        onPress={handleSelectPlace}
+      />
+    ),
+    [handleSelectPlace, isResolvingPlace],
   );
 
   const wrapperStyle = useAnimatedStyle(() => ({
@@ -489,7 +532,7 @@ export default function BottomNavBar({
 
             <ParkingAction
               expandedWidth={expandedActionWidth}
-              formattedTime={stopwatch.formattedTime}
+              formattedTime={formattedTime}
               isActive={isParkingActive}
               onPress={toggleParkingMode}
             />
@@ -555,8 +598,9 @@ export default function BottomNavBar({
         >
           <FlatList
             data={results}
+            initialNumToRender={6}
             keyboardShouldPersistTaps="handled"
-            keyExtractor={(item) => item.id}
+            keyExtractor={searchSuggestionKeyExtractor}
             ListEmptyComponent={
               <View className="border-t border-slate-100 px-4 py-6">
                 {isLoading ? (
@@ -591,14 +635,11 @@ export default function BottomNavBar({
                 )}
               </View>
             }
-            renderItem={({ item }) => (
-              <SearchResultRow
-                disabled={isResolvingPlace}
-                item={item}
-                onPress={handleSelectPlace}
-              />
-            )}
+            maxToRenderPerBatch={6}
+            renderItem={renderSearchResult}
             showsVerticalScrollIndicator={false}
+            updateCellsBatchingPeriod={50}
+            windowSize={5}
           />
         </Animated.View>
       </Animated.View>
@@ -625,7 +666,7 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
-    boxShadow: '0 14px 36px rgba(0,0,0,0.28)',
+    boxShadow: '0 10px 24px rgba(0,0,0,0.24)',
     overflow: 'hidden',
   },
   normalContent: {
@@ -650,8 +691,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.82)',
     backgroundColor: 'rgba(255,255,255,0.98)',
-    boxShadow: '0 16px 38px rgba(15,23,42,0.18)',
-    elevation: 10,
+    boxShadow: '0 10px 24px rgba(15,23,42,0.14)',
   },
   navigationGroup: {
     flex: 1,
@@ -705,7 +745,7 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: '0 8px 24px rgba(37,99,235,0.38)',
+    boxShadow: '0 5px 14px rgba(37,99,235,0.3)',
   },
   actionButton: {
     width: '100%',

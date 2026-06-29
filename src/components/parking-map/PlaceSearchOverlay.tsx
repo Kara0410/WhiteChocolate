@@ -64,6 +64,10 @@ const SearchResultRow = memo(function SearchResultRow({
   );
 });
 
+function searchSuggestionKeyExtractor(item: PlaceSearchSuggestion) {
+  return item.id;
+}
+
 export function PlaceSearchOverlay({
   visible,
   onClose,
@@ -110,6 +114,16 @@ export function PlaceSearchOverlay({
     },
     [onSelectPlace, selectSuggestion],
   );
+  const renderSearchResult = useCallback(
+    ({ item }: { item: PlaceSearchSuggestion }) => (
+      <SearchResultRow
+        disabled={isResolvingPlace}
+        item={item}
+        onPress={handleSelectPlace}
+      />
+    ),
+    [handleSelectPlace, isResolvingPlace],
+  );
 
   if (!visible) {
     return null;
@@ -131,8 +145,7 @@ export function PlaceSearchOverlay({
         style={{
           marginTop: insets.top + 12,
           borderCurve: 'continuous',
-          boxShadow: '0 16px 38px rgba(15,23,42,0.18)',
-          elevation: 10,
+          boxShadow: '0 10px 24px rgba(15,23,42,0.14)',
         }}
       >
         <View className="flex-row items-center px-4 py-3">
@@ -162,8 +175,9 @@ export function PlaceSearchOverlay({
 
         <FlatList
           data={results}
+          initialNumToRender={6}
           keyboardShouldPersistTaps="handled"
-          keyExtractor={(item) => item.id}
+          keyExtractor={searchSuggestionKeyExtractor}
           ListEmptyComponent={
             <View className="border-t border-slate-100 px-4 py-6">
               {isLoading ? (
@@ -195,14 +209,11 @@ export function PlaceSearchOverlay({
               )}
             </View>
           }
-          renderItem={({ item }) => (
-            <SearchResultRow
-              disabled={isResolvingPlace}
-              item={item}
-              onPress={handleSelectPlace}
-            />
-          )}
+          maxToRenderPerBatch={6}
+          renderItem={renderSearchResult}
           style={{ maxHeight: 360 }}
+          updateCellsBatchingPeriod={50}
+          windowSize={5}
         />
       </View>
     </View>

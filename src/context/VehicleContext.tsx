@@ -58,20 +58,31 @@ function vehicleReducer(
         action.vehicle,
       );
     case 'remove':
+      if (!state.vehicles.some((vehicle) => vehicle.id === action.vehicleId)) {
+        return state;
+      }
+
       return removeVehicleFromState(
         state.vehicles,
         state.activeVehicleId,
         action.vehicleId,
       );
-    case 'set-active':
+    case 'set-active': {
+      const activeVehicleId = setActiveVehicleInState(
+        state.vehicles,
+        state.activeVehicleId,
+        action.vehicleId,
+      );
+
+      if (activeVehicleId === state.activeVehicleId) {
+        return state;
+      }
+
       return {
         ...state,
-        activeVehicleId: setActiveVehicleInState(
-          state.vehicles,
-          state.activeVehicleId,
-          action.vehicleId,
-        ),
+        activeVehicleId,
       };
+    }
   }
 }
 
@@ -117,7 +128,8 @@ export function VehicleProvider({ children }: PropsWithChildren) {
 
   const value = useMemo(
     () => ({
-      ...state,
+      activeVehicleId: state.activeVehicleId,
+      vehicles: state.vehicles,
       addVehicle,
       isActiveVehicle,
       removeVehicle,
@@ -128,7 +140,8 @@ export function VehicleProvider({ children }: PropsWithChildren) {
       isActiveVehicle,
       removeVehicle,
       setActiveVehicle,
-      state,
+      state.activeVehicleId,
+      state.vehicles,
     ],
   );
 

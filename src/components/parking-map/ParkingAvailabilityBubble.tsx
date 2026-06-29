@@ -30,7 +30,7 @@ export type ParkingAvailabilityBubbleProps = {
   zoneCount?: number;
   size?: BubbleSize;
   state?: BubbleState;
-  moving?: boolean;
+  performanceMode?: 'normal' | 'moving';
   className?: string;
   onPress?: () => void;
 };
@@ -168,7 +168,7 @@ function ParkingAvailabilityBubble({
   zoneCount = 0,
   size = 'medium',
   state = 'default',
-  moving = false,
+  performanceMode = 'normal',
   className,
   onPress,
 }: ParkingAvailabilityBubbleProps) {
@@ -176,6 +176,7 @@ function ParkingAvailabilityBubble({
   const theme = getAvailabilityTheme(clampedPercentage);
   const selected = state === 'selected';
   const forcedPressed = state === 'pressed';
+  const moving = performanceMode === 'moving';
   const scale = useSharedValue(
     selected ? 1.04 : forcedPressed ? 0.97 : 1,
   );

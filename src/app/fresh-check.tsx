@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import Animated, {
+  cancelAnimation,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -26,15 +27,25 @@ export default function FreshCheckScreen() {
   useEffect(() => {
     pulse.value = withRepeat(withTiming(1, { duration: 1600 }), -1, true);
     intervalRef.current = setInterval(() => {
-      setElapsed((v) => Math.min(CHECK_SECONDS, v + 1));
+      setElapsed((value) => Math.min(CHECK_SECONDS, value + 1));
     }, 1000);
+
     return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      cancelAnimation(pulse);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
     };
   }, [pulse]);
 
   useEffect(() => {
     if (elapsed >= CHECK_SECONDS) {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+
       const t = setTimeout(() => router.back(), 600);
       return () => clearTimeout(t);
     }
@@ -92,11 +103,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,252,245,0.97)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.7)',
-    shadowColor: '#192A2F',
-    shadowOffset: { width: 0, height: 28 },
-    shadowOpacity: 0.2,
-    shadowRadius: 50,
-    elevation: 12,
+    boxShadow: '0 12px 28px rgba(25,42,47,0.16)',
   },
   pulseRing: {
     width: 82,

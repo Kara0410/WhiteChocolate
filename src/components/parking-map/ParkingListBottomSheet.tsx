@@ -174,6 +174,7 @@ export function ParkingListBottomSheet({
         maxToRenderPerBatch={12}
         renderItem={renderItem}
         showsVerticalScrollIndicator={false}
+        updateCellsBatchingPeriod={50}
         windowSize={7}
       />
     </BottomSheet>
@@ -188,7 +189,7 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     borderCurve: 'continuous',
-    boxShadow: '0 8px 20px rgba(15,23,42,0.08)',
+    boxShadow: '0 4px 12px rgba(15,23,42,0.07)',
   },
   content: {
     paddingHorizontal: 20,
@@ -206,12 +207,11 @@ const styles = StyleSheet.create({
   },
   row: {
     borderCurve: 'continuous',
-    boxShadow: '0 10px 26px rgba(15,23,42,0.08)',
+    boxShadow: '0 4px 12px rgba(15,23,42,0.07)',
   },
   sheet: {
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
-    boxShadow: '0 -8px 24px rgba(0,0,0,0.12)',
-    elevation: 14,
+    boxShadow: '0 -4px 14px rgba(0,0,0,0.1)',
   },
 });

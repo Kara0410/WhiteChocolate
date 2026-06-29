@@ -8,7 +8,7 @@ import {
   type ComponentRef,
 } from 'react';
 import BottomSheet, {
-  BottomSheetScrollView,
+  BottomSheetFlatList,
   useBottomSheetSpringConfigs,
 } from '@gorhom/bottom-sheet';
 import { Heart, Trash2, X } from 'lucide-react-native';
@@ -415,6 +415,27 @@ export function FavoriteParkingBottomSheet({
     },
     [removeFavorite],
   );
+  const renderFavorite = useCallback(
+    ({
+      item,
+      index,
+    }: {
+      item: ParkingClusterResponse;
+      index: number;
+    }) => (
+      <FavoriteSpotRow
+        index={index}
+        isAnyRowOpen={openRowId !== null}
+        isOpen={openRowId === item.id}
+        item={item}
+        onCloseOpenRow={closeOpenRow}
+        onDelete={handleDelete}
+        onOpenRow={setOpenRowId}
+        onPress={handleSpotPress}
+      />
+    ),
+    [closeOpenRow, handleDelete, handleSpotPress, openRowId],
+  );
 
   return (
     <BottomSheet
@@ -432,37 +453,15 @@ export function FavoriteParkingBottomSheet({
       snapPoints={snapPoints}
       style={styles.sheet}
     >
-      <BottomSheetScrollView
+      <BottomSheetFlatList
         contentContainerStyle={[
           styles.content,
           { paddingBottom: Math.max(insets.bottom, 10) + 118 },
         ]}
-        showsVerticalScrollIndicator={false}
-      >
-        <View className="mb-5 flex-row items-center justify-between">
-          <View className="flex-1 pr-3">
-            <Text className="text-[26px] font-extrabold text-slate-950">
-              Favorite spots
-            </Text>
-            <Text className="mt-1 text-[14px] font-semibold text-slate-500">
-              {favoriteItems.length === 1
-                ? '1 favorited parking spot'
-                : `${favoriteItems.length} favorited parking spots`}
-            </Text>
-          </View>
-          <Pressable
-            accessibilityLabel="Close favorite spots"
-            accessibilityRole="button"
-            className="h-11 w-11 items-center justify-center rounded-full bg-white active:bg-slate-100"
-            hitSlop={8}
-            onPress={closeSheet}
-            style={styles.closeButton}
-          >
-            <X color="#475569" size={19} strokeWidth={2.5} />
-          </Pressable>
-        </View>
-
-        {favoriteItems.length === 0 ? (
+        data={favoriteItems}
+        initialNumToRender={8}
+        keyExtractor={(item) => item.id}
+        ListEmptyComponent={
           <Animated.View
             entering={FadeInDown.duration(260).springify().damping(24)}
             exiting={FadeOutUp.duration(150)}
@@ -478,22 +477,37 @@ export function FavoriteParkingBottomSheet({
               Tap the heart on a parking spot to add it here.
             </Text>
           </Animated.View>
-        ) : (
-          favoriteItems.map((item, index) => (
-            <FavoriteSpotRow
-              index={index}
-              isAnyRowOpen={openRowId !== null}
-              isOpen={openRowId === item.id}
-              item={item}
-              key={item.id}
-              onCloseOpenRow={closeOpenRow}
-              onDelete={handleDelete}
-              onOpenRow={setOpenRowId}
-              onPress={handleSpotPress}
-            />
-          ))
-        )}
-      </BottomSheetScrollView>
+        }
+        ListHeaderComponent={
+          <View className="mb-5 flex-row items-center justify-between">
+            <View className="flex-1 pr-3">
+              <Text className="text-[26px] font-extrabold text-slate-950">
+                Favorite spots
+              </Text>
+              <Text className="mt-1 text-[14px] font-semibold text-slate-500">
+                {favoriteItems.length === 1
+                  ? '1 favorited parking spot'
+                  : `${favoriteItems.length} favorited parking spots`}
+              </Text>
+            </View>
+            <Pressable
+              accessibilityLabel="Close favorite spots"
+              accessibilityRole="button"
+              className="h-11 w-11 items-center justify-center rounded-full bg-white active:bg-slate-100"
+              hitSlop={8}
+              onPress={closeSheet}
+              style={styles.closeButton}
+            >
+              <X color="#475569" size={19} strokeWidth={2.5} />
+            </Pressable>
+          </View>
+        }
+        maxToRenderPerBatch={8}
+        renderItem={renderFavorite}
+        showsVerticalScrollIndicator={false}
+        updateCellsBatchingPeriod={50}
+        windowSize={5}
+      />
     </BottomSheet>
   );
 }
@@ -520,22 +534,15 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     borderCurve: 'continuous',
-    boxShadow: '0 8px 20px rgba(15,23,42,0.08)',
-    elevation: 2,
+    boxShadow: '0 4px 12px rgba(15,23,42,0.07)',
   },
   row: {
     borderCurve: 'continuous',
-    boxShadow: '0 10px 26px rgba(15,23,42,0.08)',
-    elevation: 3,
+    boxShadow: '0 4px 12px rgba(15,23,42,0.07)',
   },
   sheet: {
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
-    boxShadow: '0 -8px 24px rgba(0,0,0,0.12)',
-    elevation: 14,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: -8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 24,
+    boxShadow: '0 -4px 14px rgba(0,0,0,0.1)',
   },
 });

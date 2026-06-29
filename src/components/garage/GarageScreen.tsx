@@ -303,7 +303,7 @@ const VehicleCard = memo(function VehicleCard({
             }}
             style={{
               borderCurve: 'continuous',
-              boxShadow: '0 10px 26px rgba(15,23,42,0.08)',
+              boxShadow: '0 4px 12px rgba(15,23,42,0.07)',
             }}
           >
             <View
@@ -447,6 +447,7 @@ export function GarageScreen() {
         }}
         contentInsetAdjustmentBehavior="automatic"
         data={vehicles}
+        initialNumToRender={8}
         keyExtractor={(vehicle) => vehicle.id}
         keyboardDismissMode="on-drag"
         ListHeaderComponent={
@@ -459,7 +460,7 @@ export function GarageScreen() {
               onPress={goBack}
               style={{
                 borderCurve: 'continuous',
-                boxShadow: '0 6px 18px rgba(15,23,42,0.08)',
+                boxShadow: '0 3px 10px rgba(15,23,42,0.07)',
               }}
             >
               <ChevronLeft color="#334155" size={20} strokeWidth={2.6} />
@@ -482,7 +483,7 @@ export function GarageScreen() {
                 className="h-12 flex-row items-center rounded-full bg-blue-600 px-4 active:bg-blue-700"
                 onPress={openAddCar}
                 style={{
-                  boxShadow: '0 10px 22px rgba(37,99,235,0.24)',
+                  boxShadow: '0 5px 14px rgba(37,99,235,0.2)',
                 }}
               >
                 <Plus color="#FFFFFF" size={18} strokeWidth={2.7} />
@@ -524,8 +525,11 @@ export function GarageScreen() {
             </Pressable>
           </Animated.View>
         }
+        maxToRenderPerBatch={8}
         renderItem={renderVehicle}
         showsVerticalScrollIndicator={false}
+        updateCellsBatchingPeriod={50}
+        windowSize={5}
       />
 
       <Modal
@@ -548,7 +552,7 @@ export function GarageScreen() {
             className="rounded-t-[32px] bg-slate-100 px-5 pt-3"
             style={{
               borderCurve: 'continuous',
-              boxShadow: '0 -12px 30px rgba(15,23,42,0.18)',
+              boxShadow: '0 -6px 18px rgba(15,23,42,0.14)',
               paddingBottom: Math.max(insets.bottom, 18) + 8,
             }}
           >
