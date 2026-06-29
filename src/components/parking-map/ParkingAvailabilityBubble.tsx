@@ -1,12 +1,16 @@
-import React, { memo, useCallback, useEffect, useRef } from 'react';
+import React, { memo, useCallback, useEffect } from 'react';
 import {
-  Animated,
   Pressable,
   StyleSheet,
   Text,
   View,
   type ViewStyle,
 } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
 import Svg, { Circle } from 'react-native-svg';
 
 import {
@@ -26,6 +30,7 @@ export type ParkingAvailabilityBubbleProps = {
   zoneCount?: number;
   size?: BubbleSize;
   state?: BubbleState;
+  moving?: boolean;
   className?: string;
   onPress?: () => void;
 };
@@ -139,28 +144,21 @@ function getOuterStyle(
   theme: AvailabilityTheme,
   selected: boolean,
   active: boolean,
+  moving: boolean,
 ): ViewStyle {
-  const glow = selected ? theme.glowStrong : theme.glow;
-
   return {
     width,
     height,
     borderRadius: radius,
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: selected ? 16 : active ? 12 : 10,
-    shadowColor: theme.ring,
-    shadowOffset: {
-      width: 0,
-      height: selected ? 14 : active ? 8 : 12,
-    },
-    shadowOpacity: selected ? 0.75 : active ? 0.65 : 0.55,
-    shadowRadius: selected ? 32 : active ? 18 : 22,
-    boxShadow: selected
-      ? `0 12px 30px 4px ${glow}, 0 4px 14px rgba(26, 28, 30, 0.12)`
-      : active
-        ? `0 12px 18px 3px ${glow}, 0 4px 12px rgba(26, 28, 30, 0.16)`
-        : `0 12px 22px 4px ${glow}, 0 4px 14px rgba(26, 28, 30, 0.14)`,
+    boxShadow: moving
+      ? 'none'
+      : selected
+        ? `0 6px 16px 2px ${theme.glowStrong}`
+        : active
+          ? '0 3px 8px rgba(26, 28, 30, 0.18)'
+          : '0 2px 6px rgba(26, 28, 30, 0.14)',
   };
 }
 
@@ -170,6 +168,7 @@ function ParkingAvailabilityBubble({
   zoneCount = 0,
   size = 'medium',
   state = 'default',
+  moving = false,
   className,
   onPress,
 }: ParkingAvailabilityBubbleProps) {
@@ -177,9 +176,9 @@ function ParkingAvailabilityBubble({
   const theme = getAvailabilityTheme(clampedPercentage);
   const selected = state === 'selected';
   const forcedPressed = state === 'pressed';
-  const scale = useRef(
-    new Animated.Value(selected ? 1.06 : forcedPressed ? 0.96 : 1),
-  ).current;
+  const scale = useSharedValue(
+    selected ? 1.04 : forcedPressed ? 0.97 : 1,
+  );
   const dimensions =
     type === 'cluster'
       ? {
@@ -195,38 +194,41 @@ function ParkingAvailabilityBubble({
 
   const animateScale = useCallback(
     (toValue: number) => {
-      Animated.spring(scale, {
-        toValue,
+      scale.value = withSpring(toValue, {
         damping: 18,
         stiffness: 260,
         mass: 0.7,
-        useNativeDriver: true,
-      }).start();
+      });
     },
     [scale],
   );
 
   useEffect(() => {
-    animateScale(selected ? 1.06 : forcedPressed ? 0.96 : 1);
+    animateScale(selected ? 1.04 : forcedPressed ? 0.97 : 1);
   }, [animateScale, forcedPressed, selected]);
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
 
   const handlePressIn = useCallback(() => {
     if (!selected) {
-      animateScale(0.96);
+      animateScale(0.97);
     }
   }, [animateScale, selected]);
 
   const handlePressOut = useCallback(() => {
-    animateScale(selected ? 1.06 : forcedPressed ? 0.96 : 1);
+    animateScale(selected ? 1.04 : forcedPressed ? 0.97 : 1);
   }, [animateScale, forcedPressed, selected]);
 
   return (
     <Animated.View
-      style={{
-        width: dimensions.width,
-        height: dimensions.height,
-        transform: [{ scale }],
-      }}
+      style={[
+        {
+          width: dimensions.width,
+          height: dimensions.height,
+        },
+        animatedStyle,
+      ]}
     >
       <Pressable
         accessibilityLabel={`${clampedPercentage}% parking availability${
@@ -247,10 +249,11 @@ function ParkingAvailabilityBubble({
             theme,
             selected,
             pressed || forcedPressed,
+            moving,
           )
         }
       >
-        {selected ? (
+        {selected && !moving ? (
           <View
             pointerEvents="none"
             style={[
@@ -267,7 +270,7 @@ function ParkingAvailabilityBubble({
         <View
           pointerEvents="none"
           style={[
-            styles.glassShell,
+            styles.bubbleSurface,
             {
               width: dimensions.width,
               height: dimensions.height,
@@ -276,40 +279,12 @@ function ParkingAvailabilityBubble({
                 : 'rgba(255,255,255,0.82)',
               borderRadius: dimensions.radius,
               borderWidth: selected ? 1.5 : 1,
-              backgroundColor: theme.backgroundTint,
+              backgroundColor: moving
+                ? 'rgba(255,255,255,0.94)'
+                : theme.backgroundTint,
             },
           ]}
         >
-          <View
-            style={[
-              StyleSheet.absoluteFillObject,
-              {
-                borderColor: theme.border,
-                borderRadius: dimensions.radius,
-              },
-              styles.statusBorder,
-            ]}
-          />
-          <View
-            style={[
-              styles.whiteGlassLayer,
-              {
-                borderRadius: dimensions.radius,
-                opacity: forcedPressed ? 0.32 : selected ? 0.52 : 0.43,
-              },
-            ]}
-          />
-          <View
-            style={[
-              styles.innerHighlight,
-              {
-                borderTopLeftRadius: dimensions.radius,
-                borderTopRightRadius: dimensions.radius,
-                height: dimensions.height * 0.48,
-              },
-            ]}
-          />
-
           {type === 'cluster' ? (
             <View
               className="flex-row items-center"
@@ -318,12 +293,25 @@ function ParkingAvailabilityBubble({
                 paddingHorizontal: CLUSTER_SIZE[size].paddingHorizontal,
               }}
             >
-              <AvailabilityRing
-                percentage={clampedPercentage}
-                size={CLUSTER_SIZE[size].ring}
-                strokeWidth={CLUSTER_SIZE[size].ringStroke}
-                theme={theme}
-              />
+              {selected && !moving ? (
+                <AvailabilityRing
+                  percentage={clampedPercentage}
+                  size={CLUSTER_SIZE[size].ring}
+                  strokeWidth={CLUSTER_SIZE[size].ringStroke}
+                  theme={theme}
+                />
+              ) : (
+                <View
+                  style={[
+                    styles.availabilityDot,
+                    {
+                      backgroundColor: theme.ring,
+                      height: moving ? 10 : 12,
+                      width: moving ? 10 : 12,
+                    },
+                  ]}
+                />
+              )}
               <View className="flex-1 justify-center">
                 <Text
                   numberOfLines={1}
@@ -375,17 +363,14 @@ function ParkingAvailabilityBubble({
 }
 
 const styles = StyleSheet.create({
-  glassShell: {
+  availabilityDot: {
+    borderColor: 'rgba(255,255,255,0.92)',
+    borderRadius: 999,
+    borderWidth: 2,
+  },
+  bubbleSurface: {
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  innerHighlight: {
-    backgroundColor: 'rgba(255,255,255,0.42)',
-    left: 2,
-    position: 'absolute',
-    right: 2,
-    top: 1,
   },
   percentageText: {
     fontVariant: ['tabular-nums'],
@@ -396,13 +381,6 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     opacity: 0.35,
     transform: [{ scale: 1.14 }],
-  },
-  statusBorder: {
-    borderWidth: 1,
-  },
-  whiteGlassLayer: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255,255,255,0.68)',
   },
   zoneText: {
     fontVariant: ['tabular-nums'],

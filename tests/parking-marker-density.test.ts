@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   projectMapCoordinate,
   projectParkingMarkers,
+  projectSelectedParkingMarkers,
   selectSpatiallySeparatedMarkers,
 } from '../src/components/parking-map/marker-density';
 import { getAvailabilityStatus } from '../src/components/parking-map/parking-availability-status';
@@ -119,6 +120,25 @@ test('projects a marker at the camera center into the overlay center', () => {
 
   assert.ok(Math.abs(result[0].x - 200) < 0.001);
   assert.ok(Math.abs(result[0].y - 400) < 0.001);
+});
+
+test('live projection preserves an already selected marker set', () => {
+  const first = marker('first', 48.1351, 11.5824);
+  const overlapping = marker('overlapping', 48.13511, 11.58241);
+  const result = projectSelectedParkingMarkers([first, overlapping], {
+    camera: {
+      latitude: 48.1351,
+      longitude: 11.5824,
+      zoom: 13,
+    },
+    width: 400,
+    height: 800,
+  });
+
+  assert.deepEqual(result.map(({ item }) => item.id), [
+    'first',
+    'overlapping',
+  ]);
 });
 
 test('projects a user coordinate from zoom when map events omit deltas', () => {

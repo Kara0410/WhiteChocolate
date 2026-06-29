@@ -14,7 +14,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   projectMapCoordinate,
-  projectParkingMarkers,
+  projectSelectedParkingMarkers,
+  selectSpatiallySeparatedMarkers,
 } from '@/components/parking-map/marker-density';
 import {
   ParkingBottomSheet,
@@ -60,6 +61,7 @@ const LABEL_FREE_MAP_STYLE = JSON.stringify([
 const FULL_SHEET_RATIO = 0.5;
 const PROGRAMMATIC_CAMERA_GUARD_MS = 500;
 const MAP_DRAG_SETTLE_MS = 180;
+const MARKER_MOVEMENT_SETTLE_MS = 150;
 
 type ParkingMapProps = {
   initialCamera: ParkingCameraState;
@@ -142,6 +144,7 @@ export function ParkingMap({
 }: ParkingMapProps) {
   const insets = useSafeAreaInsets();
   const {
+    currentRegion,
     displayCamera,
     onCameraMove,
     visibleClusters,
@@ -153,6 +156,8 @@ export function ParkingMap({
     useRef<ReturnType<typeof setTimeout> | null>(null);
   const mapDragSettleTimerRef =
     useRef<ReturnType<typeof setTimeout> | null>(null);
+  const markerMovementSettleTimerRef =
+    useRef<ReturnType<typeof setTimeout> | null>(null);
   const favoriteFocusTimerRef =
     useRef<ReturnType<typeof setTimeout> | null>(null);
   const favoriteFocusInteractionRef =
@@ -160,6 +165,7 @@ export function ParkingMap({
       null,
     );
   const isProgrammaticCameraMoveRef = useRef(false);
+  const isMapMovingRef = useRef(false);
   const hasCompactedForCurrentDragRef = useRef(false);
   const hasInitialCameraEventRef = useRef(false);
   const pendingFocusItemRef = useRef<ParkingClusterResponse | null>(null);
@@ -177,6 +183,7 @@ export function ParkingMap({
     useState<PlaceSearchResult | null>(null);
   const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
   const [hasInitialCameraEvent, setHasInitialCameraEvent] = useState(false);
+  const [isMapMoving, setIsMapMoving] = useState(false);
   const { favoriteItems } = useFavoriteParking();
   const {
     activeOverlay,
@@ -216,22 +223,36 @@ export function ParkingMap({
     [allParkingSpots, selectedSearchPlace],
   );
 
-  const projectedMarkers = useMemo(
+  const densityFilteredMarkers = useMemo(
     () =>
       mapSize.width > 0 && mapSize.height > 0
-        ? projectParkingMarkers(visibleClusters, {
-            camera: displayCamera,
+        ? selectSpatiallySeparatedMarkers(visibleClusters, {
+            camera: currentRegion,
             width: mapSize.width,
             height: mapSize.height,
             selectedId: selectedParkingItem?.id,
           })
         : [],
     [
-      displayCamera,
+      currentRegion,
       mapSize.height,
       mapSize.width,
       selectedParkingItem?.id,
       visibleClusters,
+    ],
+  );
+  const projectedMarkers = useMemo(
+    () =>
+      projectSelectedParkingMarkers(densityFilteredMarkers, {
+        camera: displayCamera,
+        width: mapSize.width,
+        height: mapSize.height,
+      }),
+    [
+      densityFilteredMarkers,
+      displayCamera,
+      mapSize.height,
+      mapSize.width,
     ],
   );
   const projectedUserLocation = useMemo(() => {
@@ -649,6 +670,19 @@ export function ParkingMap({
   const handleCameraMove = useCallback(
     (event: Parameters<typeof onCameraMove>[0]) => {
       onCameraMove(event);
+      if (!isMapMovingRef.current) {
+        isMapMovingRef.current = true;
+        setIsMapMoving(true);
+      }
+      if (markerMovementSettleTimerRef.current) {
+        clearTimeout(markerMovementSettleTimerRef.current);
+      }
+      markerMovementSettleTimerRef.current = setTimeout(() => {
+        isMapMovingRef.current = false;
+        setIsMapMoving(false);
+        markerMovementSettleTimerRef.current = null;
+      }, MARKER_MOVEMENT_SETTLE_MS);
+
       if (!hasInitialCameraEventRef.current) {
         hasInitialCameraEventRef.current = true;
         setHasInitialCameraEvent(true);
@@ -681,6 +715,9 @@ export function ParkingMap({
       }
       if (mapDragSettleTimerRef.current) {
         clearTimeout(mapDragSettleTimerRef.current);
+      }
+      if (markerMovementSettleTimerRef.current) {
+        clearTimeout(markerMovementSettleTimerRef.current);
       }
       if (favoriteFocusTimerRef.current) {
         clearTimeout(favoriteFocusTimerRef.current);
@@ -879,23 +916,28 @@ export function ParkingMap({
           inset: 0,
         }}
       >
-        {projectedMarkers.map(({ item, x, y, width, height }) => (
+        {projectedMarkers.map(({ item, x, y, width, height, tier }) => (
           <View
             key={item.id}
             pointerEvents="box-none"
             style={{
               position: 'absolute',
-              left: x - width / 2,
-              top: y - height / 2,
+              left: 0,
+              top: 0,
+              transform: [
+                { translateX: x - width / 2 },
+                { translateY: y - height / 2 },
+              ],
               width,
               height,
             }}
           >
             <ParkingMarkerCard
               item={item}
+              moving={isMapMoving}
               onPress={handleMarkerPress}
               selected={selectedParkingItem?.id === item.id}
-              zoom={displayCamera.zoom}
+              tier={tier}
             />
           </View>
         ))}
@@ -905,9 +947,13 @@ export function ParkingMap({
             pointerEvents="none"
             style={{
               height: 28,
-              left: projectedUserLocation.x - 14,
+              left: 0,
               position: 'absolute',
-              top: projectedUserLocation.y - 14,
+              top: 0,
+              transform: [
+                { translateX: projectedUserLocation.x - 14 },
+                { translateY: projectedUserLocation.y - 14 },
+              ],
               width: 28,
               zIndex: 100,
             }}

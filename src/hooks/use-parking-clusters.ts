@@ -48,6 +48,9 @@ export function useParkingClusters(
     ParkingClusterResponse[]
   >([]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const displayCameraFrameRef = useRef<number | null>(null);
+  const latestCameraRef = useRef<ParkingCameraState>(initialCamera);
+  const currentZoomRef = useRef(initialCamera.zoom);
   const requestKeyRef = useRef<string | null>(null);
 
   const loadClusters = useCallback((camera: ParkingCameraState) => {
@@ -59,6 +62,7 @@ export function useParkingClusters(
     requestKeyRef.current = request.tileKey;
     setCurrentRegion(camera);
     setCurrentZoom(request.zoom);
+    currentZoomRef.current = request.zoom;
 
     const cached = clusterCache.get(request.tileKey);
     if (cached) {
@@ -78,8 +82,26 @@ export function useParkingClusters(
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
       }
+      if (displayCameraFrameRef.current !== null) {
+        cancelAnimationFrame(displayCameraFrameRef.current);
+      }
     };
   }, [initialCamera, loadClusters]);
+
+  const scheduleDisplayCameraUpdate = useCallback(
+    (camera: ParkingCameraState) => {
+      latestCameraRef.current = camera;
+      if (displayCameraFrameRef.current !== null) {
+        return;
+      }
+
+      displayCameraFrameRef.current = requestAnimationFrame(() => {
+        displayCameraFrameRef.current = null;
+        setDisplayCamera(latestCameraRef.current);
+      });
+    },
+    [],
+  );
 
   const onCameraMove = useCallback(
     (event: CameraMoveEvent) => {
@@ -93,7 +115,7 @@ export function useParkingClusters(
         event.zoom ??
         (event.longitudeDelta
           ? zoomFromLongitudeDelta(event.longitudeDelta)
-          : currentZoom);
+          : currentZoomRef.current);
       const camera: ParkingCameraState = {
         latitude,
         longitude,
@@ -101,7 +123,7 @@ export function useParkingClusters(
         latitudeDelta: event.latitudeDelta,
         longitudeDelta: event.longitudeDelta,
       };
-      setDisplayCamera(camera);
+      scheduleDisplayCameraUpdate(camera);
 
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
@@ -111,7 +133,7 @@ export function useParkingClusters(
         CAMERA_DEBOUNCE_MS,
       );
     },
-    [currentZoom, loadClusters],
+    [loadClusters, scheduleDisplayCameraUpdate],
   );
 
   return {

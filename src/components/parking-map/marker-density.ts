@@ -3,7 +3,11 @@ import type {
   ParkingClusterResponse,
   ParkingCoordinates,
 } from '@/types/parking-map';
-import { getMarkerDimensions, getMarkerSizeTier } from './marker-visuals';
+import {
+  getMarkerDimensions,
+  getMarkerSizeTier,
+  type MarkerSizeTier,
+} from './marker-visuals';
 
 type MarkerDensityOptions = {
   camera: ParkingCameraState;
@@ -21,6 +25,7 @@ export type ProjectedParkingMarker = {
   y: number;
   width: number;
   height: number;
+  tier: MarkerSizeTier;
 };
 
 export function projectMapCoordinate(
@@ -91,10 +96,10 @@ function markerLimitForZoom(zoom: number) {
 }
 
 /**
- * Expo Maps renders markers natively, so React Native collision layouts do
- * not apply. This visual pass projects coordinates into approximate screen
- * space and suppresses lower-priority overlaps. It does not alter clusters or
- * their metadata; it only protects legibility at the current viewport.
+ * React Native overlay markers do not participate in map collision layouts.
+ * This visual pass projects coordinates into approximate screen space and
+ * suppresses lower-priority overlaps. It does not alter clusters or their
+ * metadata; it only protects legibility at the current viewport.
  */
 export function selectSpatiallySeparatedMarkers(
   items: ParkingClusterResponse[],
@@ -112,6 +117,7 @@ export function selectSpatiallySeparatedMarkers(
         y: position.y,
         width: dimensions.width + 12,
         height: dimensions.height + 12,
+        tier,
       };
     })
     .sort((first, second) => {
@@ -154,10 +160,21 @@ export function projectParkingMarkers(
   options: MarkerDensityOptions,
 ) {
   const selected = selectSpatiallySeparatedMarkers(items, options);
-  return selected.map((item): ProjectedParkingMarker => {
-    const dimensions = getMarkerDimensions(
-      getMarkerSizeTier(item.type, options.camera.zoom),
-    );
+  return projectSelectedParkingMarkers(selected, options);
+}
+
+/**
+ * Projects an already density-filtered marker set. This is intentionally
+ * separate from collision selection so live camera movement only performs
+ * the cheap coordinate pass.
+ */
+export function projectSelectedParkingMarkers(
+  items: ParkingClusterResponse[],
+  options: Omit<MarkerDensityOptions, 'selectedId'>,
+) {
+  return items.map((item): ProjectedParkingMarker => {
+    const tier = getMarkerSizeTier(item.type, options.camera.zoom);
+    const dimensions = getMarkerDimensions(tier);
     const position = projectMapCoordinate(item, options);
     return {
       item,
@@ -165,6 +182,7 @@ export function projectParkingMarkers(
       y: position.y,
       width: dimensions.width,
       height: dimensions.height,
+      tier,
     };
   });
 }
