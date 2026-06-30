@@ -1,22 +1,19 @@
 /**
  * Parking data source abstraction.
  *
- * PRIMARY SOURCE — Munich open-data CSV (static, pre-generated):
+ * MAP SOURCE - Supabase parking_segments:
+ *   The map fetches coordinate-prepared rows by viewport and adapts them to
+ *   the existing clustering model. Geometry conversion happens once in SQL.
+ *
+ * FALLBACK / LIST SOURCE - Munich open-data CSV (static, pre-generated):
  *   Run: npm run generate:parking path/to/munich_open_data_portal.csv
  *   Output: src/data/munich_parking.ts
- *   The generated file is committed so the app works offline with no API calls.
+ *   The generated file remains available for fetch failures and existing
+ *   list flows.
  *
- * FUTURE / OPTIONAL — Google Places API enrichment:
- *   Places generally does NOT provide live parking occupancy (available spaces
- *   right now). It can provide place details, photos, and opening hours for
- *   named car parks, but NOT on-street curb space availability.
- *
- *   If Places enrichment is ever added:
- *   - It MUST run server-side (Cloud Function, edge route, etc.).
- *   - The Places API server key must NEVER be bundled in the Expo app.
- *   - Use EXPO_PUBLIC_* only for the Maps SDK display keys (not Places).
- *   - The app calls your own backend endpoint, which calls Places and returns
- *     sanitised results — keeping the secret key off the device.
+ * FUTURE / OPTIONAL - Google Places API enrichment:
+ *   Places generally does not provide live parking occupancy. Any enrichment
+ *   must run server-side so secret API keys never enter the Expo bundle.
  */
 
 export { parkingData } from '@/data/munich_parking';

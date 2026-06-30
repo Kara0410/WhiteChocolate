@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { getMockParkingClusters } from '@/services/parking-clusters';
+import { createParkingClusterEngine } from '@/services/parking-clustering';
+import { fetchParkingSegments } from '@/services/parkingSegments';
 import type {
   ParkingCameraState,
   ParkingClusterResponse,
@@ -10,6 +12,7 @@ import {
   getParkingClusterRequest,
   zoomFromLongitudeDelta,
 } from '@/utils/parking-map-geo';
+import { parkingSegmentToMapRecord } from '@/utils/parking-segments';
 
 const CAMERA_DEBOUNCE_MS = 350;
 const MAX_CLIENT_CACHE_ENTRIES = 80;
@@ -52,8 +55,9 @@ export function useParkingClusters(
   const latestCameraRef = useRef<ParkingCameraState>(initialCamera);
   const currentZoomRef = useRef(initialCamera.zoom);
   const requestKeyRef = useRef<string | null>(null);
+  const isMountedRef = useRef(true);
 
-  const loadClusters = useCallback((camera: ParkingCameraState) => {
+  const loadClusters = useCallback(async (camera: ParkingCameraState) => {
     const request = getParkingClusterRequest(camera, destination);
     setCurrentRegion(camera);
     setCurrentZoom(request.zoom);
@@ -71,15 +75,55 @@ export function useParkingClusters(
       return;
     }
 
-    const clusters = getMockParkingClusters(request);
-    cacheClusters(request.tileKey, clusters);
-    setVisibleClusters(clusters);
+    try {
+      const { segments, truncated } = await fetchParkingSegments(request.bbox);
+      const records = segments.map(parkingSegmentToMapRecord);
+      const clusters = createParkingClusterEngine(records).getClusters(
+        request.bbox,
+        request.zoom,
+        request.destination,
+      );
+
+      if (
+        !isMountedRef.current ||
+        requestKeyRef.current !== request.tileKey
+      ) {
+        return;
+      }
+
+      if (truncated && __DEV__) {
+        console.warn(
+          'Supabase parking segment result reached the per-viewport limit.',
+        );
+      }
+
+      cacheClusters(request.tileKey, clusters);
+      setVisibleClusters(clusters);
+    } catch (error) {
+      if (
+        !isMountedRef.current ||
+        requestKeyRef.current !== request.tileKey
+      ) {
+        return;
+      }
+
+      if (__DEV__) {
+        console.warn(
+          'Supabase parking fetch failed; using bundled parking data.',
+          error,
+        );
+      }
+
+      setVisibleClusters(getMockParkingClusters(request));
+    }
   }, [destination]);
 
   useEffect(() => {
-    loadClusters(initialCamera);
+    isMountedRef.current = true;
+    void loadClusters(initialCamera);
 
     return () => {
+      isMountedRef.current = false;
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
         debounceRef.current = null;
@@ -141,7 +185,7 @@ export function useParkingClusters(
           }
 
           setDisplayCamera(latestCameraRef.current);
-          loadClusters(latestCameraRef.current);
+          void loadClusters(latestCameraRef.current);
         },
         CAMERA_DEBOUNCE_MS,
       );
