@@ -21,18 +21,18 @@ export function getMarkerSizeTier(
 export function getMarkerDimensions(tier: MarkerSizeTier) {
   const base =
     tier === 'large'
-      ? { width: 164, height: 78 }
+      ? { width: 72, height: 48, visualSize: 64 }
       : tier === 'medium'
-        ? { width: 136, height: 64 }
+        ? { width: 64, height: 44, visualSize: 56 }
         : tier === 'small'
-          ? { width: 108, height: 52 }
-          : { width: 72, height: 72 };
+          ? { width: 56, height: 42, visualSize: 48 }
+          : { width: 80, height: 54, visualSize: 68 };
   const width = base.width;
   const height = base.height;
-  const glowPadding = tier === 'spot' ? 10 : 14;
+  const glowPadding = 4;
   return {
     canvasSize: Math.max(width, height) + glowPadding * 2,
-    visualSize: width,
+    visualSize: base.visualSize,
     width,
     height,
     glowPadding,

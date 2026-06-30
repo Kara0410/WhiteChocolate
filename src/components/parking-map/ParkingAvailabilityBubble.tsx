@@ -11,13 +11,11 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
-import Svg, { Circle } from 'react-native-svg';
 
 import {
   getAvailabilityStatus,
   getAvailabilityTheme,
   type AvailabilityStatus,
-  type AvailabilityTheme,
 } from './parking-availability-status';
 
 export type BubbleType = 'cluster' | 'spot';
@@ -27,6 +25,7 @@ export type BubbleState = 'default' | 'pressed' | 'selected';
 export type ParkingAvailabilityBubbleProps = {
   type: BubbleType;
   percentage: number;
+  count?: number;
   zoneCount?: number;
   size?: BubbleSize;
   state?: BubbleState;
@@ -36,135 +35,49 @@ export type ParkingAvailabilityBubbleProps = {
 };
 
 const CLUSTER_SIZE = {
-  large: {
-    width: 164,
-    height: 78,
-    radius: 39,
-    ring: 58,
-    ringStroke: 6,
-    percentage: 30,
-    zone: 16,
-    gap: 12,
-    paddingHorizontal: 10,
-  },
-  medium: {
-    width: 136,
-    height: 64,
-    radius: 32,
-    ring: 46,
-    ringStroke: 5,
-    percentage: 24,
-    zone: 13,
-    gap: 10,
-    paddingHorizontal: 9,
-  },
-  small: {
-    width: 108,
-    height: 52,
-    radius: 26,
-    ring: 34,
-    ringStroke: 4,
-    percentage: 18,
-    zone: 10,
-    gap: 7,
-    paddingHorizontal: 8,
-  },
+  large: { canvasWidth: 72, canvasHeight: 48, width: 64, height: 40, font: 17 },
+  medium: { canvasWidth: 64, canvasHeight: 44, width: 56, height: 36, font: 16 },
+  small: { canvasWidth: 56, canvasHeight: 42, width: 48, height: 34, font: 15 },
 } as const;
 
 const SPOT_SIZE = {
-  large: { diameter: 72, percentage: 22 },
-  medium: { diameter: 56, percentage: 18 },
-  small: { diameter: 44, percentage: 14 },
+  large: { canvasWidth: 80, canvasHeight: 54, width: 68, height: 36, font: 18 },
+  medium: { canvasWidth: 72, canvasHeight: 50, width: 64, height: 34, font: 17 },
+  small: { canvasWidth: 66, canvasHeight: 46, width: 58, height: 32, font: 16 },
+} as const;
+
+const SPRING_CONFIG = {
+  damping: 17,
+  stiffness: 280,
+  mass: 0.65,
 } as const;
 
 export { getAvailabilityStatus };
 export type { AvailabilityStatus };
 
-function AvailabilityRing({
-  percentage,
-  size,
-  strokeWidth,
-  theme,
-}: {
-  percentage: number;
-  size: number;
-  strokeWidth: number;
-  theme: AvailabilityTheme;
-}) {
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const dashOffset = circumference * (1 - percentage / 100);
-  const center = size / 2;
-
-  return (
-    <Svg height={size} width={size}>
-      <Circle
-        cx={center}
-        cy={center}
-        fill="rgba(255,255,255,0.64)"
-        r={radius - strokeWidth / 2}
-      />
-      <Circle
-        cx={center}
-        cy={center}
-        fill="transparent"
-        r={radius}
-        stroke={theme.ringTrack}
-        strokeWidth={strokeWidth}
-      />
-      <Circle
-        cx={center}
-        cy={center}
-        fill="transparent"
-        origin={`${center}, ${center}`}
-        r={radius}
-        rotation={-90}
-        stroke={theme.ring}
-        strokeDasharray={`${circumference} ${circumference}`}
-        strokeDashoffset={dashOffset}
-        strokeLinecap="round"
-        strokeWidth={strokeWidth}
-      />
-      <Circle
-        cx={center}
-        cy={center}
-        fill="transparent"
-        r={radius - strokeWidth - 1}
-        stroke="rgba(255,255,255,0.72)"
-        strokeWidth={1}
-      />
-    </Svg>
-  );
+function formatClusterCount(count: number) {
+  const safeCount = Math.max(0, Math.round(count));
+  return safeCount > 99 ? '99+' : `${safeCount}`;
 }
 
-function getOuterStyle(
-  width: number,
-  height: number,
-  radius: number,
-  theme: AvailabilityTheme,
+function markerShadow(
   selected: boolean,
-  active: boolean,
   moving: boolean,
-): ViewStyle {
-  return {
-    width,
-    height,
-    borderRadius: radius,
-    alignItems: 'center',
-    justifyContent: 'center',
-    boxShadow: moving
-      ? 'none'
-      : selected
-        ? `0 6px 16px 2px ${theme.glowStrong}`
-        : active
-          ? '0 3px 8px rgba(26, 28, 30, 0.18)'
-          : '0 2px 6px rgba(26, 28, 30, 0.14)',
-  };
+  glowStrong: string,
+): ViewStyle['boxShadow'] {
+  if (moving) {
+    return '0 1px 3px rgba(15, 23, 42, 0.18)';
+  }
+  if (selected) {
+    return `0 7px 18px 2px ${glowStrong}`;
+  }
+  return '0 3px 9px rgba(15, 23, 42, 0.24)';
 }
 
 function ParkingAvailabilityBubble({
   type,
   percentage,
+  count,
   zoneCount = 0,
   size = 'medium',
   state = 'default',
@@ -172,222 +85,199 @@ function ParkingAvailabilityBubble({
   className,
   onPress,
 }: ParkingAvailabilityBubbleProps) {
-  const clampedPercentage = Math.min(100, Math.max(0, percentage));
+  const clampedPercentage = Math.min(100, Math.max(0, Math.round(percentage)));
   const theme = getAvailabilityTheme(clampedPercentage);
   const selected = state === 'selected';
   const forcedPressed = state === 'pressed';
   const moving = performanceMode === 'moving';
-  const scale = useSharedValue(
-    selected ? 1.04 : forcedPressed ? 0.97 : 1,
-  );
-  const dimensions =
-    type === 'cluster'
-      ? {
-          width: CLUSTER_SIZE[size].width,
-          height: CLUSTER_SIZE[size].height,
-          radius: CLUSTER_SIZE[size].radius,
-        }
-      : {
-          width: SPOT_SIZE[size].diameter,
-          height: SPOT_SIZE[size].diameter,
-          radius: SPOT_SIZE[size].diameter / 2,
-        };
+  const isCluster = type === 'cluster';
+  const dimensions = isCluster ? CLUSTER_SIZE[size] : SPOT_SIZE[size];
+  const restingScale = selected ? 1.12 : forcedPressed ? 0.95 : 1;
+  const scale = useSharedValue(restingScale);
+  const clusterCount = count ?? zoneCount;
+  const label = isCluster
+    ? `${clusterCount} parking ${clusterCount === 1 ? 'spot' : 'spots'}`
+    : `${clampedPercentage}% parking availability`;
 
   const animateScale = useCallback(
     (toValue: number) => {
-      scale.value = withSpring(toValue, {
-        damping: 18,
-        stiffness: 260,
-        mass: 0.7,
-      });
+      scale.value = withSpring(toValue, SPRING_CONFIG);
     },
     [scale],
   );
 
   useEffect(() => {
-    animateScale(selected ? 1.04 : forcedPressed ? 0.97 : 1);
-  }, [animateScale, forcedPressed, selected]);
+    animateScale(restingScale);
+  }, [animateScale, restingScale]);
+
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
 
   const handlePressIn = useCallback(() => {
-    if (!selected) {
-      animateScale(0.97);
-    }
-  }, [animateScale, selected]);
+    animateScale(0.95);
+  }, [animateScale]);
 
   const handlePressOut = useCallback(() => {
-    animateScale(selected ? 1.04 : forcedPressed ? 0.97 : 1);
-  }, [animateScale, forcedPressed, selected]);
+    animateScale(restingScale);
+  }, [animateScale, restingScale]);
+
+  const fillColor = isCluster ? '#FFFFFF' : theme.backgroundTint;
+  const textColor = isCluster ? '#172033' : theme.text;
+  const borderColor = isCluster ? '#D7DCE3' : theme.border;
 
   return (
     <Animated.View
       style={[
+        styles.canvas,
         {
-          width: dimensions.width,
-          height: dimensions.height,
+          height: dimensions.canvasHeight,
+          width: dimensions.canvasWidth,
         },
         animatedStyle,
       ]}
     >
-      <Pressable
-        accessibilityLabel={`${clampedPercentage}% parking availability${
-          type === 'cluster'
-            ? `, ${zoneCount} ${zoneCount === 1 ? 'zone' : 'zones'}`
-            : ''
-        }`}
-        accessibilityRole="button"
-        className={className}
-        onPress={onPress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        style={({ pressed }) =>
-          getOuterStyle(
-            dimensions.width,
-            dimensions.height,
-            dimensions.radius,
-            theme,
-            selected,
-            pressed || forcedPressed,
-            moving,
-          )
-        }
-      >
-        {selected && !moving ? (
-          <View
-            pointerEvents="none"
-            style={[
-              StyleSheet.absoluteFillObject,
-              styles.selectedAura,
-              {
-                borderColor: theme.glow,
-                borderRadius: dimensions.radius,
-              },
-            ]}
-          />
-        ) : null}
-
+      {!isCluster && selected && !moving ? (
         <View
           pointerEvents="none"
           style={[
-            styles.bubbleSurface,
+            styles.selectedAura,
             {
-              width: dimensions.width,
+              backgroundColor: theme.glow,
+              height: dimensions.height + 8,
+              width: dimensions.width + 8,
+            },
+          ]}
+        />
+      ) : null}
+
+      <Pressable
+        accessibilityLabel={label}
+        accessibilityRole="button"
+        className={className}
+        hitSlop={4}
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        style={[
+          styles.pressable,
+          {
+            height: dimensions.canvasHeight,
+            width: dimensions.canvasWidth,
+          },
+        ]}
+      >
+        <View
+          pointerEvents="none"
+          style={[
+            styles.pill,
+            {
+              backgroundColor: fillColor,
+              borderColor,
+              borderWidth: isCluster ? 1.5 : selected ? 3.5 : 3,
+              boxShadow: markerShadow(
+                selected,
+                moving,
+                isCluster
+                  ? 'rgba(15, 23, 42, 0.28)'
+                  : theme.glowStrong,
+              ),
               height: dimensions.height,
-              borderColor: selected
-                ? theme.ring
-                : 'rgba(255,255,255,0.82)',
-              borderRadius: dimensions.radius,
-              borderWidth: selected ? 1.5 : 1,
-              backgroundColor: moving
-                ? 'rgba(255,255,255,0.94)'
-                : theme.backgroundTint,
+              width: dimensions.width,
             },
           ]}
         >
-          {type === 'cluster' ? (
-            <View
-              className="flex-row items-center"
-              style={{
-                gap: CLUSTER_SIZE[size].gap,
-                paddingHorizontal: CLUSTER_SIZE[size].paddingHorizontal,
-              }}
-            >
-              {selected && !moving ? (
-                <AvailabilityRing
-                  percentage={clampedPercentage}
-                  size={CLUSTER_SIZE[size].ring}
-                  strokeWidth={CLUSTER_SIZE[size].ringStroke}
-                  theme={theme}
-                />
-              ) : (
-                <View
-                  style={[
-                    styles.availabilityDot,
-                    {
-                      backgroundColor: theme.ring,
-                      height: moving ? 10 : 12,
-                      width: moving ? 10 : 12,
-                    },
-                  ]}
-                />
-              )}
-              <View className="flex-1 justify-center">
-                <Text
-                  numberOfLines={1}
-                  style={[
-                    styles.percentageText,
-                    {
-                      color: theme.text,
-                      fontSize: CLUSTER_SIZE[size].percentage,
-                      lineHeight: CLUSTER_SIZE[size].percentage + 1,
-                    },
-                  ]}
-                >
-                  {clampedPercentage}%
-                </Text>
-                <Text
-                  numberOfLines={1}
-                  style={[
-                    styles.zoneText,
-                    {
-                      color: theme.text,
-                      fontSize: CLUSTER_SIZE[size].zone,
-                      lineHeight: CLUSTER_SIZE[size].zone + 3,
-                    },
-                  ]}
-                >
-                  {zoneCount} {zoneCount === 1 ? 'zone' : 'zones'}
-                </Text>
-              </View>
-            </View>
-          ) : (
-            <Text
-              numberOfLines={1}
-              style={[
-                styles.percentageText,
-                {
-                  color: theme.text,
-                  fontSize: SPOT_SIZE[size].percentage,
-                  lineHeight: SPOT_SIZE[size].percentage + 3,
-                },
-              ]}
-            >
-              {clampedPercentage}%
-            </Text>
-          )}
+          <Text
+            numberOfLines={1}
+            style={[
+              styles.markerText,
+              {
+                color: textColor,
+                fontSize: dimensions.font,
+                lineHeight: dimensions.font + 2,
+              },
+            ]}
+          >
+            {isCluster ? formatClusterCount(clusterCount) : `${clampedPercentage}%`}
+          </Text>
         </View>
+
+        {!isCluster && selected ? (
+          <View pointerEvents="none" style={styles.tailContainer}>
+            <View
+              style={[
+                styles.tail,
+                styles.tailBorder,
+                { borderTopColor: '#FFFFFF' },
+              ]}
+            />
+            <View
+              style={[
+                styles.tail,
+                styles.tailFill,
+                { borderTopColor: theme.backgroundTint },
+              ]}
+            />
+          </View>
+        ) : null}
       </Pressable>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  availabilityDot: {
-    borderColor: 'rgba(255,255,255,0.92)',
-    borderRadius: 999,
-    borderWidth: 2,
-  },
-  bubbleSurface: {
+  canvas: {
     alignItems: 'center',
+    justifyContent: 'flex-start',
+    overflow: 'visible',
+  },
+  markerText: {
+    fontVariant: ['tabular-nums'],
+    fontWeight: '900',
+    letterSpacing: -0.45,
+    textAlign: 'center',
+  },
+  pill: {
+    alignItems: 'center',
+    borderRadius: 999,
     justifyContent: 'center',
   },
-  percentageText: {
-    fontVariant: ['tabular-nums'],
-    fontWeight: '800',
-    letterSpacing: -0.6,
+  pressable: {
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    overflow: 'visible',
   },
   selectedAura: {
-    borderWidth: 3,
-    opacity: 0.35,
-    transform: [{ scale: 1.14 }],
+    borderRadius: 999,
+    position: 'absolute',
+    top: -4,
   },
-  zoneText: {
-    fontVariant: ['tabular-nums'],
-    fontWeight: '700',
-    letterSpacing: -0.2,
-    opacity: 0.82,
+  tail: {
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderStyle: 'solid',
+    height: 0,
+    position: 'absolute',
+    width: 0,
+  },
+  tailBorder: {
+    borderLeftWidth: 8,
+    borderRightWidth: 8,
+    borderTopWidth: 11,
+    left: -8,
+    top: 0,
+  },
+  tailContainer: {
+    height: 11,
+    position: 'relative',
+    width: 0,
+  },
+  tailFill: {
+    borderLeftWidth: 5,
+    borderRightWidth: 5,
+    borderTopWidth: 7,
+    left: -5,
+    top: -3,
   },
 });
 

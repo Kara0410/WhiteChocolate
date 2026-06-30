@@ -918,6 +918,7 @@ export function ParkingMap({
               ],
               width,
               height,
+              zIndex: selectedParkingItem?.id === item.id ? 20 : 1,
             }}
           >
             <ParkingMarkerCard

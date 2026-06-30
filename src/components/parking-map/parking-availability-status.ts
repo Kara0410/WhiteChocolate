@@ -15,41 +15,41 @@ export const AVAILABILITY_THEME: Record<
   AvailabilityTheme
 > = {
   high: {
-    text: '#168A35',
-    ring: '#34C759',
-    ringTrack: 'rgba(52, 199, 89, 0.18)',
-    glow: 'rgba(52, 199, 89, 0.55)',
-    glowStrong: 'rgba(52, 199, 89, 0.70)',
-    backgroundTint: 'rgba(232, 255, 239, 0.78)',
-    border: 'rgba(112, 220, 142, 0.28)',
+    text: '#FFFFFF',
+    ring: '#22C55E',
+    ringTrack: 'rgba(34, 197, 94, 0.2)',
+    glow: 'rgba(34, 197, 94, 0.42)',
+    glowStrong: 'rgba(34, 197, 94, 0.58)',
+    backgroundTint: '#22C55E',
+    border: '#FFFFFF',
   },
   medium: {
-    text: '#D46A00',
-    ring: '#FF8A00',
-    ringTrack: 'rgba(255, 138, 0, 0.18)',
-    glow: 'rgba(255, 138, 0, 0.55)',
-    glowStrong: 'rgba(255, 138, 0, 0.70)',
-    backgroundTint: 'rgba(255, 246, 232, 0.78)',
-    border: 'rgba(255, 170, 64, 0.3)',
+    text: '#FFFFFF',
+    ring: '#FF9500',
+    ringTrack: 'rgba(255, 149, 0, 0.2)',
+    glow: 'rgba(255, 149, 0, 0.42)',
+    glowStrong: 'rgba(255, 149, 0, 0.58)',
+    backgroundTint: '#FF9500',
+    border: '#FFFFFF',
   },
   low: {
-    text: '#D91F26',
-    ring: '#FF3B30',
-    ringTrack: 'rgba(255, 59, 48, 0.18)',
-    glow: 'rgba(255, 59, 48, 0.55)',
-    glowStrong: 'rgba(255, 59, 48, 0.70)',
-    backgroundTint: 'rgba(255, 236, 236, 0.78)',
-    border: 'rgba(255, 105, 97, 0.3)',
+    text: '#FFFFFF',
+    ring: '#FF2D2D',
+    ringTrack: 'rgba(255, 45, 45, 0.2)',
+    glow: 'rgba(255, 45, 45, 0.42)',
+    glowStrong: 'rgba(255, 45, 45, 0.58)',
+    backgroundTint: '#FF2D2D',
+    border: '#FFFFFF',
   },
 };
 
 export function getAvailabilityStatus(
   percentage: number,
 ): AvailabilityStatus {
-  if (percentage >= 65) {
+  if (percentage >= 66) {
     return 'high';
   }
-  if (percentage >= 30) {
+  if (percentage >= 33) {
     return 'medium';
   }
   return 'low';

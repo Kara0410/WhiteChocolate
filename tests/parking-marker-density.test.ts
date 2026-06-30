@@ -43,22 +43,23 @@ function marker(
 
 test('maps percentage thresholds to availability status', () => {
   assert.equal(getAvailabilityStatus(100), 'high');
-  assert.equal(getAvailabilityStatus(65), 'high');
-  assert.equal(getAvailabilityStatus(64), 'medium');
-  assert.equal(getAvailabilityStatus(30), 'medium');
-  assert.equal(getAvailabilityStatus(29), 'low');
+  assert.equal(getAvailabilityStatus(66), 'high');
+  assert.equal(getAvailabilityStatus(65), 'medium');
+  assert.equal(getAvailabilityStatus(33), 'medium');
+  assert.equal(getAvailabilityStatus(32), 'low');
   assert.equal(getAvailabilityStatus(0), 'low');
 });
 
-test('keeps every marker at least as large as the parking action button', () => {
-  assert.equal(getMarkerDimensions('spot').visualSize, 72);
-  assert.equal(getMarkerDimensions('spot').height, 72);
-  assert.equal(getMarkerDimensions('small').visualSize, 108);
-  assert.equal(getMarkerDimensions('small').height, 52);
-  assert.equal(getMarkerDimensions('medium').visualSize, 136);
-  assert.equal(getMarkerDimensions('medium').height, 64);
-  assert.equal(getMarkerDimensions('large').visualSize, 164);
-  assert.equal(getMarkerDimensions('large').height, 78);
+test('uses compact pill canvases with room for selection effects', () => {
+  assert.equal(getMarkerDimensions('spot').visualSize, 68);
+  assert.equal(getMarkerDimensions('spot').width, 80);
+  assert.equal(getMarkerDimensions('spot').height, 54);
+  assert.equal(getMarkerDimensions('small').visualSize, 48);
+  assert.equal(getMarkerDimensions('small').height, 42);
+  assert.equal(getMarkerDimensions('medium').visualSize, 56);
+  assert.equal(getMarkerDimensions('medium').height, 44);
+  assert.equal(getMarkerDimensions('large').visualSize, 64);
+  assert.equal(getMarkerDimensions('large').height, 48);
 });
 
 test('suppresses visually overlapping markers at the enlarged scale', () => {
