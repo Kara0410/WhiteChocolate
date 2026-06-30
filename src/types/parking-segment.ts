@@ -7,7 +7,6 @@ export type ParkingSegment = {
   parkregelName: string | null;
   prmName: string | null;
   geoportalClass: string | null;
-  shape: string | null;
   lat: number;
   lon: number;
 };

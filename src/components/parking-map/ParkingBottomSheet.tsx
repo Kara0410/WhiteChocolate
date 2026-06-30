@@ -410,7 +410,7 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
       <ParkingDetailSection title="Details">
         <ParkingInfoRow
           label="Zone ID"
-          value={item.bestSpot.id.replace(/^spot:/, '')}
+          value={item.bestSpot.id}
         />
         <ParkingInfoRow label="Zone Type" value="Public parking" />
         <ParkingInfoRow label="Surface" value="Paved" />

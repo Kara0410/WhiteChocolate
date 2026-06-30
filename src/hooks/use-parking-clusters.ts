@@ -52,7 +52,6 @@ export function useParkingClusters(
 ) {
   const [currentRegion, setCurrentRegion] = useState(initialCamera);
   const [displayCamera, setDisplayCamera] = useState(initialCamera);
-  const [currentZoom, setCurrentZoom] = useState(initialCamera.zoom);
   const [visibleClusters, setVisibleClusters] = useState<
     ParkingClusterResponse[]
   >([]);
@@ -67,7 +66,6 @@ export function useParkingClusters(
   const loadClusters = useCallback(async (camera: ParkingCameraState) => {
     const request = getParkingClusterRequest(camera, destination);
     setCurrentRegion(camera);
-    setCurrentZoom(request.zoom);
     currentZoomRef.current = request.zoom;
 
     if (request.tileKey === requestKeyRef.current) {
@@ -209,7 +207,6 @@ export function useParkingClusters(
   return {
     currentRegion,
     displayCamera,
-    currentZoom,
     onCameraMove,
     visibleClusters,
     visibleSpots,

@@ -41,13 +41,13 @@ test('maps Supabase columns to strict app fields', () => {
     parkregelName: 'Bew 9-23',
     prmName: 'Südliche Au',
     geoportalClass: 'Bewohnerparken',
-    shape: 'LINESTRING (691000 5333000, 691100 5333100)',
     lat: 48.13,
     lon: 11.58,
   });
 });
 
 test('rejects missing or invalid coordinates', () => {
+  assert.equal(parkingSegmentFromRow(row({ id: '' })), null);
   assert.equal(parkingSegmentFromRow(row({ lat: null })), null);
   assert.equal(parkingSegmentFromRow(row({ lon: null })), null);
   assert.equal(parkingSegmentFromRow(row({ lat: 91 })), null);
@@ -86,7 +86,7 @@ test('preserves segment identity and title through the marker model', () => {
 
   const marker = parkingRecordToResponse(parkingSegmentToMapRecord(segment));
 
-  assert.equal(marker.id, 'spot:segment-id');
+  assert.equal(marker.id, 'segment-id');
   assert.equal(marker.bestSpot.id, 'segment-id');
   assert.equal(marker.bestSpot.zoneName, 'Südliche Au');
   assert.equal(marker.latitude, 48.13);

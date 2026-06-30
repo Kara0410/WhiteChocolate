@@ -163,7 +163,7 @@ export function parkingRecordToResponse(
   destination?: ParkingCoordinates,
 ): ParkingClusterResponse {
   return {
-    id: `spot:${record.id}`,
+    id: record.id,
     type: 'spot',
     latitude: record.latitude,
     longitude: record.longitude,

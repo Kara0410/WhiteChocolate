@@ -14,13 +14,12 @@ export type ParkingSegmentSelectRow = Pick<
   | 'parkregel_name'
   | 'prm_name'
   | 'geoportal_class'
-  | 'shape'
   | 'lat'
   | 'lon'
 >;
 
-function cleanText(value: string | null) {
-  const cleaned = value?.trim();
+function cleanText(value: unknown) {
+  const cleaned = typeof value === 'string' ? value.trim() : '';
   return cleaned ? cleaned : null;
 }
 
@@ -45,12 +44,14 @@ function hasValidCoordinates(
 export function parkingSegmentFromRow(
   row: ParkingSegmentSelectRow,
 ): ParkingSegment | null {
-  if (!hasValidCoordinates(row)) {
+  const id = cleanText(row.id);
+
+  if (!id || !hasValidCoordinates(row)) {
     return null;
   }
 
   return {
-    id: row.id,
+    id,
     street: cleanText(row.strasse),
     capacity:
       typeof row.angebot === 'number' && Number.isFinite(row.angebot)
@@ -61,7 +62,6 @@ export function parkingSegmentFromRow(
     parkregelName: cleanText(row.parkregel_name),
     prmName: cleanText(row.prm_name),
     geoportalClass: cleanText(row.geoportal_class),
-    shape: cleanText(row.shape),
     lat: row.lat,
     lon: row.lon,
   };
