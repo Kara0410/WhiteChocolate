@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  getMarkerLimitForZoom,
   projectMapCoordinate,
   projectParkingMarkers,
   projectSelectedParkingMarkers,
@@ -60,6 +61,13 @@ test('uses compact pill canvases with room for selection effects', () => {
   assert.equal(getMarkerDimensions('medium').height, 44);
   assert.equal(getMarkerDimensions('large').visualSize, 64);
   assert.equal(getMarkerDimensions('large').height, 48);
+});
+
+test('allows progressively more compact pills at closer zoom levels', () => {
+  assert.equal(getMarkerLimitForZoom(10), 20);
+  assert.equal(getMarkerLimitForZoom(13), 50);
+  assert.equal(getMarkerLimitForZoom(15), 90);
+  assert.equal(getMarkerLimitForZoom(16), 140);
 });
 
 test('suppresses visually overlapping markers at the enlarged scale', () => {

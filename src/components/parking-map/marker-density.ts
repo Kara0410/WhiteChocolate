@@ -82,17 +82,17 @@ export function projectMapCoordinate(
   };
 }
 
-function markerLimitForZoom(zoom: number) {
+export function getMarkerLimitForZoom(zoom: number) {
   if (zoom <= 10) {
     return 20;
   }
   if (zoom <= 13) {
-    return 40;
+    return 50;
   }
   if (zoom <= 15) {
-    return 64;
+    return 90;
   }
-  return 96;
+  return 140;
 }
 
 /**
@@ -105,7 +105,7 @@ export function selectSpatiallySeparatedMarkers(
   items: ParkingClusterResponse[],
   options: MarkerDensityOptions,
 ) {
-  const limit = markerLimitForZoom(options.camera.zoom);
+  const limit = getMarkerLimitForZoom(options.camera.zoom);
   const projected: ProjectedParkingMarker[] = items
     .map((item) => {
       const tier = getMarkerSizeTier(item.type, options.camera.zoom);
@@ -115,8 +115,8 @@ export function selectSpatiallySeparatedMarkers(
         item,
         x: position.x,
         y: position.y,
-        width: dimensions.width + 12,
-        height: dimensions.height + 12,
+        width: dimensions.width + 4,
+        height: dimensions.height + 4,
         tier,
       };
     })

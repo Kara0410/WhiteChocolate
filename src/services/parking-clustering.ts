@@ -13,11 +13,11 @@ import {
   haversineDistanceMeters,
 } from '@/utils/parking-map-geo';
 
-const MAX_CLUSTER_ZOOM = 18;
-const MAX_VISIBLE_MARKERS = 120;
+const MAX_CLUSTER_ZOOM = 16;
+const MAX_VISIBLE_MARKERS = 180;
 
-type RadiusBucket = 20 | 40 | 60 | 80 | 100 | 120 | 160 | 200;
-const RADIUS_BUCKETS: RadiusBucket[] = [20, 40, 60, 80, 100, 120, 160, 200];
+type RadiusBucket = 16 | 24 | 32 | 48 | 64 | 80 | 100 | 120;
+const RADIUS_BUCKETS: RadiusBucket[] = [16, 24, 32, 48, 64, 80, 100, 120];
 
 type ParkingPointProperties = {
   record: ParkingMapRecord;
@@ -42,19 +42,19 @@ type ParkingClusterProperties = {
  * - <= 10: broad city scanning
  * - 11-13: driving areas (roughly a few kilometres across)
  * - 14-15: walking-relevance areas (roughly 416-624 m across at Munich)
- * - >= 16: tiny clusters that quickly resolve into individual records
+ * - 16: tiny clusters that resolve into individual records at zoom 17
  */
 export function getClusterRadiusForZoom(zoom: number): RadiusBucket {
   if (zoom <= 10) {
-    return 80;
+    return 64;
   }
   if (zoom <= 13) {
-    return 60;
+    return 48;
   }
   if (zoom <= 15) {
-    return 40;
+    return 32;
   }
-  return 20;
+  return 16;
 }
 
 function toBestSpot(record: ParkingMapRecord): ParkingBestSpot {
@@ -257,9 +257,8 @@ export function createParkingClusterEngine(records: ParkingMapRecord[]) {
       let index = indexes.get(radius)!;
       let features = index.getClusters(clusterBbox, Math.round(zoom));
 
-      // Dense central areas need stronger grouping than sparse outskirts.
-      // Escalating through prebuilt KD-tree indexes caps native marker work
-      // without rebuilding an index during camera movement.
+      // Dense central areas still need a safety cap, but the overlay density
+      // pass now handles the final visible marker count for compact pills.
       for (const candidateRadius of RADIUS_BUCKETS) {
         if (
           candidateRadius <= baseRadius ||

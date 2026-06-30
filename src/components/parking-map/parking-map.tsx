@@ -243,27 +243,39 @@ export function ParkingMap({
             camera: currentRegion,
             width: mapSize.width,
             height: mapSize.height,
-            selectedId: selectedParkingItem?.id,
           })
         : [],
     [
       currentRegion,
       mapSize.height,
       mapSize.width,
-      selectedParkingItem?.id,
       visibleClusters,
     ],
   );
+  const displayedMarkerItems = useMemo(() => {
+    if (selectedParkingItem !== null) {
+      return [selectedParkingItem];
+    }
+    if (activeOverlay !== 'none' || selectedSearchPlace !== null) {
+      return [];
+    }
+    return densityFilteredMarkers;
+  }, [
+    activeOverlay,
+    densityFilteredMarkers,
+    selectedParkingItem,
+    selectedSearchPlace,
+  ]);
   const projectedMarkers = useMemo(
     () =>
-      projectSelectedParkingMarkers(densityFilteredMarkers, {
+      projectSelectedParkingMarkers(displayedMarkerItems, {
         camera: displayCamera,
         width: mapSize.width,
         height: mapSize.height,
       }),
     [
-      densityFilteredMarkers,
       displayCamera,
+      displayedMarkerItems,
       mapSize.height,
       mapSize.width,
     ],
@@ -775,9 +787,10 @@ export function ParkingMap({
       return;
     }
 
+    cancelPendingCameraFocus();
     setSelectedSearchPlace(null);
     clearSelection();
-  }, [activeOverlay, clearSelection]);
+  }, [activeOverlay, cancelPendingCameraFocus, clearSelection]);
 
   useEffect(() => {
     if (

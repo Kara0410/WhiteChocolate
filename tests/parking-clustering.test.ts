@@ -34,10 +34,10 @@ function record(
 }
 
 test('uses behavior-based radius buckets', () => {
-  assert.equal(getClusterRadiusForZoom(10), 80);
-  assert.equal(getClusterRadiusForZoom(12), 60);
-  assert.equal(getClusterRadiusForZoom(15), 40);
-  assert.equal(getClusterRadiusForZoom(16), 20);
+  assert.equal(getClusterRadiusForZoom(10), 64);
+  assert.equal(getClusterRadiusForZoom(12), 48);
+  assert.equal(getClusterRadiusForZoom(15), 32);
+  assert.equal(getClusterRadiusForZoom(16), 16);
 });
 
 test('calculates walking thresholds with Haversine distance', () => {
@@ -99,7 +99,7 @@ test('builds weighted cluster metadata and filters by viewport', () => {
   assert.ok(cluster.expansionZoom !== undefined);
 });
 
-test('returns individual records at the closest zoom', () => {
+test('returns individual records at street-level zoom', () => {
   const engine = createParkingClusterEngine([
     record({ id: 'a' }),
     record({ id: 'b', latitude: 48.1353, longitude: 11.5826 }),
@@ -111,14 +111,14 @@ test('returns individual records at the closest zoom', () => {
       maxLng: 11.59,
       maxLat: 48.15,
     },
-    19,
+    17,
   );
 
   assert.equal(results.length, 2);
   assert.ok(results.every((item) => item.type === 'spot'));
 });
 
-test('clusters dense viewports aggressively enough for native maps', () => {
+test('keeps dense clustered viewports within the engine safety cap', () => {
   const records = Array.from({ length: 400 }, (_, index) =>
     record({
       id: String(index),
@@ -136,7 +136,7 @@ test('clusters dense viewports aggressively enough for native maps', () => {
     14,
   );
 
-  assert.ok(results.length <= 120);
+  assert.ok(results.length <= 180);
 });
 
 test('handles an empty Supabase result without producing markers', () => {
