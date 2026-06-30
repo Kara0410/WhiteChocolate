@@ -32,7 +32,6 @@ import { useMapOverlay } from '@/context/MapOverlayContext';
 import { useParkingClusters } from '@/hooks/use-parking-clusters';
 import { MUNICH_MOCK_LOCATION } from '@/hooks/use-map-location';
 import type { PlaceSearchResult } from '@/hooks/use-google-place-search';
-import { getAllMockParkingSpots } from '@/services/parking-clusters';
 import type {
   ParkingCameraState,
   ParkingClusterResponse,
@@ -173,6 +172,7 @@ export function ParkingMap({
     displayCamera,
     onCameraMove,
     visibleClusters,
+    visibleSpots,
   } = useParkingClusters(initialCamera, destination);
   const googleMapRef = useRef<GoogleMaps.MapView | null>(null);
   const appleMapRef = useRef<AppleMaps.MapView | null>(null);
@@ -221,18 +221,6 @@ export function ParkingMap({
   const lastSearchFocusKeyRef = useRef<string | null>(null);
   const lastSearchSelectionIdRef = useRef<number | null>(null);
   const lastLocationFocusKeyRef = useRef<string | null>(null);
-  const allParkingSpots = useMemo(
-    () =>
-      getAllMockParkingSpots(
-        selectedSearchPlace
-          ? {
-              latitude: selectedSearchPlace.latitude,
-              longitude: selectedSearchPlace.longitude,
-            }
-          : undefined,
-      ),
-    [selectedSearchPlace],
-  );
   const nearestSearchSpots = useMemo(
     () =>
       selectedSearchPlace
@@ -241,11 +229,11 @@ export function ParkingMap({
               latitude: selectedSearchPlace.latitude,
               longitude: selectedSearchPlace.longitude,
             },
-            spots: allParkingSpots,
+            spots: visibleSpots,
             limit: 25,
           })
         : [],
-    [allParkingSpots, selectedSearchPlace],
+    [selectedSearchPlace, visibleSpots],
   );
 
   const densityFilteredMarkers = useMemo(
@@ -1030,7 +1018,7 @@ export function ParkingMap({
         <ParkingListBottomSheet
           onClose={closeOverlay}
           onSpotPress={handleParkingOverlaySpotPress}
-          spots={allParkingSpots}
+          spots={visibleSpots}
         />
       ) : null}
 

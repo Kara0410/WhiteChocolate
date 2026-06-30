@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { getMockParkingClusters } from '@/services/parking-clusters';
-import { createParkingClusterEngine } from '@/services/parking-clustering';
+import {
+  createParkingClusterEngine,
+  parkingRecordToResponse,
+} from '@/services/parking-clustering';
 import { fetchParkingSegments } from '@/services/parkingSegments';
 import type {
   ParkingCameraState,
@@ -16,16 +18,20 @@ import { parkingSegmentToMapRecord } from '@/utils/parking-segments';
 
 const CAMERA_DEBOUNCE_MS = 350;
 const MAX_CLIENT_CACHE_ENTRIES = 80;
-const clusterCache = new Map<string, ParkingClusterResponse[]>();
+type CachedParkingData = {
+  clusters: ParkingClusterResponse[];
+  spots: ParkingClusterResponse[];
+};
+const parkingCache = new Map<string, CachedParkingData>();
 
-function cacheClusters(key: string, clusters: ParkingClusterResponse[]) {
-  clusterCache.delete(key);
-  clusterCache.set(key, clusters);
+function cacheParkingData(key: string, data: CachedParkingData) {
+  parkingCache.delete(key);
+  parkingCache.set(key, data);
 
-  if (clusterCache.size > MAX_CLIENT_CACHE_ENTRIES) {
-    const oldestKey = clusterCache.keys().next().value;
+  if (parkingCache.size > MAX_CLIENT_CACHE_ENTRIES) {
+    const oldestKey = parkingCache.keys().next().value;
     if (oldestKey) {
-      clusterCache.delete(oldestKey);
+      parkingCache.delete(oldestKey);
     }
   }
 }
@@ -50,6 +56,7 @@ export function useParkingClusters(
   const [visibleClusters, setVisibleClusters] = useState<
     ParkingClusterResponse[]
   >([]);
+  const [visibleSpots, setVisibleSpots] = useState<ParkingClusterResponse[]>([]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const displayCameraFrameRef = useRef<number | null>(null);
   const latestCameraRef = useRef<ParkingCameraState>(initialCamera);
@@ -69,15 +76,19 @@ export function useParkingClusters(
 
     requestKeyRef.current = request.tileKey;
 
-    const cached = clusterCache.get(request.tileKey);
+    const cached = parkingCache.get(request.tileKey);
     if (cached) {
-      setVisibleClusters(cached);
+      setVisibleClusters(cached.clusters);
+      setVisibleSpots(cached.spots);
       return;
     }
 
     try {
       const { segments, truncated } = await fetchParkingSegments(request.bbox);
       const records = segments.map(parkingSegmentToMapRecord);
+      const spots = records.map((record) =>
+        parkingRecordToResponse(record, request.destination),
+      );
       const clusters = createParkingClusterEngine(records).getClusters(
         request.bbox,
         request.zoom,
@@ -97,8 +108,9 @@ export function useParkingClusters(
         );
       }
 
-      cacheClusters(request.tileKey, clusters);
+      cacheParkingData(request.tileKey, { clusters, spots });
       setVisibleClusters(clusters);
+      setVisibleSpots(spots);
     } catch (error) {
       if (
         !isMountedRef.current ||
@@ -109,12 +121,13 @@ export function useParkingClusters(
 
       if (__DEV__) {
         console.warn(
-          'Supabase parking fetch failed; using bundled parking data.',
+          'Supabase parking fetch failed.',
           error,
         );
       }
 
-      setVisibleClusters(getMockParkingClusters(request));
+      setVisibleClusters([]);
+      setVisibleSpots([]);
     }
   }, [destination]);
 
@@ -199,5 +212,6 @@ export function useParkingClusters(
     currentZoom,
     onCameraMove,
     visibleClusters,
+    visibleSpots,
   };
 }

@@ -1,23 +1,119 @@
-import { Linking, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Linking,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { AppleMaps, GoogleMaps, type CameraPosition } from 'expo-maps';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import InfoRow from '@/components/InfoRow';
-import { parkingData } from '@/data/munich_parking';
+import { fetchParkingSegmentById } from '@/services/parkingSegments';
+import type { ParkingSegment } from '@/types/parking-segment';
 import { getBadgeColor } from '@/utils/parking';
 
-export default function ParkingDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const item = parkingData[parseInt(id ?? '0', 10)];
+type DetailState =
+  | { status: 'loading' }
+  | { status: 'success'; item: ParkingSegment }
+  | { status: 'not-found' }
+  | { status: 'error'; message: string };
 
-  if (!item) {
-    return <Text className="text-white text-center mt-10 text-base">Entry not found.</Text>;
+function DetailStatus({
+  loading = false,
+  message,
+}: {
+  loading?: boolean;
+  message: string;
+}) {
+  return (
+    <>
+      <Stack.Screen
+        options={{
+          title: 'Parking details',
+          headerStyle: { backgroundColor: '#25292e' },
+          headerTintColor: '#fff',
+          headerShadowVisible: false,
+        }}
+      />
+      <View className="flex-1 items-center justify-center gap-3 bg-surface px-6">
+        {loading ? <ActivityIndicator color="#ffd33d" /> : null}
+        <Text className="text-center text-base text-white">{message}</Text>
+      </View>
+    </>
+  );
+}
+
+export default function ParkingDetailScreen() {
+  const { id } = useLocalSearchParams<{ id?: string }>();
+  const [state, setState] = useState<DetailState>({ status: 'loading' });
+
+  useEffect(() => {
+    let active = true;
+
+    if (!id) {
+      setState({ status: 'not-found' });
+      return () => {
+        active = false;
+      };
+    }
+
+    setState({ status: 'loading' });
+    void fetchParkingSegmentById(id)
+      .then((item) => {
+        if (!active) {
+          return;
+        }
+
+        setState(item ? { status: 'success', item } : { status: 'not-found' });
+      })
+      .catch((error: unknown) => {
+        if (!active) {
+          return;
+        }
+
+        setState({
+          status: 'error',
+          message:
+            error instanceof Error
+              ? error.message
+              : 'Unable to load parking details.',
+        });
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [id]);
+
+  if (state.status === 'loading') {
+    return <DetailStatus loading message="Loading parking details…" />;
   }
 
-  const badgeColor = getBadgeColor(item.gruppe);
+  if (state.status === 'error') {
+    return <DetailStatus message={state.message} />;
+  }
+
+  if (state.status === 'not-found') {
+    return <DetailStatus message="Parking segment not found." />;
+  }
+
+  const { item } = state;
+  const title = item.street ?? item.prmName ?? 'Parking segment';
+  const groupName = item.groupName ?? item.geoportalClass ?? 'Parking';
+  const badgeColor = getBadgeColor(groupName);
   const darkBadge = badgeColor === '#6b7280' || badgeColor === '#f87171';
-  const hasCoords = item.lat !== null && item.lon !== null;
+  const hasCoords =
+    Number.isFinite(item.lat) &&
+    item.lat >= -90 &&
+    item.lat <= 90 &&
+    Number.isFinite(item.lon) &&
+    item.lon >= -180 &&
+    item.lon <= 180;
 
   const openOSM = () =>
     Linking.openURL(
@@ -27,8 +123,8 @@ export default function ParkingDetailScreen() {
   const cameraPosition: CameraPosition | undefined = hasCoords
     ? {
         coordinates: {
-          latitude: item.lat!,
-          longitude: item.lon!,
+          latitude: item.lat,
+          longitude: item.lon,
         },
         zoom: 17,
       }
@@ -37,12 +133,12 @@ export default function ParkingDetailScreen() {
   const appleMarkers: AppleMaps.Marker[] = hasCoords
     ? [
         {
-          id: String(id),
+          id: item.id,
           coordinates: {
-            latitude: item.lat!,
-            longitude: item.lon!,
+            latitude: item.lat,
+            longitude: item.lon,
           },
-          title: item.strasse,
+          title,
         },
       ]
     : [];
@@ -50,13 +146,13 @@ export default function ParkingDetailScreen() {
   const googleMarkers: GoogleMaps.Marker[] = hasCoords
     ? [
         {
-          id: String(id),
+          id: item.id,
           coordinates: {
-            latitude: item.lat!,
-            longitude: item.lon!,
+            latitude: item.lat,
+            longitude: item.lon,
           },
-          title: item.strasse,
-          snippet: item.gruppe,
+          title,
+          snippet: groupName,
           showCallout: true,
         },
       ]
@@ -66,7 +162,7 @@ export default function ParkingDetailScreen() {
     <>
       <Stack.Screen
         options={{
-          title: item.strasse,
+          title,
           headerStyle: { backgroundColor: '#25292e' },
           headerTintColor: '#fff',
           headerShadowVisible: false,
@@ -118,18 +214,18 @@ export default function ParkingDetailScreen() {
               >
                 {hasCoords ? 'Open in OpenStreetMap' : 'No location data'}
               </Text>
-              {hasCoords && (
-                <Text className="text-gray-500 text-xs">
-                  {item.lat?.toFixed(5)}, {item.lon?.toFixed(5)}
+              {hasCoords ? (
+                <Text className="text-xs text-gray-500">
+                  {item.lat.toFixed(5)}, {item.lon.toFixed(5)}
                 </Text>
-              )}
+              ) : null}
             </Pressable>
           )}
         </View>
 
-        <View className="m-4 bg-elevated rounded-2xl p-5">
-          <View className="gap-2.5 mb-4">
-            <Text className="text-[22px] font-bold text-white">{item.strasse}</Text>
+        <View className="m-4 rounded-2xl bg-elevated p-5">
+          <View className="mb-4 gap-2.5">
+            <Text className="text-[22px] font-bold text-white">{title}</Text>
             <View
               className="self-start rounded-full px-3 py-1"
               style={{ backgroundColor: badgeColor }}
@@ -138,38 +234,52 @@ export default function ParkingDetailScreen() {
                 className="text-xs font-semibold"
                 style={{ color: darkBadge ? '#fff' : '#1a1f24' }}
               >
-                {item.gruppe}
+                {groupName}
               </Text>
             </View>
           </View>
 
-          <View className="h-px bg-gray-700 mb-4" />
+          <View className="mb-4 h-px bg-gray-700" />
 
-          <InfoRow icon="document-text-outline" label="Regulation" value={item.beschreibung} />
-          {item.prm !== '' && (
-            <InfoRow icon="location-outline" label="District" value={item.prm} />
-          )}
-          {item.angebot > 0 && (
-            <InfoRow icon="car-outline" label="Spaces" value={`${item.angebot} parking spots`} />
-          )}
-          {hasCoords && (
+          <InfoRow
+            icon="document-text-outline"
+            label="Regulation"
+            value={item.description ?? 'No regulation description'}
+          />
+          {item.prmName ? (
+            <InfoRow
+              icon="location-outline"
+              label="District"
+              value={item.prmName}
+            />
+          ) : null}
+          {item.capacity !== null ? (
+            <InfoRow
+              icon="car-outline"
+              label="Spaces"
+              value={`${item.capacity} parking spots`}
+            />
+          ) : null}
+          {hasCoords ? (
             <InfoRow
               icon="navigate-outline"
               label="Coordinates"
-              value={`${item.lat?.toFixed(5)} deg N, ${item.lon?.toFixed(5)} deg E`}
+              value={`${item.lat.toFixed(5)} deg N, ${item.lon.toFixed(5)} deg E`}
             />
-          )}
+          ) : null}
         </View>
 
-        {hasCoords && Platform.OS === 'web' && (
+        {hasCoords && Platform.OS === 'web' ? (
           <Pressable
-            className="flex-row items-center justify-center gap-2 bg-gold mx-4 rounded-xl py-3.5"
+            className="mx-4 flex-row items-center justify-center gap-2 rounded-xl bg-gold py-3.5"
             onPress={openOSM}
           >
             <Ionicons name="open-outline" size={16} color="#25292e" />
-            <Text className="text-surface font-bold text-[15px]">Open in OpenStreetMap</Text>
+            <Text className="text-[15px] font-bold text-surface">
+              Open in OpenStreetMap
+            </Text>
           </Pressable>
-        )}
+        ) : null}
       </ScrollView>
     </>
   );

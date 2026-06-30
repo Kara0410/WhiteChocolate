@@ -41,3 +41,25 @@ export async function fetchParkingSegments(bounds?: ParkingBoundingBox) {
     truncated: rows.length > MAX_SEGMENTS_PER_REQUEST,
   };
 }
+
+export async function fetchParkingSegmentById(id: string) {
+  const segmentId = id.trim();
+
+  if (!segmentId) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from('parking_segments')
+    .select(PARKING_SEGMENT_COLUMNS)
+    .eq('id', segmentId)
+    .not('lat', 'is', null)
+    .not('lon', 'is', null)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Unable to fetch parking segment: ${error.message}`);
+  }
+
+  return data ? parkingSegmentFromRow(data) : null;
+}

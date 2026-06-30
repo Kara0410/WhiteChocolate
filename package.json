@@ -54,8 +54,7 @@
     "lint": "expo lint",
     "build:dev:android": "eas build --profile development --platform android",
     "build:dev:ios": "eas build --profile development --platform ios",
-    "build:dev:ios-sim": "eas build --profile development-simulator --platform ios",
-    "generate:parking": "node scripts/generate-parking-data.js"
+    "build:dev:ios-sim": "eas build --profile development-simulator --platform ios"
   },
   "private": true
 }

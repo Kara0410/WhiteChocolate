@@ -5,7 +5,6 @@ import {
   createParkingClusterEngine,
   getClusterRadiusForZoom,
 } from '../src/services/parking-clustering';
-import { getMockParkingClusters } from '../src/services/parking-clusters';
 import type { ParkingMapRecord } from '../src/types/parking-map';
 import {
   getWalkingCategory,
@@ -140,18 +139,16 @@ test('clusters dense viewports aggressively enough for native maps', () => {
   assert.ok(results.length <= 120);
 });
 
-test('loads alpha map data synchronously from the bundled Munich mock data', () => {
-  const results = getMockParkingClusters({
-    bbox: {
+test('handles an empty Supabase result without producing markers', () => {
+  const results = createParkingClusterEngine([]).getClusters(
+    {
       minLng: 11.55,
       minLat: 48.12,
       maxLng: 11.6,
       maxLat: 48.16,
     },
-    zoom: 14,
-    tileKey: 'test',
-  });
+    14,
+  );
 
-  assert.ok(results.length > 0);
-  assert.ok(Array.isArray(results));
+  assert.deepEqual(results, []);
 });
