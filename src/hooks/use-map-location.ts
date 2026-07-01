@@ -7,7 +7,9 @@ import type {
 } from '@/types/parking-map';
 import { hasValidParkingCoordinates } from '@/utils/parking-map-geo';
 
-const LOCATION_TIMEOUT_MS = 12_000;
+const LOCATION_TIMEOUT_MS = 15_000;
+const LAST_KNOWN_LOCATION_MAX_AGE_MS = 2 * 60_000;
+const LAST_KNOWN_LOCATION_MAX_ACCURACY_METERS = 500;
 
 export const MUNICH_MOCK_LOCATION: ParkingCoordinates = {
   latitude: 48.1351,
@@ -23,16 +25,73 @@ type LocationResult =
   | { coordinates: ParkingCoordinates }
   | { message: string };
 
+class LocationRequestTimeoutError extends Error {}
+
+function coordinatesFromLocation(
+  location: Location.LocationObject | null,
+): ParkingCoordinates | null {
+  if (location === null) {
+    return null;
+  }
+
+  const coordinates = {
+    latitude: location.coords.latitude,
+    longitude: location.coords.longitude,
+  };
+
+  return hasValidParkingCoordinates(coordinates) ? coordinates : null;
+}
+
+async function getCurrentPositionWithTimeout() {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeout = setTimeout(
+      () =>
+        reject(
+          new LocationRequestTimeoutError('Location request timed out'),
+        ),
+      LOCATION_TIMEOUT_MS,
+    );
+  });
+
+  try {
+    return await Promise.race([
+      Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      }),
+      timeoutPromise,
+    ]);
+  } finally {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+  }
+}
+
+async function getRecentLastKnownCoordinates() {
+  try {
+    const location = await Location.getLastKnownPositionAsync({
+      maxAge: LAST_KNOWN_LOCATION_MAX_AGE_MS,
+      requiredAccuracy: LAST_KNOWN_LOCATION_MAX_ACCURACY_METERS,
+    });
+
+    return coordinatesFromLocation(location);
+  } catch {
+    return null;
+  }
+}
+
 async function getDeviceLocation(): Promise<LocationResult> {
   try {
     let permission = await Location.getForegroundPermissionsAsync();
-    if (permission.status !== Location.PermissionStatus.GRANTED) {
+    if (!permission.granted && permission.canAskAgain) {
       permission = await Location.requestForegroundPermissionsAsync();
     }
 
-    if (permission.status !== Location.PermissionStatus.GRANTED) {
+    if (!permission.granted) {
       return {
-        message: 'Location permission denied. Showing the Munich test area.',
+        message:
+          'Location permission is denied. Enable it in Settings to show your position. Showing the Munich test area.',
       };
     }
 
@@ -43,37 +102,30 @@ async function getDeviceLocation(): Promise<LocationResult> {
       };
     }
 
-    let timeout: ReturnType<typeof setTimeout> | undefined;
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timeout = setTimeout(
-        () => reject(new Error('Location request timed out')),
-        LOCATION_TIMEOUT_MS,
-      );
-    });
-
     try {
-      const position = await Promise.race([
-        Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        }),
-        timeoutPromise,
-      ]);
-
-      const coordinates = {
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-      };
-
-      return hasValidParkingCoordinates(coordinates)
-        ? { coordinates }
-        : {
-            message:
-              'Current location is unavailable. Showing the Munich test area.',
-          };
-    } finally {
-      if (timeout) {
-        clearTimeout(timeout);
+      const coordinates = coordinatesFromLocation(
+        await getCurrentPositionWithTimeout(),
+      );
+      if (coordinates) {
+        return { coordinates };
       }
+
+      return {
+        message:
+          'Current location is unavailable. Showing the Munich test area.',
+      };
+    } catch (error) {
+      const lastKnownCoordinates = await getRecentLastKnownCoordinates();
+      if (lastKnownCoordinates) {
+        return { coordinates: lastKnownCoordinates };
+      }
+
+      return {
+        message:
+          error instanceof LocationRequestTimeoutError
+            ? 'Location request timed out. Showing the Munich test area.'
+            : 'Current location is unavailable. Showing the Munich test area.',
+      };
     }
   } catch {
     return {
@@ -100,6 +152,7 @@ export function useMapLocation() {
       return result.coordinates;
     }
 
+    setUserLocation(null);
     setLocationMessage(result.message);
     return null;
   }, []);

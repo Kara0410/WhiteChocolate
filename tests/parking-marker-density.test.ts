@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  filterParkingMarkersForViewport,
   getMarkerLimitForZoom,
   projectMapCoordinate,
   projectParkingMarkers,
@@ -74,6 +75,7 @@ test('buffers viewport bounds without retaining far-away markers', () => {
     latitudeDelta: 0.04,
     longitudeDelta: 0.06,
   });
+  assert.ok(bounds);
 
   assert.equal(
     isCoordinateInsideBounds(
@@ -106,6 +108,7 @@ test('buffered viewport bounds support the antimeridian', () => {
     latitudeDelta: 0.1,
     longitudeDelta: 0.1,
   });
+  assert.ok(bounds);
 
   assert.equal(
     isCoordinateInsideBounds(
@@ -114,6 +117,64 @@ test('buffered viewport bounds support the antimeridian', () => {
     ),
     true,
   );
+});
+
+test('derives generous viewport bounds when native map events omit deltas', () => {
+  const bounds = createBufferedViewportBounds({
+    latitude: 48.1351,
+    longitude: 11.5824,
+    zoom: 17,
+  });
+
+  assert.ok(bounds);
+  assert.equal(
+    isCoordinateInsideBounds(
+      { latitude: 48.1351, longitude: 11.5824 },
+      bounds,
+    ),
+    true,
+  );
+});
+
+test('returns null when viewport bounds cannot be computed safely', () => {
+  assert.equal(
+    createBufferedViewportBounds({
+      latitude: 48.1351,
+      longitude: 11.5824,
+      zoom: Number.NaN,
+    }),
+    null,
+  );
+});
+
+test('keeps server-filtered markers when inferred bounds remove everything', () => {
+  const serverMarkers = [
+    marker('server-nearby', 48.2, 11.7),
+    marker('server-nearby-2', 48.21, 11.71),
+  ];
+  const result = filterParkingMarkersForViewport(serverMarkers, {
+    latitude: 48.1351,
+    longitude: 11.5824,
+    zoom: 17,
+  });
+
+  assert.equal(result.usedServerFallback, true);
+  assert.deepEqual(result.markers, serverMarkers);
+});
+
+test('still removes far markers when the buffered viewport has matches', () => {
+  const nearby = marker('nearby', 48.1351, 11.5824);
+  const far = marker('far', 48.3, 11.9);
+  const result = filterParkingMarkersForViewport([nearby, far], {
+    latitude: 48.1351,
+    longitude: 11.5824,
+    zoom: 14,
+    latitudeDelta: 0.04,
+    longitudeDelta: 0.06,
+  });
+
+  assert.equal(result.usedServerFallback, false);
+  assert.deepEqual(result.markers, [nearby]);
 });
 
 test('maps percentage thresholds to availability status', () => {

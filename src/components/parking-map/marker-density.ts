@@ -4,6 +4,11 @@ import type {
   ParkingCoordinates,
 } from '@/types/parking-map';
 import {
+  createBufferedViewportBounds,
+  hasValidParkingCoordinates,
+  isCoordinateInsideBounds,
+} from '@/utils/parking-map-geo';
+import {
   getMarkerDimensions,
   getMarkerSizeTier,
   type MarkerSizeTier,
@@ -27,6 +32,46 @@ export type ProjectedParkingMarker = {
   height: number;
   tier: MarkerSizeTier;
 };
+
+export type ParkingViewportFilterResult = {
+  bounds: ReturnType<typeof createBufferedViewportBounds>;
+  markers: ParkingClusterResponse[];
+  usedServerFallback: boolean;
+};
+
+export function filterParkingMarkersForViewport(
+  items: ParkingClusterResponse[],
+  camera: ParkingCameraState,
+): ParkingViewportFilterResult {
+  const validItems = items.filter(hasValidParkingCoordinates);
+  const bounds = createBufferedViewportBounds(camera);
+
+  if (bounds === null) {
+    return {
+      bounds,
+      markers: validItems,
+      usedServerFallback: validItems.length > 0,
+    };
+  }
+
+  const filteredItems = validItems.filter((item) =>
+    isCoordinateInsideBounds(item, bounds),
+  );
+
+  if (filteredItems.length === 0 && validItems.length > 0) {
+    return {
+      bounds,
+      markers: validItems,
+      usedServerFallback: true,
+    };
+  }
+
+  return {
+    bounds,
+    markers: filteredItems,
+    usedServerFallback: false,
+  };
+}
 
 export function projectMapCoordinate(
   coordinates: ParkingCoordinates,

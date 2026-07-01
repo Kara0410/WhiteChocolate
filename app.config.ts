@@ -1,6 +1,9 @@
 import type { ExpoConfig } from 'expo/config';
 import type { ConfigContext } from 'expo/config';
 
+const LOCATION_PERMISSION_DESCRIPTION =
+  'Allow WhiteChocolate to use your location to show where you are and find nearby parking.';
+
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: 'White_choclate',
@@ -16,10 +19,15 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     icon: './assets/expo.icon',
     infoPlist: {
       LSApplicationQueriesSchemes: ['comgooglemaps', 'waze'],
+      NSLocationWhenInUseUsageDescription: LOCATION_PERMISSION_DESCRIPTION,
     },
   },
   android: {
     package: 'com.whitechoclate.app',
+    permissions: [
+      'android.permission.ACCESS_COARSE_LOCATION',
+      'android.permission.ACCESS_FINE_LOCATION',
+    ],
     config: {
       googleMaps: {
         apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_ANDROID_API_KEY,
@@ -57,14 +65,16 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       'expo-maps',
       {
         requestLocationPermission: true,
-        locationPermission: 'Allow WhiteChoclate to use your location',
+        locationPermission: LOCATION_PERMISSION_DESCRIPTION,
       },
     ],
     [
       'expo-location',
       {
-        locationWhenInUsePermission:
-          'Allow WhiteChoclate to search nearby parking spots around places.',
+        isAndroidBackgroundLocationEnabled: false,
+        isAndroidForegroundServiceEnabled: false,
+        isIosBackgroundLocationEnabled: false,
+        locationWhenInUsePermission: LOCATION_PERMISSION_DESCRIPTION,
       },
     ],
   ],

@@ -13,6 +13,7 @@ import { FlaskConical, LocateFixed } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
+  filterParkingMarkersForViewport,
   projectMapCoordinate,
   projectSelectedParkingMarkers,
   selectSpatiallySeparatedMarkers,
@@ -41,11 +42,7 @@ import type {
   ParkingClusterResponse,
   ParkingCoordinates,
 } from '@/types/parking-map';
-import {
-  createBufferedViewportBounds,
-  hasValidParkingCoordinates,
-  isCoordinateInsideBounds,
-} from '@/utils/parking-map-geo';
+import { hasValidParkingCoordinates } from '@/utils/parking-map-geo';
 import { getNearestParkingSpots } from '@/utils/parkingSearch';
 
 const LABEL_FREE_MAP_STYLE = JSON.stringify([
@@ -238,13 +235,31 @@ export function ParkingMap({
     [selectedSearchPlace, visibleSpots],
   );
 
-  const viewportFilteredClusters = useMemo(() => {
-    const bounds = createBufferedViewportBounds(currentRegion);
+  const viewportFilterResult = useMemo(
+    () => filterParkingMarkersForViewport(visibleClusters, currentRegion),
+    [currentRegion, visibleClusters],
+  );
+  const viewportFilteredClusters = viewportFilterResult.markers;
 
-    return visibleClusters.filter((item) =>
-      isCoordinateInsideBounds(item, bounds),
+  useEffect(() => {
+    if (!__DEV__ || !viewportFilterResult.usedServerFallback) {
+      return;
+    }
+
+    console.warn(
+      'Parking viewport filter used the server-filtered cluster fallback.',
+      {
+        bounds: viewportFilterResult.bounds,
+        currentRegion,
+        visibleClusters: visibleClusters.length,
+      },
     );
-  }, [currentRegion, visibleClusters]);
+  }, [
+    currentRegion,
+    viewportFilterResult.bounds,
+    viewportFilterResult.usedServerFallback,
+    visibleClusters.length,
+  ]);
 
   const densityFilteredMarkers = useMemo(
     () =>
