@@ -1,5 +1,5 @@
 import { memo, useCallback } from 'react';
-import { View } from 'react-native';
+import Animated, { ZoomIn } from 'react-native-reanimated';
 
 import ParkingAvailabilityBubble, {
   type BubbleSize,
@@ -15,6 +15,11 @@ type ParkingMarkerCardProps = {
   onPress: (item: ParkingClusterResponse) => void;
 };
 
+const MARKER_ENTERING_TRANSITION = ZoomIn.duration(160).withInitialValues({
+  opacity: 0,
+  transform: [{ scale: 0.92 }],
+});
+
 export const ParkingMarkerCard = memo(function ParkingMarkerCard({
   item,
   performanceMode,
@@ -26,7 +31,11 @@ export const ParkingMarkerCard = memo(function ParkingMarkerCard({
   const handlePress = useCallback(() => onPress(item), [item, onPress]);
 
   return (
-    <View>
+    <Animated.View
+      entering={
+        performanceMode === 'moving' ? undefined : MARKER_ENTERING_TRANSITION
+      }
+    >
       <ParkingAvailabilityBubble
         count={item.spotCount ?? item.zoneCount ?? item.count}
         onPress={handlePress}
@@ -37,6 +46,6 @@ export const ParkingMarkerCard = memo(function ParkingMarkerCard({
         type={item.type}
         zoneCount={item.zoneCount}
       />
-    </View>
+    </Animated.View>
   );
 });

@@ -27,6 +27,10 @@ import {
 } from 'lucide-react-native';
 import { Share, StyleSheet, Text, View } from 'react-native';
 
+import {
+  MAP_ELEVATIONS,
+  MAP_LAYERS,
+} from '@/components/parking-map/map-layers';
 import { useFavoriteParking } from '@/context/FavoriteParkingContext';
 import type { ParkingClusterResponse } from '@/types/parking-map';
 import { openParkingNavigation } from '@/utils/openParkingNavigation';
@@ -578,6 +582,8 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
     boxShadow: '0 -4px 14px rgba(0,0,0,0.1)',
+    elevation: MAP_ELEVATIONS.bottomSheet,
+    zIndex: MAP_LAYERS.bottomSheet,
   },
   scrollContent: {
     paddingBottom: 120,

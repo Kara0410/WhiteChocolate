@@ -10,6 +10,9 @@ import type {
 const MAX_MERCATOR_LATITUDE = 85.05112878;
 const EARTH_RADIUS_METERS = 6_371_000;
 const VIEWPORT_PADDING_FACTOR = 1.35;
+const DEFAULT_RENDER_BUFFER_RATIO = 0.3;
+const MAX_LATITUDE_BUFFER_DEGREES = 12;
+const MAX_LONGITUDE_BUFFER_DEGREES = 24;
 
 export function hasValidParkingCoordinates(
   coordinates: ParkingCoordinates,
@@ -73,11 +76,82 @@ export function bboxContains(
   latitude: number,
   longitude: number,
 ) {
+  const longitudeIsInside =
+    bbox.minLng <= bbox.maxLng
+      ? longitude >= bbox.minLng && longitude <= bbox.maxLng
+      : longitude >= bbox.minLng || longitude <= bbox.maxLng;
+
   return (
-    longitude >= bbox.minLng &&
-    longitude <= bbox.maxLng &&
+    longitudeIsInside &&
     latitude >= bbox.minLat &&
     latitude <= bbox.maxLat
+  );
+}
+
+export function createBufferedViewportBounds(
+  camera: ParkingCameraState,
+  bufferRatio = DEFAULT_RENDER_BUFFER_RATIO,
+): ParkingBoundingBox {
+  const zoom = clampZoom(camera.zoom);
+  const fallbackLongitudeDelta = (360 / 2 ** zoom) * 2.5;
+  const longitudeDelta = Math.min(
+    360,
+    Math.max(camera.longitudeDelta ?? fallbackLongitudeDelta, 0.000001),
+  );
+  const latitudeDelta = Math.min(
+    MAX_MERCATOR_LATITUDE * 2,
+    Math.max(camera.latitudeDelta ?? longitudeDelta * 1.6, 0.000001),
+  );
+  const safeBufferRatio = Math.max(0, bufferRatio);
+  const longitudeBuffer = Math.min(
+    (longitudeDelta * safeBufferRatio) / 2,
+    MAX_LONGITUDE_BUFFER_DEGREES,
+  );
+  const latitudeBuffer = Math.min(
+    (latitudeDelta * safeBufferRatio) / 2,
+    MAX_LATITUDE_BUFFER_DEGREES,
+  );
+
+  const longitudeSpan = longitudeDelta + longitudeBuffer * 2;
+  const rawMinLongitude =
+    camera.longitude - longitudeDelta / 2 - longitudeBuffer;
+  const rawMaxLongitude =
+    camera.longitude + longitudeDelta / 2 + longitudeBuffer;
+  const minLng =
+    longitudeSpan >= 360
+      ? -180
+      : rawMinLongitude < -180
+        ? rawMinLongitude + 360
+        : rawMinLongitude;
+  const maxLng =
+    longitudeSpan >= 360
+      ? 180
+      : rawMaxLongitude > 180
+        ? rawMaxLongitude - 360
+        : rawMaxLongitude;
+
+  return {
+    minLng,
+    maxLng,
+    minLat: Math.max(
+      -MAX_MERCATOR_LATITUDE,
+      camera.latitude - latitudeDelta / 2 - latitudeBuffer,
+    ),
+    maxLat: Math.min(
+      MAX_MERCATOR_LATITUDE,
+      camera.latitude + latitudeDelta / 2 + latitudeBuffer,
+    ),
+  };
+}
+
+export function isCoordinateInsideBounds(
+  coordinates: ParkingCoordinates,
+  bounds: ParkingBoundingBox,
+) {
+  return bboxContains(
+    bounds,
+    coordinates.latitude,
+    coordinates.longitude,
   );
 }
 

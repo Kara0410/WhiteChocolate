@@ -28,6 +28,10 @@ import {
   type LucideIcon,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  MAP_ELEVATIONS,
+  MAP_LAYERS,
+} from '@/components/parking-map/map-layers';
 import { useMapOverlay } from '@/context/MapOverlayContext';
 import {
   type PlaceSearchSuggestion,
@@ -650,14 +654,16 @@ export default function BottomNavBar({
 const styles = StyleSheet.create({
   searchBackdrop: {
     ...StyleSheet.absoluteFillObject,
-    zIndex: 30,
     backgroundColor: 'rgba(15,23,42,0.2)',
+    elevation: MAP_ELEVATIONS.navBackdrop,
+    zIndex: MAP_LAYERS.navBackdrop,
   },
   wrapper: {
     position: 'absolute',
     left: 0,
     right: 0,
-    zIndex: 40,
+    elevation: MAP_ELEVATIONS.navBar,
+    zIndex: MAP_LAYERS.navBar,
     height: NAVBAR_HEIGHT,
     alignItems: 'center',
   },

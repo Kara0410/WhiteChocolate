@@ -18,6 +18,10 @@ import {
   selectSpatiallySeparatedMarkers,
 } from '@/components/parking-map/marker-density';
 import {
+  MAP_ELEVATIONS,
+  MAP_LAYERS,
+} from '@/components/parking-map/map-layers';
+import {
   ParkingBottomSheet,
   type ParkingBottomSheetHandle,
 } from '@/components/parking-map/ParkingBottomSheet';
@@ -37,7 +41,11 @@ import type {
   ParkingClusterResponse,
   ParkingCoordinates,
 } from '@/types/parking-map';
-import { hasValidParkingCoordinates } from '@/utils/parking-map-geo';
+import {
+  createBufferedViewportBounds,
+  hasValidParkingCoordinates,
+  isCoordinateInsideBounds,
+} from '@/utils/parking-map-geo';
 import { getNearestParkingSpots } from '@/utils/parkingSearch';
 
 const LABEL_FREE_MAP_STYLE = JSON.stringify([
@@ -57,7 +65,11 @@ const LABEL_FREE_MAP_STYLE = JSON.stringify([
     stylers: [{ visibility: 'off' }],
   },
 ]);
-const MAP_VIEW_STYLE = { flex: 1 } as const;
+const MAP_VIEW_STYLE = {
+  elevation: MAP_ELEVATIONS.map,
+  flex: 1,
+  zIndex: MAP_LAYERS.map,
+} as const;
 const APPLE_MAP_PROPERTIES = {
   isMyLocationEnabled: false,
   pointsOfInterest: { including: [] },
@@ -226,10 +238,18 @@ export function ParkingMap({
     [selectedSearchPlace, visibleSpots],
   );
 
+  const viewportFilteredClusters = useMemo(() => {
+    const bounds = createBufferedViewportBounds(currentRegion);
+
+    return visibleClusters.filter((item) =>
+      isCoordinateInsideBounds(item, bounds),
+    );
+  }, [currentRegion, visibleClusters]);
+
   const densityFilteredMarkers = useMemo(
     () =>
       mapSize.width > 0 && mapSize.height > 0
-        ? selectSpatiallySeparatedMarkers(visibleClusters, {
+        ? selectSpatiallySeparatedMarkers(viewportFilteredClusters, {
             camera: currentRegion,
             width: mapSize.width,
             height: mapSize.height,
@@ -239,7 +259,7 @@ export function ParkingMap({
       currentRegion,
       mapSize.height,
       mapSize.width,
-      visibleClusters,
+      viewportFilteredClusters,
     ],
   );
   const displayedMarkerItems = useMemo(() => {
@@ -258,11 +278,13 @@ export function ParkingMap({
   ]);
   const projectedMarkers = useMemo(
     () =>
-      projectSelectedParkingMarkers(displayedMarkerItems, {
-        camera: displayCamera,
-        width: mapSize.width,
-        height: mapSize.height,
-      }),
+      mapSize.width > 0 && mapSize.height > 0
+        ? projectSelectedParkingMarkers(displayedMarkerItems, {
+            camera: displayCamera,
+            width: mapSize.width,
+            height: mapSize.height,
+          })
+        : [],
     [
       displayCamera,
       displayedMarkerItems,
@@ -905,8 +927,10 @@ export function ParkingMap({
       <View
         pointerEvents="box-none"
         style={{
+          elevation: MAP_ELEVATIONS.markers,
           position: 'absolute',
           inset: 0,
+          zIndex: MAP_LAYERS.markers,
         }}
       >
         {projectedMarkers.map(({ item, x, y, width, height, tier }) => (
@@ -923,7 +947,7 @@ export function ParkingMap({
               ],
               width,
               height,
-              zIndex: selectedParkingItem?.id === item.id ? 200 : 1,
+              zIndex: selectedParkingItem?.id === item.id ? 2 : 1,
             }}
           >
             <ParkingMarkerCard
@@ -935,27 +959,29 @@ export function ParkingMap({
             />
           </View>
         ))}
-        {projectedUserLocation ? (
-          <View
-            collapsable={false}
-            pointerEvents="none"
-            style={{
-              height: 28,
-              left: 0,
-              position: 'absolute',
-              top: 0,
-              transform: [
-                { translateX: projectedUserLocation.x - 14 },
-                { translateY: projectedUserLocation.y - 14 },
-              ],
-              width: 28,
-              zIndex: 300,
-            }}
-          >
-            <UserLocationMarker />
-          </View>
-        ) : null}
       </View>
+
+      {projectedUserLocation ? (
+        <View
+          collapsable={false}
+          pointerEvents="none"
+          style={{
+            elevation: MAP_ELEVATIONS.userLocation,
+            height: 28,
+            left: 0,
+            position: 'absolute',
+            top: 0,
+            transform: [
+              { translateX: projectedUserLocation.x - 14 },
+              { translateY: projectedUserLocation.y - 14 },
+            ],
+            width: 28,
+            zIndex: MAP_LAYERS.userLocation,
+          }}
+        >
+          <UserLocationMarker />
+        </View>
+      ) : null}
 
       {activeOverlay === 'none' &&
       selectedParkingItem === null &&
@@ -963,7 +989,11 @@ export function ParkingMap({
         <View
           className="absolute right-4 items-end gap-2"
           pointerEvents="box-none"
-          style={{ bottom: Math.max(insets.bottom, 10) + 104 }}
+          style={{
+            bottom: Math.max(insets.bottom, 10) + 104,
+            elevation: MAP_ELEVATIONS.floatingControls,
+            zIndex: MAP_LAYERS.floatingControls,
+          }}
         >
           {locationMessage ? (
             <View

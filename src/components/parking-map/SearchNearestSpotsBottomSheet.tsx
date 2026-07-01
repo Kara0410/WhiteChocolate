@@ -8,6 +8,10 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import {
+  MAP_ELEVATIONS,
+  MAP_LAYERS,
+} from '@/components/parking-map/map-layers';
 import type { PlaceSearchResult } from '@/hooks/use-google-place-search';
 import type { ParkingClusterResponse } from '@/types/parking-map';
 import {
@@ -272,5 +276,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
     boxShadow: '0 -4px 14px rgba(0,0,0,0.1)',
+    elevation: MAP_ELEVATIONS.bottomSheet,
+    zIndex: MAP_LAYERS.bottomSheet,
   },
 });

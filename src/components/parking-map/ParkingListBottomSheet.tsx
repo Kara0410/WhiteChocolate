@@ -13,6 +13,10 @@ import { Car, ChevronRight, MapPin, X } from 'lucide-react-native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import {
+  MAP_ELEVATIONS,
+  MAP_LAYERS,
+} from '@/components/parking-map/map-layers';
 import type { ParkingClusterResponse } from '@/types/parking-map';
 
 type ParkingListBottomSheetProps = {
@@ -213,5 +217,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
     boxShadow: '0 -4px 14px rgba(0,0,0,0.1)',
+    elevation: MAP_ELEVATIONS.bottomSheet,
+    zIndex: MAP_LAYERS.bottomSheet,
   },
 });

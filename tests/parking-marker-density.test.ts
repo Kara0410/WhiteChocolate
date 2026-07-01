@@ -11,7 +11,11 @@ import {
 import { getAvailabilityStatus } from '../src/components/parking-map/parking-availability-status';
 import { getMarkerDimensions } from '../src/components/parking-map/marker-visuals';
 import type { ParkingClusterResponse } from '../src/types/parking-map';
-import { hasValidParkingCoordinates } from '../src/utils/parking-map-geo';
+import {
+  createBufferedViewportBounds,
+  hasValidParkingCoordinates,
+  isCoordinateInsideBounds,
+} from '../src/utils/parking-map-geo';
 
 function marker(
   id: string,
@@ -59,6 +63,56 @@ test('validates user coordinates before map projection', () => {
   assert.equal(
     hasValidParkingCoordinates({ latitude: Number.NaN, longitude: 11.5824 }),
     false,
+  );
+});
+
+test('buffers viewport bounds without retaining far-away markers', () => {
+  const bounds = createBufferedViewportBounds({
+    latitude: 48.1351,
+    longitude: 11.5824,
+    zoom: 14,
+    latitudeDelta: 0.04,
+    longitudeDelta: 0.06,
+  });
+
+  assert.equal(
+    isCoordinateInsideBounds(
+      { latitude: 48.1351, longitude: 11.5824 },
+      bounds,
+    ),
+    true,
+  );
+  assert.equal(
+    isCoordinateInsideBounds(
+      { latitude: 48.1605, longitude: 11.5824 },
+      bounds,
+    ),
+    true,
+  );
+  assert.equal(
+    isCoordinateInsideBounds(
+      { latitude: 48.3, longitude: 11.9 },
+      bounds,
+    ),
+    false,
+  );
+});
+
+test('buffered viewport bounds support the antimeridian', () => {
+  const bounds = createBufferedViewportBounds({
+    latitude: 0,
+    longitude: 179.99,
+    zoom: 12,
+    latitudeDelta: 0.1,
+    longitudeDelta: 0.1,
+  });
+
+  assert.equal(
+    isCoordinateInsideBounds(
+      { latitude: 0, longitude: -179.99 },
+      bounds,
+    ),
+    true,
   );
 });
 
