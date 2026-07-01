@@ -5,6 +5,7 @@ import type {
   ParkingCameraState,
   ParkingCoordinates,
 } from '@/types/parking-map';
+import { hasValidParkingCoordinates } from '@/utils/parking-map-geo';
 
 const LOCATION_TIMEOUT_MS = 12_000;
 
@@ -58,12 +59,17 @@ async function getDeviceLocation(): Promise<LocationResult> {
         timeoutPromise,
       ]);
 
-      return {
-        coordinates: {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        },
+      const coordinates = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
       };
+
+      return hasValidParkingCoordinates(coordinates)
+        ? { coordinates }
+        : {
+            message:
+              'Current location is unavailable. Showing the Munich test area.',
+          };
     } finally {
       if (timeout) {
         clearTimeout(timeout);

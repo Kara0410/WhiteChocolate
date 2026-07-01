@@ -21,12 +21,12 @@ export function getMarkerSizeTier(
 export function getMarkerDimensions(tier: MarkerSizeTier) {
   const base =
     tier === 'large'
-      ? { width: 72, height: 48, visualSize: 64 }
+      ? { width: 70, height: 44, visualSize: 62 }
       : tier === 'medium'
-        ? { width: 64, height: 44, visualSize: 56 }
+        ? { width: 62, height: 42, visualSize: 54 }
         : tier === 'small'
-          ? { width: 56, height: 42, visualSize: 48 }
-          : { width: 80, height: 54, visualSize: 68 };
+          ? { width: 54, height: 40, visualSize: 46 }
+          : { width: 78, height: 50, visualSize: 68 };
   const width = base.width;
   const height = base.height;
   const glowPadding = 4;

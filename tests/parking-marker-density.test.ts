@@ -11,6 +11,7 @@ import {
 import { getAvailabilityStatus } from '../src/components/parking-map/parking-availability-status';
 import { getMarkerDimensions } from '../src/components/parking-map/marker-visuals';
 import type { ParkingClusterResponse } from '../src/types/parking-map';
+import { hasValidParkingCoordinates } from '../src/utils/parking-map-geo';
 
 function marker(
   id: string,
@@ -42,6 +43,25 @@ function marker(
   };
 }
 
+test('validates user coordinates before map projection', () => {
+  assert.equal(
+    hasValidParkingCoordinates({ latitude: 48.1351, longitude: 11.5824 }),
+    true,
+  );
+  assert.equal(
+    hasValidParkingCoordinates({ latitude: 91, longitude: 11.5824 }),
+    false,
+  );
+  assert.equal(
+    hasValidParkingCoordinates({ latitude: 48.1351, longitude: -181 }),
+    false,
+  );
+  assert.equal(
+    hasValidParkingCoordinates({ latitude: Number.NaN, longitude: 11.5824 }),
+    false,
+  );
+});
+
 test('maps percentage thresholds to availability status', () => {
   assert.equal(getAvailabilityStatus(100), 'high');
   assert.equal(getAvailabilityStatus(66), 'high');
@@ -53,14 +73,14 @@ test('maps percentage thresholds to availability status', () => {
 
 test('uses compact pill canvases with room for selection effects', () => {
   assert.equal(getMarkerDimensions('spot').visualSize, 68);
-  assert.equal(getMarkerDimensions('spot').width, 80);
-  assert.equal(getMarkerDimensions('spot').height, 54);
-  assert.equal(getMarkerDimensions('small').visualSize, 48);
-  assert.equal(getMarkerDimensions('small').height, 42);
-  assert.equal(getMarkerDimensions('medium').visualSize, 56);
-  assert.equal(getMarkerDimensions('medium').height, 44);
-  assert.equal(getMarkerDimensions('large').visualSize, 64);
-  assert.equal(getMarkerDimensions('large').height, 48);
+  assert.equal(getMarkerDimensions('spot').width, 78);
+  assert.equal(getMarkerDimensions('spot').height, 50);
+  assert.equal(getMarkerDimensions('small').visualSize, 46);
+  assert.equal(getMarkerDimensions('small').height, 40);
+  assert.equal(getMarkerDimensions('medium').visualSize, 54);
+  assert.equal(getMarkerDimensions('medium').height, 42);
+  assert.equal(getMarkerDimensions('large').visualSize, 62);
+  assert.equal(getMarkerDimensions('large').height, 44);
 });
 
 test('allows progressively more compact pills at closer zoom levels', () => {

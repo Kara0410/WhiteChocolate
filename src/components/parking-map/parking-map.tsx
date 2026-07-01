@@ -37,6 +37,7 @@ import type {
   ParkingClusterResponse,
   ParkingCoordinates,
 } from '@/types/parking-map';
+import { hasValidParkingCoordinates } from '@/utils/parking-map-geo';
 import { getNearestParkingSpots } from '@/utils/parkingSearch';
 
 const LABEL_FREE_MAP_STYLE = JSON.stringify([
@@ -129,17 +130,6 @@ function isCameraCancellationError(error: unknown) {
 
 function hasValidCoordinates(item: ParkingClusterResponse) {
   return Number.isFinite(item.latitude) && Number.isFinite(item.longitude);
-}
-
-function hasValidCoordinatePair(coordinates: ParkingCoordinates) {
-  return (
-    Number.isFinite(coordinates.latitude) &&
-    Number.isFinite(coordinates.longitude) &&
-    coordinates.latitude >= -90 &&
-    coordinates.latitude <= 90 &&
-    coordinates.longitude >= -180 &&
-    coordinates.longitude <= 180
-  );
 }
 
 function safelyHandleCameraUpdate(update: unknown, context: string) {
@@ -283,7 +273,7 @@ export function ParkingMap({
   const projectedUserLocation = useMemo(() => {
     if (
       userLocation == null ||
-      !hasValidCoordinatePair(userLocation) ||
+      !hasValidParkingCoordinates(userLocation) ||
       mapSize.width <= 0 ||
       mapSize.height <= 0
     ) {
@@ -426,7 +416,7 @@ export function ParkingMap({
 
   const focusCoordinatesAboveSheetSafely = useCallback(
     (coordinates: ParkingCoordinates, context: string) => {
-      if (!hasValidCoordinatePair(coordinates)) {
+      if (!hasValidParkingCoordinates(coordinates)) {
         return;
       }
 
@@ -492,7 +482,7 @@ export function ParkingMap({
 
   const focusLocationSafely = useCallback(
     (coordinates: ParkingCoordinates, context: string) => {
-      if (!hasValidCoordinatePair(coordinates)) {
+      if (!hasValidParkingCoordinates(coordinates)) {
         return;
       }
 
@@ -752,6 +742,8 @@ export function ParkingMap({
       pendingFocusItemRef.current = null;
       pendingCoordinateFocusRef.current = null;
       pendingLocationFocusRef.current = null;
+      cameraFocusRequestIdRef.current += 1;
+      locationActionRequestIdRef.current += 1;
     },
     [],
   );
@@ -931,7 +923,7 @@ export function ParkingMap({
               ],
               width,
               height,
-              zIndex: selectedParkingItem?.id === item.id ? 20 : 1,
+              zIndex: selectedParkingItem?.id === item.id ? 200 : 1,
             }}
           >
             <ParkingMarkerCard
@@ -957,7 +949,7 @@ export function ParkingMap({
                 { translateY: projectedUserLocation.y - 14 },
               ],
               width: 28,
-              zIndex: 100,
+              zIndex: 300,
             }}
           >
             <UserLocationMarker />

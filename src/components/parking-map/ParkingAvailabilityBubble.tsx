@@ -35,13 +35,13 @@ export type ParkingAvailabilityBubbleProps = {
 };
 
 const CLUSTER_SIZE = {
-  large: { canvasWidth: 72, canvasHeight: 48, width: 64, height: 40, font: 17 },
-  medium: { canvasWidth: 64, canvasHeight: 44, width: 56, height: 36, font: 16 },
-  small: { canvasWidth: 56, canvasHeight: 42, width: 48, height: 34, font: 15 },
+  large: { canvasWidth: 70, canvasHeight: 44, width: 62, height: 38, font: 17 },
+  medium: { canvasWidth: 62, canvasHeight: 42, width: 54, height: 36, font: 16 },
+  small: { canvasWidth: 54, canvasHeight: 40, width: 46, height: 34, font: 15 },
 } as const;
 
 const SPOT_SIZE = {
-  large: { canvasWidth: 80, canvasHeight: 54, width: 68, height: 36, font: 18 },
+  large: { canvasWidth: 78, canvasHeight: 50, width: 68, height: 36, font: 18 },
   medium: { canvasWidth: 72, canvasHeight: 50, width: 64, height: 34, font: 17 },
   small: { canvasWidth: 66, canvasHeight: 46, width: 58, height: 32, font: 16 },
 } as const;
@@ -56,8 +56,18 @@ export { getAvailabilityStatus };
 export type { AvailabilityStatus };
 
 function formatClusterCount(count: number) {
-  const safeCount = Math.max(0, Math.round(count));
+  const safeCount = normalizeClusterCount(count);
   return safeCount > 99 ? '99+' : `${safeCount}`;
+}
+
+function normalizeClusterCount(count: number) {
+  return Number.isFinite(count) ? Math.max(0, Math.round(count)) : 0;
+}
+
+function clampPercentage(percentage: number) {
+  return Number.isFinite(percentage)
+    ? Math.min(100, Math.max(0, Math.round(percentage)))
+    : 0;
 }
 
 function markerShadow(
@@ -85,7 +95,7 @@ function ParkingAvailabilityBubble({
   className,
   onPress,
 }: ParkingAvailabilityBubbleProps) {
-  const clampedPercentage = Math.min(100, Math.max(0, Math.round(percentage)));
+  const clampedPercentage = clampPercentage(percentage);
   const theme = getAvailabilityTheme(clampedPercentage);
   const selected = state === 'selected';
   const forcedPressed = state === 'pressed';
@@ -94,7 +104,7 @@ function ParkingAvailabilityBubble({
   const dimensions = isCluster ? CLUSTER_SIZE[size] : SPOT_SIZE[size];
   const restingScale = selected ? 1.12 : forcedPressed ? 0.95 : 1;
   const scale = useSharedValue(restingScale);
-  const clusterCount = count ?? zoneCount;
+  const clusterCount = normalizeClusterCount(count ?? zoneCount);
   const label = isCluster
     ? `${clusterCount} parking ${clusterCount === 1 ? 'spot' : 'spots'}`
     : `${clampedPercentage}% parking availability`;
@@ -122,7 +132,11 @@ function ParkingAvailabilityBubble({
     animateScale(restingScale);
   }, [animateScale, restingScale]);
 
-  const fillColor = isCluster ? '#FFFFFF' : theme.backgroundTint;
+  const fillColor = isCluster
+    ? '#FFFFFF'
+    : moving
+      ? theme.movingFill
+      : theme.fill;
   const textColor = isCluster ? '#172033' : theme.text;
   const borderColor = isCluster ? '#D7DCE3' : theme.border;
 
@@ -215,7 +229,7 @@ function ParkingAvailabilityBubble({
               style={[
                 styles.tail,
                 styles.tailFill,
-                { borderTopColor: theme.backgroundTint },
+                { borderTopColor: fillColor },
               ]}
             />
           </View>

@@ -11,6 +11,19 @@ const MAX_MERCATOR_LATITUDE = 85.05112878;
 const EARTH_RADIUS_METERS = 6_371_000;
 const VIEWPORT_PADDING_FACTOR = 1.35;
 
+export function hasValidParkingCoordinates(
+  coordinates: ParkingCoordinates,
+) {
+  return (
+    Number.isFinite(coordinates.latitude) &&
+    coordinates.latitude >= -90 &&
+    coordinates.latitude <= 90 &&
+    Number.isFinite(coordinates.longitude) &&
+    coordinates.longitude >= -180 &&
+    coordinates.longitude <= 180
+  );
+}
+
 export function clampZoom(zoom: number) {
   return Math.max(1, Math.min(20, Math.round(zoom)));
 }
