@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  filterParkingMarkersForScreenCircle,
   filterParkingMarkersForViewport,
+  getDisplayedParkingMarkerItems,
   getMarkerLimitForZoom,
   projectMapCoordinate,
   projectParkingMarkers,
@@ -14,6 +16,8 @@ import { getMarkerDimensions } from '../src/components/parking-map/marker-visual
 import type { ParkingClusterResponse } from '../src/types/parking-map';
 import {
   createBufferedViewportBounds,
+  createParkingRenderCircleBounds,
+  createParkingSearchFocusCamera,
   hasValidParkingCoordinates,
   isCoordinateInsideBounds,
 } from '../src/utils/parking-map-geo';
@@ -175,6 +179,110 @@ test('still removes far markers when the buffered viewport has matches', () => {
 
   assert.equal(result.usedServerFallback, false);
   assert.deepEqual(result.markers, [nearby]);
+});
+
+test('screen circle keeps markers inside and removes markers outside', () => {
+  const inside = marker('inside-circle', 48.1351, 11.5924);
+  const outside = marker('outside-circle', 48.1351, 11.6124);
+  const result = filterParkingMarkersForScreenCircle([inside, outside], {
+    camera: {
+      latitude: 48.1351,
+      longitude: 11.5824,
+      zoom: 14,
+      latitudeDelta: 0.04,
+      longitudeDelta: 0.04,
+    },
+    width: 400,
+    height: 800,
+  });
+
+  assert.ok(result.radiusPixels);
+  assert.equal(result.radiusPixels, 208);
+  assert.deepEqual(result.markers, [inside]);
+});
+
+test('screen circle falls back safely before map dimensions are ready', () => {
+  const markers = [marker('first', 48.1351, 11.5824)];
+  const result = filterParkingMarkersForScreenCircle(markers, {
+    camera: { latitude: 48.1351, longitude: 11.5824, zoom: 14 },
+    width: 0,
+    height: 0,
+  });
+
+  assert.equal(result.usedServerFallback, true);
+  assert.deepEqual(result.markers, markers);
+});
+
+test('screen circle reports when every server marker is outside', () => {
+  const outside = marker('outside', 48.1351, 11.6224);
+  const result = filterParkingMarkersForScreenCircle([outside], {
+    camera: {
+      latitude: 48.1351,
+      longitude: 11.5824,
+      zoom: 14,
+      latitudeDelta: 0.04,
+      longitudeDelta: 0.04,
+    },
+    width: 400,
+    height: 800,
+  });
+
+  assert.equal(result.removedAllMarkers, true);
+  assert.deepEqual(result.markers, []);
+});
+
+test('selected marker bypasses the circular marker list', () => {
+  const inside = marker('inside', 48.1351, 11.5824);
+  const selectedOutside = marker('selected-outside', 48.3, 11.9);
+
+  assert.deepEqual(
+    getDisplayedParkingMarkerItems(
+      [inside],
+      selectedOutside,
+      [inside],
+      false,
+    ),
+    [selectedOutside],
+  );
+});
+
+test('search focus camera keeps the destination above the half-height sheet', () => {
+  const destination = { latitude: 48.1351, longitude: 11.5824 };
+  const mapSize = { width: 400, height: 800 };
+  const camera = createParkingSearchFocusCamera(
+    destination,
+    mapSize,
+    'google',
+  );
+
+  assert.ok(camera);
+  const projected = projectMapCoordinate(destination, {
+    camera,
+    ...mapSize,
+  });
+  const fetchBounds = createParkingRenderCircleBounds(camera, mapSize);
+
+  assert.ok(fetchBounds);
+  assert.ok(Math.abs(projected.x - mapSize.width / 2) < 0.001);
+  assert.ok(Math.abs(projected.y - mapSize.height / 4) < 0.001);
+  assert.equal(isCoordinateInsideBounds(destination, fetchBounds), true);
+});
+
+test('search mode renders only its stable nearest parking markers', () => {
+  const normal = marker('normal', 48.1351, 11.5824);
+  const nearest = [
+    marker('nearest-1', 48.136, 11.5824),
+    marker('nearest-2', 48.137, 11.5824),
+  ];
+
+  assert.deepEqual(
+    getDisplayedParkingMarkerItems([normal], null, nearest, false),
+    nearest,
+  );
+  assert.deepEqual(
+    getDisplayedParkingMarkerItems([normal], null, null, true),
+    [],
+  );
 });
 
 test('maps percentage thresholds to availability status', () => {

@@ -68,6 +68,11 @@ export type ParkingCameraState = {
   longitudeDelta?: number;
 };
 
+export type ParkingMapSize = {
+  width: number;
+  height: number;
+};
+
 export type ParkingClusterRequest = {
   bbox: ParkingBoundingBox;
   zoom: number;

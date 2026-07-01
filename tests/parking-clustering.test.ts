@@ -7,6 +7,9 @@ import {
 } from '../src/services/parking-clustering';
 import type { ParkingMapRecord } from '../src/types/parking-map';
 import {
+  deriveCameraViewportDeltas,
+  getParkingClusterRequest,
+  getParkingRenderCircleClusterRequest,
   getWalkingCategory,
   haversineDistanceMeters,
 } from '../src/utils/parking-map-geo';
@@ -51,6 +54,116 @@ test('calculates walking thresholds with Haversine distance', () => {
     { latitude: 48.1387, longitude: 11.5824 },
   );
   assert.ok(distance > 390 && distance < 410);
+});
+
+test('moves the parking cluster request bbox with the camera', () => {
+  const munichRequest = getParkingClusterRequest({
+    latitude: 48.1351,
+    longitude: 11.5824,
+    zoom: 16,
+  });
+  const pannedRequest = getParkingClusterRequest({
+    latitude: 48.2351,
+    longitude: 11.7824,
+    zoom: 16,
+  });
+
+  assert.notEqual(munichRequest.tileKey, pannedRequest.tileKey);
+  assert.notDeepEqual(munichRequest.bbox, pannedRequest.bbox);
+  assert.ok(
+    munichRequest.bbox.minLat < 48.1351 &&
+      munichRequest.bbox.maxLat > 48.1351,
+  );
+  assert.ok(
+    pannedRequest.bbox.minLng < 11.7824 &&
+      pannedRequest.bbox.maxLng > 11.7824,
+  );
+});
+
+test('centers the circular fetch bbox on the camera and map dimensions', () => {
+  const camera = { latitude: 48.1351, longitude: 11.5824, zoom: 16 };
+  const request = getParkingRenderCircleClusterRequest(camera, {
+    width: 400,
+    height: 800,
+  });
+
+  assert.ok(request);
+  assert.ok(
+    Math.abs(
+      (request.bbox.minLng + request.bbox.maxLng) / 2 -
+        camera.longitude,
+    ) < 0.000001,
+  );
+  assert.ok(
+    request.bbox.minLat < camera.latitude &&
+      request.bbox.maxLat > camera.latitude,
+  );
+  assert.match(request.tileKey, /^parking:circle:/);
+});
+
+test('derives provider-specific viewport deltas when native events omit them', () => {
+  const camera = { latitude: 48.1351, longitude: 11.5824, zoom: 16 };
+  const mapSize = { width: 400, height: 800 };
+  const apple = deriveCameraViewportDeltas(camera, mapSize, 'apple');
+  const google = deriveCameraViewportDeltas(camera, mapSize, 'google');
+
+  assert.ok(apple);
+  assert.ok(google);
+  assert.ok(apple.latitudeDelta > 0);
+  assert.ok(google.latitudeDelta > 0);
+  assert.equal(apple.longitudeDelta, 360 / 2 ** camera.zoom);
+  assert.equal(
+    google.longitudeDelta,
+    (mapSize.width * 360) / (256 * 2 ** camera.zoom),
+  );
+});
+
+test('panning changes the circular fetch bbox and cache key', () => {
+  const mapSize = { width: 400, height: 800 };
+  const first = getParkingRenderCircleClusterRequest(
+    { latitude: 48.1351, longitude: 11.5824, zoom: 16 },
+    mapSize,
+  );
+  const panned = getParkingRenderCircleClusterRequest(
+    { latitude: 48.2351, longitude: 11.7824, zoom: 16 },
+    mapSize,
+  );
+
+  assert.ok(first);
+  assert.ok(panned);
+  assert.notEqual(first.tileKey, panned.tileKey);
+  assert.notDeepEqual(first.bbox, panned.bbox);
+});
+
+test('screen circle covers less geography when zoomed in', () => {
+  const cameraCenter = { latitude: 48.1351, longitude: 11.5824 };
+  const mapSize = { width: 400, height: 800 };
+  const zoomedOut = getParkingRenderCircleClusterRequest(
+    { ...cameraCenter, zoom: 14 },
+    mapSize,
+  );
+  const zoomedIn = getParkingRenderCircleClusterRequest(
+    { ...cameraCenter, zoom: 17 },
+    mapSize,
+  );
+
+  assert.ok(zoomedOut);
+  assert.ok(zoomedIn);
+  assert.ok(
+    zoomedOut.bbox.maxLng - zoomedOut.bbox.minLng >
+      zoomedIn.bbox.maxLng - zoomedIn.bbox.minLng,
+  );
+});
+
+test('distance metadata does not change the camera-derived fetch bbox', () => {
+  const camera = { latitude: 48.1351, longitude: 11.5824, zoom: 15 };
+  const withoutDestination = getParkingClusterRequest(camera);
+  const withDestination = getParkingClusterRequest(camera, {
+    latitude: 47.5,
+    longitude: 10.5,
+  });
+
+  assert.deepEqual(withDestination.bbox, withoutDestination.bbox);
 });
 
 test('builds weighted cluster metadata and filters by viewport', () => {

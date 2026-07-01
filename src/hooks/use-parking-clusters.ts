@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Platform } from 'react-native';
 
 import {
   createParkingClusterEngine,
@@ -6,12 +7,17 @@ import {
 } from '@/services/parking-clustering';
 import { fetchParkingSegments } from '@/services/parkingSegments';
 import type {
+  ParkingBoundingBox,
   ParkingCameraState,
+  ParkingClusterRequest,
   ParkingClusterResponse,
   ParkingCoordinates,
+  ParkingMapSize,
 } from '@/types/parking-map';
 import {
+  deriveCameraViewportDeltas,
   getParkingClusterRequest,
+  getParkingRenderCircleClusterRequest,
   zoomFromLongitudeDelta,
 } from '@/utils/parking-map-geo';
 import { parkingSegmentToMapRecord } from '@/utils/parking-segments';
@@ -49,6 +55,7 @@ type CameraMoveEvent = {
 export function useParkingClusters(
   initialCamera: ParkingCameraState,
   destination?: ParkingCoordinates,
+  mapSize?: ParkingMapSize,
 ) {
   const [currentRegion, setCurrentRegion] = useState(initialCamera);
   const [displayCamera, setDisplayCamera] = useState(initialCamera);
@@ -56,15 +63,39 @@ export function useParkingClusters(
     ParkingClusterResponse[]
   >([]);
   const [visibleSpots, setVisibleSpots] = useState<ParkingClusterResponse[]>([]);
+  const [loadedRequestKey, setLoadedRequestKey] = useState<string | null>(null);
+  const [loadedRequestBounds, setLoadedRequestBounds] =
+    useState<ParkingBoundingBox | null>(null);
+  const [loadedRequestVersion, setLoadedRequestVersion] = useState(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const displayCameraFrameRef = useRef<number | null>(null);
   const latestCameraRef = useRef<ParkingCameraState>(initialCamera);
   const currentZoomRef = useRef(initialCamera.zoom);
   const requestKeyRef = useRef<string | null>(null);
   const isMountedRef = useRef(true);
+  const markRequestLoaded = useCallback((request: ParkingClusterRequest) => {
+    setLoadedRequestKey(request.tileKey);
+    setLoadedRequestBounds(request.bbox);
+    setLoadedRequestVersion((current) => current + 1);
+  }, []);
 
-  const loadClusters = useCallback(async (camera: ParkingCameraState) => {
-    const request = getParkingClusterRequest(camera, destination);
+  const createRequest = useCallback(
+    (camera: ParkingCameraState) =>
+      (mapSize
+        ? getParkingRenderCircleClusterRequest(
+            camera,
+            mapSize,
+            destination,
+          )
+        : null) ?? getParkingClusterRequest(camera, destination),
+    [destination, mapSize],
+  );
+
+  const loadClusters = useCallback(async (
+    camera: ParkingCameraState,
+    preparedRequest?: ParkingClusterRequest,
+  ) => {
+    const request = preparedRequest ?? createRequest(camera);
     setCurrentRegion(camera);
     currentZoomRef.current = request.zoom;
 
@@ -78,6 +109,7 @@ export function useParkingClusters(
     if (cached) {
       setVisibleClusters(cached.clusters);
       setVisibleSpots(cached.spots);
+      markRequestLoaded(request);
       return;
     }
 
@@ -100,6 +132,27 @@ export function useParkingClusters(
         return;
       }
 
+      if (__DEV__ && segments.length > 0 && clusters.length === 0) {
+        console.warn('Camera parking query produced no clusters.', {
+          camera,
+          clusters: clusters.length,
+          fetchedSegments: segments.length,
+          requestBbox: request.bbox,
+        });
+      }
+
+      if (
+        __DEV__ &&
+        request.tileKey.startsWith('parking:circle:') &&
+        segments.length === 0
+      ) {
+        console.warn('No parking data returned for camera circle bbox.', {
+          camera,
+          fetchBbox: request.bbox,
+          mapSize,
+        });
+      }
+
       if (truncated && __DEV__) {
         console.warn(
           'Supabase parking segment result reached the per-viewport limit.',
@@ -109,6 +162,7 @@ export function useParkingClusters(
       cacheParkingData(request.tileKey, { clusters, spots });
       setVisibleClusters(clusters);
       setVisibleSpots(spots);
+      markRequestLoaded(request);
     } catch (error) {
       if (
         !isMountedRef.current ||
@@ -126,8 +180,18 @@ export function useParkingClusters(
 
       setVisibleClusters([]);
       setVisibleSpots([]);
+      markRequestLoaded(request);
     }
-  }, [destination]);
+  }, [createRequest, mapSize, markRequestLoaded]);
+
+  const requestParkingForCamera = useCallback(
+    (camera: ParkingCameraState) => {
+      const request = createRequest(camera);
+      void loadClusters(camera, request);
+      return request.tileKey;
+    },
+    [createRequest, loadClusters],
+  );
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -174,12 +238,27 @@ export function useParkingClusters(
         (event.longitudeDelta
           ? zoomFromLongitudeDelta(event.longitudeDelta)
           : currentZoomRef.current);
+      const viewportDeltas = mapSize
+        ? deriveCameraViewportDeltas(
+            {
+              latitude,
+              longitude,
+              zoom,
+              latitudeDelta: event.latitudeDelta,
+              longitudeDelta: event.longitudeDelta,
+            },
+            mapSize,
+            Platform.OS === 'ios' ? 'apple' : 'google',
+          )
+        : null;
       const camera: ParkingCameraState = {
         latitude,
         longitude,
         zoom,
-        latitudeDelta: event.latitudeDelta,
-        longitudeDelta: event.longitudeDelta,
+        latitudeDelta:
+          event.latitudeDelta ?? viewportDeltas?.latitudeDelta,
+        longitudeDelta:
+          event.longitudeDelta ?? viewportDeltas?.longitudeDelta,
       };
       scheduleDisplayCameraUpdate(camera);
 
@@ -201,13 +280,17 @@ export function useParkingClusters(
         CAMERA_DEBOUNCE_MS,
       );
     },
-    [loadClusters, scheduleDisplayCameraUpdate],
+    [loadClusters, mapSize, scheduleDisplayCameraUpdate],
   );
 
   return {
     currentRegion,
     displayCamera,
+    loadedRequestBounds,
+    loadedRequestKey,
+    loadedRequestVersion,
     onCameraMove,
+    requestParkingForCamera,
     visibleClusters,
     visibleSpots,
   };

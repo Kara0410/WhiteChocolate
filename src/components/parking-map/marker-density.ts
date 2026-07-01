@@ -5,6 +5,7 @@ import type {
 } from '@/types/parking-map';
 import {
   createBufferedViewportBounds,
+  getParkingRenderRadiusPixels,
   hasValidParkingCoordinates,
   isCoordinateInsideBounds,
 } from '@/utils/parking-map-geo';
@@ -36,6 +37,13 @@ export type ProjectedParkingMarker = {
 export type ParkingViewportFilterResult = {
   bounds: ReturnType<typeof createBufferedViewportBounds>;
   markers: ParkingClusterResponse[];
+  usedServerFallback: boolean;
+};
+
+export type ParkingCircleFilterResult = {
+  markers: ParkingClusterResponse[];
+  radiusPixels: number | null;
+  removedAllMarkers: boolean;
   usedServerFallback: boolean;
 };
 
@@ -71,6 +79,76 @@ export function filterParkingMarkersForViewport(
     markers: filteredItems,
     usedServerFallback: false,
   };
+}
+
+export function filterParkingMarkersForScreenCircle(
+  items: ParkingClusterResponse[],
+  options: Pick<MarkerDensityOptions, 'camera' | 'height' | 'width'>,
+): ParkingCircleFilterResult {
+  const validItems = items.filter(hasValidParkingCoordinates);
+  const radiusPixels = getParkingRenderRadiusPixels({
+    width: options.width,
+    height: options.height,
+  });
+
+  if (radiusPixels === null) {
+    return {
+      markers: validItems,
+      radiusPixels,
+      removedAllMarkers: false,
+      usedServerFallback: validItems.length > 0,
+    };
+  }
+
+  const centerX = options.width / 2;
+  const centerY = options.height / 2;
+  let hasUsableProjection = false;
+  const filteredItems = validItems.filter((item) => {
+    const position = projectMapCoordinate(item, options);
+    if (!Number.isFinite(position.x) || !Number.isFinite(position.y)) {
+      return false;
+    }
+
+    hasUsableProjection = true;
+    return (
+      Math.hypot(position.x - centerX, position.y - centerY) <= radiusPixels
+    );
+  });
+
+  if (!hasUsableProjection && validItems.length > 0) {
+    return {
+      markers: validItems,
+      radiusPixels,
+      removedAllMarkers: false,
+      usedServerFallback: true,
+    };
+  }
+
+  return {
+    markers: filteredItems,
+    radiusPixels,
+    removedAllMarkers:
+      filteredItems.length === 0 && validItems.length > 0,
+    usedServerFallback: false,
+  };
+}
+
+export function getDisplayedParkingMarkerItems(
+  filteredItems: ParkingClusterResponse[],
+  selectedItem: ParkingClusterResponse | null,
+  searchItems: ParkingClusterResponse[] | null,
+  suppressMarkers: boolean,
+) {
+  if (selectedItem !== null) {
+    return [selectedItem];
+  }
+  if (searchItems !== null) {
+    return searchItems;
+  }
+  if (suppressMarkers) {
+    return [];
+  }
+  return filteredItems;
 }
 
 export function projectMapCoordinate(

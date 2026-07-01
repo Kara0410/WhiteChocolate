@@ -13,7 +13,8 @@ import { FlaskConical, LocateFixed } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
-  filterParkingMarkersForViewport,
+  filterParkingMarkersForScreenCircle,
+  getDisplayedParkingMarkerItems,
   projectMapCoordinate,
   projectSelectedParkingMarkers,
   selectSpatiallySeparatedMarkers,
@@ -29,6 +30,7 @@ import {
 import { FavoriteParkingBottomSheet } from '@/components/parking-map/FavoriteParkingBottomSheet';
 import { ParkingListBottomSheet } from '@/components/parking-map/ParkingListBottomSheet';
 import { ParkingMarkerCard } from '@/components/parking-map/parking-marker-card';
+import { SearchDestinationMarker } from '@/components/parking-map/search-destination-marker';
 import { SearchNearestSpotsBottomSheet } from '@/components/parking-map/SearchNearestSpotsBottomSheet';
 import { YouBottomSheet } from '@/components/parking-map/YouBottomSheet';
 import { UserLocationMarker } from '@/components/parking-map/user-location-marker';
@@ -42,8 +44,15 @@ import type {
   ParkingClusterResponse,
   ParkingCoordinates,
 } from '@/types/parking-map';
-import { hasValidParkingCoordinates } from '@/utils/parking-map-geo';
-import { getNearestParkingSpots } from '@/utils/parkingSearch';
+import {
+  createParkingSearchFocusCamera,
+  hasValidParkingCoordinates,
+  isCoordinateInsideBounds,
+} from '@/utils/parking-map-geo';
+import {
+  getNearestParkingSpots,
+  type ParkingSpotWithDistance,
+} from '@/utils/parkingSearch';
 
 const LABEL_FREE_MAP_STYLE = JSON.stringify([
   {
@@ -100,6 +109,7 @@ const FULL_SHEET_RATIO = 0.5;
 const PROGRAMMATIC_CAMERA_GUARD_MS = 500;
 const MAP_DRAG_SETTLE_MS = 180;
 const MARKER_MOVEMENT_SETTLE_MS = 150;
+const EMPTY_SEARCH_SPOTS: ParkingSpotWithDistance[] = [];
 
 type ParkingMapProps = {
   initialCamera: ParkingCameraState;
@@ -125,6 +135,16 @@ type CameraFocusSource = ParkingSelectionSource;
 
 type CameraFocusOptions = {
   source?: CameraFocusSource;
+};
+
+type SearchSpotsSnapshot = {
+  placeId: string;
+  spots: ParkingSpotWithDistance[];
+};
+
+type SearchParkingRequest = {
+  key: string;
+  startedAtVersion: number;
 };
 
 function isCameraCancellationError(error: unknown) {
@@ -166,13 +186,18 @@ export function ParkingMap({
   userLocation,
 }: ParkingMapProps) {
   const insets = useSafeAreaInsets();
+  const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
   const {
     currentRegion,
     displayCamera,
+    loadedRequestBounds,
+    loadedRequestKey,
+    loadedRequestVersion,
     onCameraMove,
+    requestParkingForCamera,
     visibleClusters,
     visibleSpots,
-  } = useParkingClusters(initialCamera, destination);
+  } = useParkingClusters(initialCamera, destination, mapSize);
   const googleMapRef = useRef<GoogleMaps.MapView | null>(null);
   const appleMapRef = useRef<AppleMaps.MapView | null>(null);
   const bottomSheetRef = useRef<ParkingBottomSheetHandle>(null);
@@ -205,7 +230,10 @@ export function ParkingMap({
     useState<ParkingClusterResponse | null>(null);
   const [selectedSearchPlace, setSelectedSearchPlace] =
     useState<PlaceSearchResult | null>(null);
-  const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
+  const [searchParkingRequest, setSearchParkingRequest] =
+    useState<SearchParkingRequest | null>(null);
+  const [searchSpotsSnapshot, setSearchSpotsSnapshot] =
+    useState<SearchSpotsSnapshot | null>(null);
   const [hasInitialCameraEvent, setHasInitialCameraEvent] = useState(false);
   const [isMapMoving, setIsMapMoving] = useState(false);
   const { favoriteItems } = useFavoriteParking();
@@ -220,51 +248,102 @@ export function ParkingMap({
   const lastSearchFocusKeyRef = useRef<string | null>(null);
   const lastSearchSelectionIdRef = useRef<number | null>(null);
   const lastLocationFocusKeyRef = useRef<string | null>(null);
-  const nearestSearchSpots = useMemo(
-    () =>
-      selectedSearchPlace
-        ? getNearestParkingSpots({
-            origin: {
-              latitude: selectedSearchPlace.latitude,
-              longitude: selectedSearchPlace.longitude,
-            },
-            spots: visibleSpots,
-            limit: 25,
-          })
-        : [],
-    [selectedSearchPlace, visibleSpots],
-  );
-
-  const viewportFilterResult = useMemo(
-    () => filterParkingMarkersForViewport(visibleClusters, currentRegion),
-    [currentRegion, visibleClusters],
-  );
-  const viewportFilteredClusters = viewportFilterResult.markers;
-
   useEffect(() => {
-    if (!__DEV__ || !viewportFilterResult.usedServerFallback) {
+    if (
+      selectedSearchPlace === null ||
+      searchParkingRequest === null ||
+      searchSpotsSnapshot?.placeId === selectedSearchPlace.placeId
+    ) {
       return;
     }
 
-    console.warn(
-      'Parking viewport filter used the server-filtered cluster fallback.',
-      {
-        bounds: viewportFilterResult.bounds,
-        currentRegion,
-        visibleClusters: visibleClusters.length,
-      },
-    );
+    const loadedExpectedRequest =
+      loadedRequestKey === searchParkingRequest.key;
+    const loadedEquivalentCameraArea =
+      loadedRequestVersion > searchParkingRequest.startedAtVersion &&
+      loadedRequestBounds !== null &&
+      isCoordinateInsideBounds(selectedSearchPlace, loadedRequestBounds);
+    if (!loadedExpectedRequest && !loadedEquivalentCameraArea) {
+      return;
+    }
+
+    setSearchSpotsSnapshot({
+      placeId: selectedSearchPlace.placeId,
+      spots: getNearestParkingSpots({
+        origin: {
+          latitude: selectedSearchPlace.latitude,
+          longitude: selectedSearchPlace.longitude,
+        },
+        spots: visibleSpots,
+        limit: 25,
+      }),
+    });
   }, [
+    loadedRequestBounds,
+    loadedRequestKey,
+    loadedRequestVersion,
+    searchParkingRequest,
+    searchSpotsSnapshot?.placeId,
+    selectedSearchPlace,
+    visibleSpots,
+  ]);
+
+  const nearestSearchSpots =
+    selectedSearchPlace !== null &&
+    searchSpotsSnapshot?.placeId === selectedSearchPlace.placeId
+      ? searchSpotsSnapshot.spots
+      : EMPTY_SEARCH_SPOTS;
+  const isSearchParkingLoading =
+    selectedSearchPlace !== null &&
+    searchSpotsSnapshot?.placeId !== selectedSearchPlace.placeId;
+
+  const circleFilterResult = useMemo(
+    () =>
+      filterParkingMarkersForScreenCircle(visibleClusters, {
+        camera: currentRegion,
+        width: mapSize.width,
+        height: mapSize.height,
+      }),
+    [currentRegion, mapSize.height, mapSize.width, visibleClusters],
+  );
+  const circularFilteredClusters = circleFilterResult.markers;
+
+  useEffect(() => {
+    if (
+      !__DEV__ ||
+      (!circleFilterResult.usedServerFallback &&
+        !circleFilterResult.removedAllMarkers)
+    ) {
+      return;
+    }
+
+    const message = circleFilterResult.removedAllMarkers
+      ? 'Parking circle filter removed all server-returned markers.'
+      : 'Parking circle filter used the server-filtered marker fallback.';
+    console.warn(message, {
+      cameraCenter: {
+        latitude: currentRegion.latitude,
+        longitude: currentRegion.longitude,
+      },
+      circularFiltered: circularFilteredClusters.length,
+      mapSize,
+      radiusPixels: circleFilterResult.radiusPixels,
+      visibleClusters: visibleClusters.length,
+    });
+  }, [
+    circleFilterResult.radiusPixels,
+    circleFilterResult.removedAllMarkers,
+    circleFilterResult.usedServerFallback,
+    circularFilteredClusters.length,
     currentRegion,
-    viewportFilterResult.bounds,
-    viewportFilterResult.usedServerFallback,
+    mapSize,
     visibleClusters.length,
   ]);
 
   const densityFilteredMarkers = useMemo(
     () =>
       mapSize.width > 0 && mapSize.height > 0
-        ? selectSpatiallySeparatedMarkers(viewportFilteredClusters, {
+        ? selectSpatiallySeparatedMarkers(circularFilteredClusters, {
             camera: currentRegion,
             width: mapSize.width,
             height: mapSize.height,
@@ -272,25 +351,27 @@ export function ParkingMap({
         : [],
     [
       currentRegion,
+      circularFilteredClusters,
       mapSize.height,
       mapSize.width,
-      viewportFilteredClusters,
     ],
   );
-  const displayedMarkerItems = useMemo(() => {
-    if (selectedParkingItem !== null) {
-      return [selectedParkingItem];
-    }
-    if (activeOverlay !== 'none' || selectedSearchPlace !== null) {
-      return [];
-    }
-    return densityFilteredMarkers;
-  }, [
-    activeOverlay,
-    densityFilteredMarkers,
-    selectedParkingItem,
-    selectedSearchPlace,
-  ]);
+  const displayedMarkerItems = useMemo(
+    () =>
+      getDisplayedParkingMarkerItems(
+        densityFilteredMarkers,
+        selectedParkingItem,
+        selectedSearchPlace !== null ? nearestSearchSpots : null,
+        activeOverlay !== 'none',
+      ),
+    [
+      activeOverlay,
+      densityFilteredMarkers,
+      nearestSearchSpots,
+      selectedParkingItem,
+      selectedSearchPlace,
+    ],
+  );
   const projectedMarkers = useMemo(
     () =>
       mapSize.width > 0 && mapSize.height > 0
@@ -307,6 +388,84 @@ export function ParkingMap({
       mapSize.width,
     ],
   );
+
+  useEffect(() => {
+    if (
+      !__DEV__ ||
+      isMapMoving ||
+      activeOverlay !== 'none' ||
+      selectedSearchPlace !== null ||
+      mapSize.width <= 0 ||
+      mapSize.height <= 0 ||
+      visibleClusters.length === 0 ||
+      circleFilterResult.removedAllMarkers ||
+      projectedMarkers.length > 0
+    ) {
+      return;
+    }
+
+    console.warn('Parking marker pipeline produced no projected markers.', {
+      currentRegion,
+      circularFilteredMarkers: circularFilteredClusters.length,
+      densityFilteredMarkers: densityFilteredMarkers.length,
+      displayCamera,
+      mapSize: {
+        height: mapSize.height,
+        width: mapSize.width,
+      },
+      projectedMarkers: projectedMarkers.length,
+      radiusPixels: circleFilterResult.radiusPixels,
+      visibleClusters: visibleClusters.length,
+    });
+  }, [
+    activeOverlay,
+    circleFilterResult.radiusPixels,
+    circleFilterResult.removedAllMarkers,
+    circularFilteredClusters.length,
+    currentRegion,
+    densityFilteredMarkers.length,
+    displayCamera,
+    isMapMoving,
+    mapSize.height,
+    mapSize.width,
+    projectedMarkers.length,
+    selectedSearchPlace,
+    visibleClusters.length,
+  ]);
+
+  const projectedSearchDestination = useMemo(() => {
+    if (
+      selectedSearchPlace === null ||
+      !hasValidParkingCoordinates(selectedSearchPlace) ||
+      mapSize.width <= 0 ||
+      mapSize.height <= 0
+    ) {
+      return null;
+    }
+
+    const position = projectMapCoordinate(selectedSearchPlace, {
+      camera: displayCamera,
+      height: mapSize.height,
+      width: mapSize.width,
+    });
+
+    if (
+      position.x < -40 ||
+      position.x > mapSize.width + 40 ||
+      position.y < -44 ||
+      position.y > mapSize.height + 44
+    ) {
+      return null;
+    }
+
+    return position;
+  }, [
+    displayCamera,
+    mapSize.height,
+    mapSize.width,
+    selectedSearchPlace,
+  ]);
+
   const projectedUserLocation = useMemo(() => {
     if (
       userLocation == null ||
@@ -463,21 +622,25 @@ export function ParkingMap({
         return;
       }
 
-      const longitudeDelta =
-        displayCamera.longitudeDelta ??
-        Math.max(0.000001, (360 / 2 ** displayCamera.zoom) * 2);
-      const latitudeDelta =
-        displayCamera.latitudeDelta ??
-        Math.max(0.000001, longitudeDelta * 1.6);
-      const visibleMapRatio = 1 - FULL_SHEET_RATIO;
-      const desiredYRatio = visibleMapRatio / 2;
-      const yOffsetRatio = 0.5 - desiredYRatio;
+      const searchCamera = createParkingSearchFocusCamera(
+        coordinates,
+        mapSize,
+        Platform.OS === 'ios' ? 'apple' : 'google',
+        FULL_SHEET_RATIO,
+      );
+      if (searchCamera === null) {
+        return;
+      }
+
+      const startedAtVersion = loadedRequestVersion;
+      const key = requestParkingForCamera(searchCamera);
+      setSearchParkingRequest({ key, startedAtVersion });
       const nextCamera = {
         coordinates: {
-          latitude: coordinates.latitude - latitudeDelta * yOffsetRatio,
-          longitude: coordinates.longitude,
+          latitude: searchCamera.latitude,
+          longitude: searchCamera.longitude,
         },
-        zoom: Math.max(displayCamera.zoom, 16),
+        zoom: searchCamera.zoom,
       };
 
       isProgrammaticCameraMoveRef.current = true;
@@ -511,9 +674,9 @@ export function ParkingMap({
     },
     [
       canFocusCamera,
-      displayCamera.latitudeDelta,
-      displayCamera.longitudeDelta,
-      displayCamera.zoom,
+      loadedRequestVersion,
+      mapSize,
+      requestParkingForCamera,
     ],
   );
 
@@ -600,6 +763,8 @@ export function ParkingMap({
   const handleMarkerPress = useCallback(
     (item: ParkingClusterResponse) => {
       setSelectedSearchPlace(null);
+      setSearchParkingRequest(null);
+      setSearchSpotsSnapshot(null);
       selectParkingItem(item);
     },
     [selectParkingItem],
@@ -607,8 +772,14 @@ export function ParkingMap({
 
   const handleSelectSearchPlace = useCallback(
     (place: PlaceSearchResult) => {
+      if (!hasValidParkingCoordinates(place)) {
+        return;
+      }
+
       setSelectedParkingItem(null);
       cancelPendingCameraFocus();
+      setSearchParkingRequest(null);
+      setSearchSpotsSnapshot(null);
       setSelectedSearchPlace(place);
       focusCoordinatesAboveSheetSafely(
         { latitude: place.latitude, longitude: place.longitude },
@@ -623,11 +794,15 @@ export function ParkingMap({
 
   const closeSearchResults = useCallback(() => {
     setSelectedSearchPlace(null);
+    setSearchParkingRequest(null);
+    setSearchSpotsSnapshot(null);
   }, []);
 
   const handleSearchSpotPress = useCallback(
     (item: ParkingClusterResponse) => {
       setSelectedSearchPlace(null);
+      setSearchParkingRequest(null);
+      setSearchSpotsSnapshot(null);
       selectParkingItem(item, { source: 'search', focusCamera: true });
     },
     [selectParkingItem],
@@ -640,6 +815,8 @@ export function ParkingMap({
   const prepareForLocationFocus = useCallback(() => {
     closeOverlay();
     setSelectedSearchPlace(null);
+    setSearchParkingRequest(null);
+    setSearchSpotsSnapshot(null);
     clearSelection();
     cancelPendingCameraFocus();
   }, [cancelPendingCameraFocus, clearSelection, closeOverlay]);
@@ -818,6 +995,8 @@ export function ParkingMap({
 
     cancelPendingCameraFocus();
     setSelectedSearchPlace(null);
+    setSearchParkingRequest(null);
+    setSearchSpotsSnapshot(null);
     clearSelection();
   }, [activeOverlay, cancelPendingCameraFocus, clearSelection]);
 
@@ -976,6 +1155,31 @@ export function ParkingMap({
         ))}
       </View>
 
+      {projectedSearchDestination ? (
+        <View
+          accessibilityLabel="Searched destination"
+          accessibilityRole="image"
+          accessible
+          collapsable={false}
+          pointerEvents="none"
+          style={{
+            elevation: MAP_ELEVATIONS.searchDestination,
+            height: 44,
+            left: 0,
+            position: 'absolute',
+            top: 0,
+            transform: [
+              { translateX: projectedSearchDestination.x - 20 },
+              { translateY: projectedSearchDestination.y - 38 },
+            ],
+            width: 40,
+            zIndex: MAP_LAYERS.searchDestination,
+          }}
+        >
+          <SearchDestinationMarker />
+        </View>
+      ) : null}
+
       {projectedUserLocation ? (
         <View
           collapsable={false}
@@ -1059,6 +1263,7 @@ export function ParkingMap({
       />
 
       <SearchNearestSpotsBottomSheet
+        isLoading={isSearchParkingLoading}
         onClose={closeSearchResults}
         onSpotPress={handleSearchSpotPress}
         searchPlace={selectedSearchPlace}

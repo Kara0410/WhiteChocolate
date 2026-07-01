@@ -4,7 +4,13 @@ import BottomSheet, {
   useBottomSheetSpringConfigs,
 } from '@gorhom/bottom-sheet';
 import { MapPin, Navigation, X } from 'lucide-react-native';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -24,6 +30,7 @@ import { getAvailabilityTheme } from './parking-availability-status';
 type SearchNearestSpotsBottomSheetProps = {
   searchPlace: PlaceSearchResult | null;
   spots: ParkingSpotWithDistance[];
+  isLoading?: boolean;
   onClose: () => void;
   onSpotPress: (spot: ParkingClusterResponse) => void;
 };
@@ -128,6 +135,7 @@ const NearestSpotRow = memo(function NearestSpotRow({
 function SearchNearestSpotsBottomSheetComponent({
   searchPlace,
   spots,
+  isLoading = false,
   onClose,
   onSpotPress,
 }: SearchNearestSpotsBottomSheetProps) {
@@ -222,11 +230,16 @@ function SearchNearestSpotsBottomSheetComponent({
         keyboardShouldPersistTaps="handled"
         ListEmptyComponent={
           <View className="items-center justify-center rounded-[28px] border border-dashed border-slate-300 bg-white/80 px-6 py-10">
-            <Text className="text-[18px] font-extrabold text-slate-950">
-              No nearby spots found
+            {isLoading ? (
+              <ActivityIndicator color="#2563EB" size="small" />
+            ) : null}
+            <Text className="mt-2 text-[18px] font-extrabold text-slate-950">
+              {isLoading ? 'Finding nearby spots' : 'No nearby spots found'}
             </Text>
             <Text className="mt-2 text-center text-[14px] font-medium leading-5 text-slate-500">
-              Try a different place or address.
+              {isLoading
+                ? 'Loading parking data around this destination.'
+                : 'Try a different place or address.'}
             </Text>
           </View>
         }
