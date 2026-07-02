@@ -10,6 +10,11 @@ import {
   type LayoutChangeEvent,
 } from 'react-native';
 import { LocateFixed, MapPinned } from 'lucide-react-native';
+import Animated, {
+  FadeIn,
+  FadeOut,
+  ReduceMotion,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -23,6 +28,11 @@ import {
   MAP_ELEVATIONS,
   MAP_LAYERS,
 } from '@/components/parking-map/map-layers';
+import { MAP_DETAIL_THRESHOLDS } from '@/components/parking-map/map-detail-level';
+import {
+  ZONE_SUMMARY_MARKER_SIZE,
+  ZoneSummaryMarker,
+} from '@/components/parking-map/zone-summary-marker';
 import {
   ParkingBottomSheet,
   type ParkingBottomSheetHandle,
@@ -36,6 +46,7 @@ import { YouBottomSheet } from '@/components/parking-map/YouBottomSheet';
 import { UserLocationMarker } from '@/components/parking-map/user-location-marker';
 import { useFavoriteParking } from '@/context/FavoriteParkingContext';
 import { useMapOverlay } from '@/context/MapOverlayContext';
+import { useMapDetailLevel } from '@/hooks/use-map-detail-level';
 import { useParkingClusters } from '@/hooks/use-parking-clusters';
 import {
   MUNICH_CENTER,
@@ -53,6 +64,11 @@ import {
   hasValidParkingCoordinates,
   isCoordinateInsideBounds,
 } from '@/utils/parking-map-geo';
+import {
+  buildZoneSummaries,
+  getZoneFocusZoom,
+  type ParkingZoneSummary,
+} from '@/utils/parking-zones';
 import {
   getNearestParkingSpots,
   type ParkingSpotWithDistance,
@@ -111,10 +127,26 @@ const GOOGLE_MAP_UI_SETTINGS = {
 
 const FULL_SHEET_RATIO = 0.5;
 const PROGRAMMATIC_CAMERA_GUARD_MS = 500;
+/**
+ * Extra time past the requested animation duration before the next
+ * programmatic camera command may start. Android's expo-maps wrapper does
+ * not expose the setCameraPosition promise, so a command that interrupts a
+ * running animation surfaces as an uncatchable "Animation cancelled"
+ * rejection — serializing commands is the only reliable prevention.
+ */
+const CAMERA_COMMAND_SETTLE_BUFFER_MS = 80;
 const INITIAL_CAMERA_SETTLE_MS = 750;
 const MAP_DRAG_SETTLE_MS = 180;
 const MARKER_MOVEMENT_SETTLE_MS = 150;
 const EMPTY_SEARCH_SPOTS: ParkingSpotWithDistance[] = [];
+const EMPTY_ZONE_SUMMARIES: ParkingZoneSummary[] = [];
+
+const DETAIL_LAYER_ENTERING = FadeIn.duration(180).reduceMotion(
+  ReduceMotion.System,
+);
+const DETAIL_LAYER_EXITING = FadeOut.duration(140).reduceMotion(
+  ReduceMotion.System,
+);
 
 type ParkingMapProps = {
   initialCamera: ParkingCameraState;
@@ -151,6 +183,12 @@ type SearchSpotsSnapshot = {
 type SearchParkingRequest = {
   key: string;
   startedAtVersion: number;
+};
+
+type CameraAnimationCommand = {
+  /** Android animation duration; the serialization window is based on it. */
+  duration: number;
+  execute: () => void;
 };
 
 function isCameraCancellationError(error: unknown) {
@@ -255,6 +293,10 @@ export function ParkingMap({
   } | null>(null);
   const cameraFocusRequestIdRef = useRef(0);
   const locationActionRequestIdRef = useRef(0);
+  const cameraAnimationUntilRef = useRef(0);
+  const pendingCameraCommandRef = useRef<CameraAnimationCommand | null>(null);
+  const pendingCameraCommandTimerRef =
+    useRef<ReturnType<typeof setTimeout> | null>(null);
   const [selectedParkingItem, setSelectedParkingItem] =
     useState<ParkingClusterResponse | null>(null);
   const [selectedSearchPlace, setSelectedSearchPlace] =
@@ -326,6 +368,7 @@ export function ParkingMap({
     selectedSearchPlace !== null &&
     searchSpotsSnapshot?.placeId !== selectedSearchPlace.placeId;
 
+  const detailLevel = useMapDetailLevel(displayCamera);
   const circleFilterResult = useMemo(
     () =>
       filterParkingMarkersForScreenCircle(visibleClusters, {
@@ -338,7 +381,7 @@ export function ParkingMap({
   const circularFilteredClusters = circleFilterResult.markers;
   const nativeZonePolygons = useMemo(
     () =>
-      mapMode === 'munichOverview'
+      mapMode === 'munichOverview' || detailLevel === 'overview'
         ? parkingZonePolygons.map((polygon) => ({
             id: polygon.id,
             coordinates: polygon.coordinates,
@@ -347,7 +390,7 @@ export function ParkingMap({
             lineWidth: 1,
           }))
         : [],
-    [mapMode, parkingZonePolygons],
+    [detailLevel, mapMode, parkingZonePolygons],
   );
 
   useEffect(() => {
@@ -422,7 +465,7 @@ export function ParkingMap({
       }
 
       return getDisplayedParkingMarkerItems(
-        densityFilteredMarkers,
+        detailLevel === 'spotDetail' ? densityFilteredMarkers : [],
         selectedParkingItem,
         selectedSearchPlace !== null ? nearestSearchSpots : null,
         activeOverlay !== 'none',
@@ -431,6 +474,7 @@ export function ParkingMap({
     [
       activeOverlay,
       densityFilteredMarkers,
+      detailLevel,
       mapMode,
       nearestSearchSpots,
       selectedParkingItem,
@@ -454,10 +498,61 @@ export function ParkingMap({
     ],
   );
 
+  const zoneSummaries = useMemo(
+    () =>
+      detailLevel === 'zoneSummary' && mapMode !== 'munichOverview'
+        ? buildZoneSummaries(visibleSpots, parkingZonePolygons)
+        : EMPTY_ZONE_SUMMARIES,
+    [detailLevel, mapMode, parkingZonePolygons, visibleSpots],
+  );
+  const projectedZoneSummaries = useMemo(() => {
+    if (
+      zoneSummaries.length === 0 ||
+      mapSize.width <= 0 ||
+      mapSize.height <= 0 ||
+      activeOverlay !== 'none' ||
+      selectedSearchPlace !== null ||
+      selectedParkingItem !== null
+    ) {
+      return [];
+    }
+
+    const margin = ZONE_SUMMARY_MARKER_SIZE.width;
+    return zoneSummaries.flatMap((summary) => {
+      const position = projectMapCoordinate(summary, {
+        camera: displayCamera,
+        height: mapSize.height,
+        width: mapSize.width,
+      });
+
+      if (
+        !Number.isFinite(position.x) ||
+        !Number.isFinite(position.y) ||
+        position.x < -margin ||
+        position.x > mapSize.width + margin ||
+        position.y < -margin ||
+        position.y > mapSize.height + margin
+      ) {
+        return [];
+      }
+
+      return [{ summary, x: position.x, y: position.y }];
+    });
+  }, [
+    activeOverlay,
+    displayCamera,
+    mapSize.height,
+    mapSize.width,
+    selectedParkingItem,
+    selectedSearchPlace,
+    zoneSummaries,
+  ]);
+
   useEffect(() => {
     if (
       !__DEV__ ||
       isMapMoving ||
+      detailLevel !== 'spotDetail' ||
       activeOverlay !== 'none' ||
       selectedSearchPlace !== null ||
       mapSize.width <= 0 ||
@@ -489,6 +584,7 @@ export function ParkingMap({
     circularFilteredClusters.length,
     currentRegion,
     densityFilteredMarkers.length,
+    detailLevel,
     displayCamera,
     isMapMoving,
     mapSize.height,
@@ -577,7 +673,12 @@ export function ParkingMap({
     pendingFocusSourceRef.current = 'marker';
     pendingCoordinateFocusRef.current = null;
     pendingLocationFocusRef.current = null;
+    pendingCameraCommandRef.current = null;
 
+    if (pendingCameraCommandTimerRef.current) {
+      clearTimeout(pendingCameraCommandTimerRef.current);
+      pendingCameraCommandTimerRef.current = null;
+    }
     if (favoriteFocusTimerRef.current) {
       clearTimeout(favoriteFocusTimerRef.current);
       favoriteFocusTimerRef.current = null;
@@ -587,6 +688,43 @@ export function ParkingMap({
       favoriteFocusInteractionRef.current = null;
     }
   }, []);
+
+  /**
+   * Runs a programmatic camera animation only when no other one is in
+   * flight; otherwise the command is parked until the current window ends.
+   * Only the newest parked command survives, so rapid taps resolve to the
+   * user's latest intent without ever cancelling a native animation.
+   */
+  const runOrQueueCameraCommand = useCallback(
+    (command: CameraAnimationCommand) => {
+      const run = (nextCommand: CameraAnimationCommand) => {
+        const now = Date.now();
+        const waitMs = cameraAnimationUntilRef.current - now;
+
+        if (waitMs <= 0) {
+          cameraAnimationUntilRef.current =
+            now + nextCommand.duration + CAMERA_COMMAND_SETTLE_BUFFER_MS;
+          nextCommand.execute();
+          return;
+        }
+
+        pendingCameraCommandRef.current = nextCommand;
+        if (pendingCameraCommandTimerRef.current === null) {
+          pendingCameraCommandTimerRef.current = setTimeout(() => {
+            pendingCameraCommandTimerRef.current = null;
+            const pending = pendingCameraCommandRef.current;
+            pendingCameraCommandRef.current = null;
+            if (pending) {
+              run(pending);
+            }
+          }, waitMs);
+        }
+      };
+
+      run(command);
+    },
+    [],
+  );
 
   const beginProgrammaticCameraMove = useCallback(
     (coordinates: ParkingCoordinates, zoom: number) => {
@@ -662,44 +800,50 @@ export function ParkingMap({
         zoom: displayCamera.zoom,
       };
 
-      if (
-        !beginProgrammaticCameraMove(
-          nextCamera.coordinates,
-          nextCamera.zoom,
-        )
-      ) {
-        return;
-      }
+      const duration = source === 'favorite' ? 0 : 320;
+      runOrQueueCameraCommand({
+        duration,
+        execute: () => {
+          if (
+            !beginProgrammaticCameraMove(
+              nextCamera.coordinates,
+              nextCamera.zoom,
+            )
+          ) {
+            return;
+          }
 
-      try {
-        const cameraUpdate =
-          Platform.OS === 'android'
-            ? googleMapRef.current!.setCameraPosition({
-                ...nextCamera,
-                duration: source === 'favorite' ? 0 : 320,
-              })
-            : appleMapRef.current!.setCameraPosition(nextCamera);
+          try {
+            const cameraUpdate =
+              Platform.OS === 'android'
+                ? googleMapRef.current!.setCameraPosition({
+                    ...nextCamera,
+                    duration,
+                  })
+                : appleMapRef.current!.setCameraPosition(nextCamera);
 
-        safelyHandleCameraUpdate(
-          cameraUpdate,
-          source === 'favorite'
-            ? 'Favorite camera focus failed'
-            : 'Unable to focus parking map camera',
-        );
-      } catch (error) {
-        if (isCameraCancellationError(error)) {
-          return;
-        }
+            safelyHandleCameraUpdate(
+              cameraUpdate,
+              source === 'favorite'
+                ? 'Favorite camera focus failed'
+                : 'Unable to focus parking map camera',
+            );
+          } catch (error) {
+            if (isCameraCancellationError(error)) {
+              return;
+            }
 
-        if (__DEV__) {
-          console.warn(
-            source === 'favorite'
-              ? 'Favorite camera focus failed'
-              : 'Unable to focus parking map camera',
-            error,
-          );
-        }
-      }
+            if (__DEV__) {
+              console.warn(
+                source === 'favorite'
+                  ? 'Favorite camera focus failed'
+                  : 'Unable to focus parking map camera',
+                error,
+              );
+            }
+          }
+        },
+      });
     },
     [
       canFocusCamera,
@@ -707,6 +851,7 @@ export function ParkingMap({
       displayCamera.latitudeDelta,
       displayCamera.longitudeDelta,
       displayCamera.zoom,
+      runOrQueueCameraCommand,
     ],
   );
 
@@ -740,38 +885,43 @@ export function ParkingMap({
         zoom: searchCamera.zoom,
       };
 
-      if (
-        !beginProgrammaticCameraMove(
-          nextCamera.coordinates,
-          nextCamera.zoom,
-        )
-      ) {
-        return;
-      }
-
       const startedAtVersion = loadedRequestVersion;
       const key = requestParkingForCamera(searchCamera);
       setSearchParkingRequest({ key, startedAtVersion });
 
-      try {
-        const cameraUpdate =
-          Platform.OS === 'android'
-            ? googleMapRef.current!.setCameraPosition({
-                ...nextCamera,
-                duration: 360,
-              })
-            : appleMapRef.current!.setCameraPosition(nextCamera);
+      runOrQueueCameraCommand({
+        duration: 360,
+        execute: () => {
+          if (
+            !beginProgrammaticCameraMove(
+              nextCamera.coordinates,
+              nextCamera.zoom,
+            )
+          ) {
+            return;
+          }
 
-        safelyHandleCameraUpdate(cameraUpdate, context);
-      } catch (error) {
-        if (isCameraCancellationError(error)) {
-          return;
-        }
+          try {
+            const cameraUpdate =
+              Platform.OS === 'android'
+                ? googleMapRef.current!.setCameraPosition({
+                    ...nextCamera,
+                    duration: 360,
+                  })
+                : appleMapRef.current!.setCameraPosition(nextCamera);
 
-        if (__DEV__) {
-          console.warn(context, error);
-        }
-      }
+            safelyHandleCameraUpdate(cameraUpdate, context);
+          } catch (error) {
+            if (isCameraCancellationError(error)) {
+              return;
+            }
+
+            if (__DEV__) {
+              console.warn(context, error);
+            }
+          }
+        },
+      });
     },
     [
       beginProgrammaticCameraMove,
@@ -779,6 +929,7 @@ export function ParkingMap({
       loadedRequestVersion,
       mapSize,
       requestParkingForCamera,
+      runOrQueueCameraCommand,
     ],
   );
 
@@ -808,27 +959,32 @@ export function ParkingMap({
         tilt: 0,
       };
 
-      if (!beginProgrammaticCameraMove(coordinates, zoom)) {
-        return;
-      }
+      runOrQueueCameraCommand({
+        duration: 360,
+        execute: () => {
+          if (!beginProgrammaticCameraMove(coordinates, zoom)) {
+            return;
+          }
 
-      try {
-        const cameraUpdate =
-          Platform.OS === 'android'
-            ? googleMapRef.current!.setCameraPosition({
-                ...nextCamera,
-                duration: 360,
-              })
-            : appleMapRef.current!.setCameraPosition(nextCamera);
+          try {
+            const cameraUpdate =
+              Platform.OS === 'android'
+                ? googleMapRef.current!.setCameraPosition({
+                    ...nextCamera,
+                    duration: 360,
+                  })
+                : appleMapRef.current!.setCameraPosition(nextCamera);
 
-        safelyHandleCameraUpdate(cameraUpdate, context);
-      } catch (error) {
-        if (!isCameraCancellationError(error) && __DEV__) {
-          console.warn(context, error);
-        }
-      }
+            safelyHandleCameraUpdate(cameraUpdate, context);
+          } catch (error) {
+            if (!isCameraCancellationError(error) && __DEV__) {
+              console.warn(context, error);
+            }
+          }
+        },
+      });
     },
-    [beginProgrammaticCameraMove, canFocusCamera],
+    [beginProgrammaticCameraMove, canFocusCamera, runOrQueueCameraCommand],
   );
 
   const selectParkingItem = useCallback(
@@ -866,14 +1022,92 @@ export function ParkingMap({
     ],
   );
 
+  const expandClusterSafely = useCallback(
+    (item: ParkingClusterResponse) => {
+      if (!hasValidCoordinates(item)) {
+        return;
+      }
+
+      cancelPendingCameraFocus();
+      const currentZoom = Number.isFinite(displayCamera.zoom)
+        ? displayCamera.zoom
+        : MAP_DETAIL_THRESHOLDS.spotDetailEnterZoom;
+      // Always zoom in at least one level so repeated taps make progress
+      // even when supercluster reports an expansion zoom we already passed.
+      const targetZoom = Math.min(
+        17,
+        Math.max(
+          item.expansionZoom ?? currentZoom + 2,
+          Math.floor(currentZoom) + 1,
+        ),
+      );
+      const coordinates = {
+        latitude: item.latitude,
+        longitude: item.longitude,
+      };
+
+      setMapMode('focusedArea');
+      setAutomaticParkingFetchEnabled(true);
+      requestParkingForCamera({ ...coordinates, zoom: targetZoom });
+      focusLocationSafely(
+        coordinates,
+        'Unable to expand the parking cluster',
+        targetZoom,
+      );
+    },
+    [
+      cancelPendingCameraFocus,
+      displayCamera.zoom,
+      focusLocationSafely,
+      requestParkingForCamera,
+    ],
+  );
+
   const handleMarkerPress = useCallback(
     (item: ParkingClusterResponse) => {
       setSelectedSearchPlace(null);
       setSearchParkingRequest(null);
       setSearchSpotsSnapshot(null);
+      if (item.type === 'cluster') {
+        expandClusterSafely(item);
+        return;
+      }
+
       selectParkingItem(item);
     },
-    [selectParkingItem],
+    [expandClusterSafely, selectParkingItem],
+  );
+
+  const handleZoneSummaryPress = useCallback(
+    (summary: ParkingZoneSummary) => {
+      cancelPendingCameraFocus();
+      const targetZoom = getZoneFocusZoom(
+        parkingZonePolygons,
+        summary.zoneId,
+        mapSize.width,
+        MAP_DETAIL_THRESHOLDS.spotDetailEnterZoom + 0.2,
+      );
+      const coordinates = {
+        latitude: summary.latitude,
+        longitude: summary.longitude,
+      };
+
+      setMapMode('focusedArea');
+      setAutomaticParkingFetchEnabled(true);
+      requestParkingForCamera({ ...coordinates, zoom: targetZoom });
+      focusLocationSafely(
+        coordinates,
+        'Unable to focus the parking zone',
+        targetZoom,
+      );
+    },
+    [
+      cancelPendingCameraFocus,
+      focusLocationSafely,
+      mapSize.width,
+      parkingZonePolygons,
+      requestParkingForCamera,
+    ],
   );
 
   const handleSelectSearchPlace = useCallback(
@@ -1095,6 +1329,10 @@ export function ParkingMap({
       if (favoriteFocusInteractionRef.current) {
         favoriteFocusInteractionRef.current.cancel();
       }
+      if (pendingCameraCommandTimerRef.current) {
+        clearTimeout(pendingCameraCommandTimerRef.current);
+      }
+      pendingCameraCommandRef.current = null;
       pendingFocusItemRef.current = null;
       pendingCoordinateFocusRef.current = null;
       pendingLocationFocusRef.current = null;
@@ -1274,32 +1512,88 @@ export function ParkingMap({
           zIndex: MAP_LAYERS.markers,
         }}
       >
-        {projectedMarkers.map(({ item, x, y, width, height, tier }) => (
-          <View
-            key={item.id}
+        <Animated.View
+          key={`marker-layer-${detailLevel}`}
+          entering={DETAIL_LAYER_ENTERING}
+          exiting={DETAIL_LAYER_EXITING}
+          pointerEvents="box-none"
+          style={{ flex: 1 }}
+        >
+          {projectedMarkers.map(({ item, x, y, width, height, tier }) => (
+            <View
+              key={item.id}
+              pointerEvents="box-none"
+              style={{
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                transform: [
+                  { translateX: x - width / 2 },
+                  { translateY: y - height / 2 },
+                ],
+                width,
+                height,
+                zIndex: selectedParkingItem?.id === item.id ? 2 : 1,
+              }}
+            >
+              <ParkingMarkerCard
+                item={item}
+                onPress={handleMarkerPress}
+                performanceMode={isMapMoving ? 'moving' : 'normal'}
+                selected={selectedParkingItem?.id === item.id}
+                tier={tier}
+              />
+            </View>
+          ))}
+        </Animated.View>
+      </View>
+
+      <View
+        pointerEvents="box-none"
+        style={{
+          elevation: MAP_ELEVATIONS.markers,
+          position: 'absolute',
+          inset: 0,
+          zIndex: MAP_LAYERS.markers,
+        }}
+      >
+        {projectedZoneSummaries.length > 0 ? (
+          <Animated.View
+            entering={DETAIL_LAYER_ENTERING}
+            exiting={DETAIL_LAYER_EXITING}
             pointerEvents="box-none"
-            style={{
-              position: 'absolute',
-              left: 0,
-              top: 0,
-              transform: [
-                { translateX: x - width / 2 },
-                { translateY: y - height / 2 },
-              ],
-              width,
-              height,
-              zIndex: selectedParkingItem?.id === item.id ? 2 : 1,
-            }}
+            style={{ flex: 1 }}
           >
-            <ParkingMarkerCard
-              item={item}
-              onPress={handleMarkerPress}
-              performanceMode={isMapMoving ? 'moving' : 'normal'}
-              selected={selectedParkingItem?.id === item.id}
-              tier={tier}
-            />
-          </View>
-        ))}
+            {projectedZoneSummaries.map(({ summary, x, y }) => (
+              <View
+                key={summary.zoneId}
+                pointerEvents="box-none"
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  top: 0,
+                  transform: [
+                    {
+                      translateX:
+                        x - ZONE_SUMMARY_MARKER_SIZE.width / 2,
+                    },
+                    {
+                      translateY:
+                        y - ZONE_SUMMARY_MARKER_SIZE.height / 2,
+                    },
+                  ],
+                  width: ZONE_SUMMARY_MARKER_SIZE.width,
+                  height: ZONE_SUMMARY_MARKER_SIZE.height,
+                }}
+              >
+                <ZoneSummaryMarker
+                  onPress={handleZoneSummaryPress}
+                  summary={summary}
+                />
+              </View>
+            ))}
+          </Animated.View>
+        ) : null}
       </View>
 
       {projectedSearchDestination ? (

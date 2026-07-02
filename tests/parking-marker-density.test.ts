@@ -62,6 +62,15 @@ test('formats cluster labels with singular, plural, and a readable cap', () => {
   assert.equal(formatSpotCount(1_500), '999+ Spots');
 });
 
+test('caps zone summary labels at the configured threshold', () => {
+  assert.equal(formatSpotCount(1, { capped: true, cap: 50 }), '1 Spot');
+  assert.equal(formatSpotCount(49, { capped: true, cap: 50 }), '49 Spots');
+  assert.equal(formatSpotCount(50, { capped: true, cap: 50 }), '50+ Spots');
+  assert.equal(formatSpotCount(73, { capped: true, cap: 50 }), '50+ Spots');
+  assert.equal(formatSpotCount(73, { capped: false }), '73 Spots');
+  assert.equal(formatSpotCount(73, { capped: true }), '50+ Spots');
+});
+
 test('validates user coordinates before map projection', () => {
   assert.equal(
     hasValidParkingCoordinates({ latitude: 48.1351, longitude: 11.5824 }),

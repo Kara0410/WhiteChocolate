@@ -3,7 +3,10 @@ import test from 'node:test';
 
 import type { ParkingZone } from '../src/types/parking-zone';
 import {
+  buildZoneSummaries,
   createParkingZoneMatcher,
+  getZoneFocusZoom,
+  getZoneRepresentativePoint,
   isCoordinateInsidePolygon,
   parkingZonesToPolygons,
 } from '../src/utils/parking-zones';
@@ -100,4 +103,102 @@ test('matches points inside zones and treats polygon boundaries as contained', (
     matchZone({ latitude: 48.3, longitude: 11.7 }),
     null,
   );
+});
+
+test('zone representative point stays inside a concave polygon', () => {
+  // U-shaped polygon whose centroid falls inside the notch (outside the shape).
+  const uShape = [
+    { latitude: 48.0, longitude: 11.0 },
+    { latitude: 48.0, longitude: 11.5 },
+    { latitude: 48.5, longitude: 11.5 },
+    { latitude: 48.5, longitude: 11.4 },
+    { latitude: 48.1, longitude: 11.4 },
+    { latitude: 48.1, longitude: 11.1 },
+    { latitude: 48.5, longitude: 11.1 },
+    { latitude: 48.5, longitude: 11.0 },
+  ];
+  const polygon = {
+    id: 'zone-u:0',
+    zoneId: 'zone-u',
+    zoneName: 'U zone',
+    coordinates: uShape,
+  };
+
+  const point = getZoneRepresentativePoint(polygon);
+  assert.equal(isCoordinateInsidePolygon(point, uShape), true);
+});
+
+test('builds one capped summary per zone from assigned spots', () => {
+  const polygons = parkingZonesToPolygons([
+    zone({
+      type: 'Polygon',
+      coordinates: [
+        [
+          [11.5, 48.1],
+          [11.6, 48.1],
+          [11.6, 48.2],
+          [11.5, 48.2],
+          [11.5, 48.1],
+        ],
+      ],
+    }),
+  ]);
+  const spots = [
+    ...Array.from({ length: 3 }, (_, index) => ({
+      latitude: 48.15,
+      longitude: 11.55,
+      zoneId: 'zone-1',
+      zoneName: 'Test zone',
+      id: `spot-${index}`,
+    })),
+    { latitude: 48.15, longitude: 11.55, zoneId: null, zoneName: null },
+  ];
+
+  const summaries = buildZoneSummaries(spots, polygons);
+  assert.equal(summaries.length, 1);
+  assert.equal(summaries[0].zoneId, 'zone-1');
+  assert.equal(summaries[0].spotCount, 3);
+  assert.equal(
+    isCoordinateInsidePolygon(summaries[0], polygons[0].coordinates),
+    true,
+  );
+});
+
+test('zone focus zoom fits small zones but always lands in spot detail', () => {
+  const polygons = parkingZonesToPolygons([
+    zone({
+      type: 'Polygon',
+      coordinates: [
+        [
+          [11.5, 48.1],
+          [11.6, 48.1],
+          [11.6, 48.2],
+          [11.5, 48.2],
+          [11.5, 48.1],
+        ],
+      ],
+    }),
+  ]);
+
+  const largeZoneZoom = getZoneFocusZoom(polygons, 'zone-1', 400, 15.2);
+  assert.equal(largeZoneZoom, 15.2);
+
+  const unknownZoneZoom = getZoneFocusZoom(polygons, 'missing', 400, 15.2);
+  assert.equal(unknownZoneZoom, 15.2);
+
+  const tinyPolygons = parkingZonesToPolygons([
+    zone({
+      type: 'Polygon',
+      coordinates: [
+        [
+          [11.5, 48.1],
+          [11.5001, 48.1],
+          [11.5001, 48.1001],
+          [11.5, 48.1],
+        ],
+      ],
+    }),
+  ]);
+  const tinyZoneZoom = getZoneFocusZoom(tinyPolygons, 'zone-1', 400, 15.2);
+  assert.equal(tinyZoneZoom, 17);
 });

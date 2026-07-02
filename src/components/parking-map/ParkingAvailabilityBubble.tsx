@@ -7,6 +7,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import Animated, {
+  ReduceMotion,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
@@ -51,6 +52,7 @@ const SPRING_CONFIG = {
   damping: 17,
   stiffness: 280,
   mass: 0.65,
+  reduceMotion: ReduceMotion.System,
 } as const;
 
 export { getAvailabilityStatus };

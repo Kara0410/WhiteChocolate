@@ -1,5 +1,5 @@
 import { memo, useCallback } from 'react';
-import Animated, { ZoomIn } from 'react-native-reanimated';
+import Animated, { ReduceMotion, ZoomIn } from 'react-native-reanimated';
 
 import ParkingAvailabilityBubble, {
   type BubbleSize,
@@ -15,10 +15,12 @@ type ParkingMarkerCardProps = {
   onPress: (item: ParkingClusterResponse) => void;
 };
 
-const MARKER_ENTERING_TRANSITION = ZoomIn.duration(160).withInitialValues({
-  opacity: 0,
-  transform: [{ scale: 0.92 }],
-});
+const MARKER_ENTERING_TRANSITION = ZoomIn.duration(160)
+  .withInitialValues({
+    opacity: 0,
+    transform: [{ scale: 0.92 }],
+  })
+  .reduceMotion(ReduceMotion.System);
 
 export const ParkingMarkerCard = memo(function ParkingMarkerCard({
   item,

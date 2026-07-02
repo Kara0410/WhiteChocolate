@@ -39,10 +39,28 @@ export function getMarkerDimensions(tier: MarkerSizeTier) {
   };
 }
 
-export function formatSpotCount(count: number) {
+export type FormatSpotCountOptions = {
+  /** Cap large values, e.g. 73 -> "50+ Spots" for zone summaries. */
+  capped?: boolean;
+  /** Cap threshold used when capped is true. Defaults to 50. */
+  cap?: number;
+};
+
+export function formatSpotCount(
+  count: number,
+  options?: FormatSpotCountOptions,
+) {
   const normalizedCount = Number.isFinite(count)
     ? Math.max(0, Math.round(count))
     : 0;
+
+  if (options?.capped) {
+    const cap = options.cap ?? 50;
+    if (normalizedCount >= cap) {
+      return `${cap}+ Spots`;
+    }
+  }
+
   const displayedCount =
     normalizedCount > 999 ? '999+' : String(normalizedCount);
 
