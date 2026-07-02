@@ -42,10 +42,48 @@ export type ParkingViewportFilterResult = {
 
 export type ParkingCircleFilterResult = {
   markers: ParkingClusterResponse[];
+  radiusMeters: number | null;
   radiusPixels: number | null;
   removedAllMarkers: boolean;
   usedServerFallback: boolean;
 };
+
+const EARTH_RADIUS_METERS = 6_371_000;
+
+function getApproximateCircleRadiusMeters(
+  camera: ParkingCameraState,
+  height: number,
+  radiusPixels: number | null,
+) {
+  if (
+    radiusPixels === null ||
+    !Number.isFinite(camera.zoom) ||
+    height <= 0
+  ) {
+    return null;
+  }
+
+  if (
+    camera.latitudeDelta !== undefined &&
+    Number.isFinite(camera.latitudeDelta) &&
+    camera.latitudeDelta > 0
+  ) {
+    return (
+      radiusPixels *
+      (camera.latitudeDelta / height) *
+      (Math.PI / 180) *
+      EARTH_RADIUS_METERS
+    );
+  }
+
+  const latitudeRadians = (camera.latitude * Math.PI) / 180;
+  const worldSize = TILE_SIZE * 2 ** camera.zoom;
+  const metersPerPixel =
+    (Math.cos(latitudeRadians) * 2 * Math.PI * EARTH_RADIUS_METERS) /
+    worldSize;
+
+  return radiusPixels * metersPerPixel;
+}
 
 export function filterParkingMarkersForViewport(
   items: ParkingClusterResponse[],
@@ -90,10 +128,16 @@ export function filterParkingMarkersForScreenCircle(
     width: options.width,
     height: options.height,
   });
+  const radiusMeters = getApproximateCircleRadiusMeters(
+    options.camera,
+    options.height,
+    radiusPixels,
+  );
 
   if (radiusPixels === null) {
     return {
       markers: validItems,
+      radiusMeters,
       radiusPixels,
       removedAllMarkers: false,
       usedServerFallback: validItems.length > 0,
@@ -118,18 +162,22 @@ export function filterParkingMarkersForScreenCircle(
   if (!hasUsableProjection && validItems.length > 0) {
     return {
       markers: validItems,
+      radiusMeters,
       radiusPixels,
       removedAllMarkers: false,
       usedServerFallback: true,
     };
   }
 
+  const removedAllMarkers =
+    filteredItems.length === 0 && validItems.length > 0;
+
   return {
-    markers: filteredItems,
+    markers: removedAllMarkers ? validItems : filteredItems,
+    radiusMeters,
     radiusPixels,
-    removedAllMarkers:
-      filteredItems.length === 0 && validItems.length > 0,
-    usedServerFallback: false,
+    removedAllMarkers,
+    usedServerFallback: removedAllMarkers,
   };
 }
 

@@ -56,6 +56,7 @@ export function useParkingClusters(
   initialCamera: ParkingCameraState,
   destination?: ParkingCoordinates,
   mapSize?: ParkingMapSize,
+  isAutomaticFetchEnabled = true,
 ) {
   const [currentRegion, setCurrentRegion] = useState(initialCamera);
   const [displayCamera, setDisplayCamera] = useState(initialCamera);
@@ -125,6 +126,22 @@ export function useParkingClusters(
         request.destination,
       );
 
+      if (__DEV__) {
+        console.debug('[parking-map] Parking bbox fetch', {
+          bbox: request.bbox,
+          cameraCenter: {
+            latitude: camera.latitude,
+            longitude: camera.longitude,
+          },
+          sampleMarkerCoordinates: clusters.slice(0, 3).map((marker) => ({
+            latitude: marker.latitude,
+            longitude: marker.longitude,
+          })),
+          serverMarkers: clusters.length,
+          serverSegments: segments.length,
+        });
+      }
+
       if (
         !isMountedRef.current ||
         requestKeyRef.current !== request.tileKey
@@ -193,9 +210,19 @@ export function useParkingClusters(
     [createRequest, loadClusters],
   );
 
+  const clearParkingData = useCallback(() => {
+    requestKeyRef.current = null;
+    setLoadedRequestBounds(null);
+    setLoadedRequestKey(null);
+    setVisibleClusters([]);
+    setVisibleSpots([]);
+  }, []);
+
   useEffect(() => {
     isMountedRef.current = true;
-    void loadClusters(initialCamera);
+    if (isAutomaticFetchEnabled) {
+      void loadClusters(latestCameraRef.current);
+    }
 
     return () => {
       isMountedRef.current = false;
@@ -208,7 +235,7 @@ export function useParkingClusters(
         displayCameraFrameRef.current = null;
       }
     };
-  }, [initialCamera, loadClusters]);
+  }, [isAutomaticFetchEnabled, loadClusters]);
 
   const scheduleDisplayCameraUpdate = useCallback(
     (camera: ParkingCameraState) => {
@@ -275,15 +302,23 @@ export function useParkingClusters(
           }
 
           setDisplayCamera(latestCameraRef.current);
-          void loadClusters(latestCameraRef.current);
+          if (isAutomaticFetchEnabled) {
+            void loadClusters(latestCameraRef.current);
+          }
         },
         CAMERA_DEBOUNCE_MS,
       );
     },
-    [loadClusters, mapSize, scheduleDisplayCameraUpdate],
+    [
+      isAutomaticFetchEnabled,
+      loadClusters,
+      mapSize,
+      scheduleDisplayCameraUpdate,
+    ],
   );
 
   return {
+    clearParkingData,
     currentRegion,
     displayCamera,
     loadedRequestBounds,

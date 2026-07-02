@@ -11,14 +11,16 @@ const LOCATION_TIMEOUT_MS = 15_000;
 const LAST_KNOWN_LOCATION_MAX_AGE_MS = 2 * 60_000;
 const LAST_KNOWN_LOCATION_MAX_ACCURACY_METERS = 500;
 
-export const MUNICH_MOCK_LOCATION: ParkingCoordinates = {
+export const MUNICH_CENTER: ParkingCoordinates = {
   latitude: 48.1351,
-  longitude: 11.5824,
+  longitude: 11.582,
 };
 
-export const MOCK_CAMERA: ParkingCameraState = {
-  ...MUNICH_MOCK_LOCATION,
-  zoom: 17,
+export const MUNICH_OVERVIEW_CAMERA: ParkingCameraState = {
+  ...MUNICH_CENTER,
+  zoom: 11,
+  latitudeDelta: 0.2,
+  longitudeDelta: 0.22,
 };
 
 type LocationResult =
@@ -91,14 +93,14 @@ async function getDeviceLocation(): Promise<LocationResult> {
     if (!permission.granted) {
       return {
         message:
-          'Location permission is denied. Enable it in Settings to show your position. Showing the Munich test area.',
+          'Location permission is denied. Enable it in Settings to show your position. Showing the Munich overview.',
       };
     }
 
     const servicesEnabled = await Location.hasServicesEnabledAsync();
     if (!servicesEnabled) {
       return {
-        message: 'Location services are off. Showing the Munich test area.',
+        message: 'Location services are off. Showing the Munich overview.',
       };
     }
 
@@ -112,7 +114,7 @@ async function getDeviceLocation(): Promise<LocationResult> {
 
       return {
         message:
-          'Current location is unavailable. Showing the Munich test area.',
+          'Current location is unavailable. Showing the Munich overview.',
       };
     } catch (error) {
       const lastKnownCoordinates = await getRecentLastKnownCoordinates();
@@ -123,26 +125,26 @@ async function getDeviceLocation(): Promise<LocationResult> {
       return {
         message:
           error instanceof LocationRequestTimeoutError
-            ? 'Location request timed out. Showing the Munich test area.'
-            : 'Current location is unavailable. Showing the Munich test area.',
+            ? 'Location request timed out. Showing the Munich overview.'
+            : 'Current location is unavailable. Showing the Munich overview.',
       };
     }
   } catch {
     return {
-      message: 'Current location is unavailable. Showing the Munich test area.',
+      message: 'Current location is unavailable. Showing the Munich overview.',
     };
   }
 }
 
 export function useMapLocation() {
-  const bootstrapPromiseRef = useRef<Promise<LocationResult> | null>(null);
   const isMountedRef = useRef(true);
   const requestIdRef = useRef(0);
-  const [initialCamera, setInitialCamera] =
-    useState<ParkingCameraState | null>(null);
+  const [initialCamera] = useState<ParkingCameraState>(
+    MUNICH_OVERVIEW_CAMERA,
+  );
   const [userLocation, setUserLocation] =
     useState<ParkingCoordinates | null>(null);
-  const [isLocationLoading, setIsLocationLoading] = useState(true);
+  const [isLocationLoading, setIsLocationLoading] = useState(false);
   const [locationMessage, setLocationMessage] = useState<string | null>(null);
 
   const applyResult = useCallback((result: LocationResult) => {
@@ -165,32 +167,6 @@ export function useMapLocation() {
       requestIdRef.current += 1;
     };
   }, []);
-
-  useEffect(() => {
-    let isActive = true;
-    const requestId = ++requestIdRef.current;
-    bootstrapPromiseRef.current ??= getDeviceLocation();
-
-    void bootstrapPromiseRef.current.then((result) => {
-      if (
-        !isActive ||
-        !isMountedRef.current ||
-        requestId !== requestIdRef.current
-      ) {
-        return;
-      }
-
-      const coordinates = applyResult(result);
-      setInitialCamera(
-        coordinates ? { ...coordinates, zoom: 17 } : MOCK_CAMERA,
-      );
-      setIsLocationLoading(false);
-    });
-
-    return () => {
-      isActive = false;
-    };
-  }, [applyResult]);
 
   const requestCurrentLocation = useCallback(async () => {
     const requestId = ++requestIdRef.current;

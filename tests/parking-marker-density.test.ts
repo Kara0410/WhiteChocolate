@@ -213,7 +213,7 @@ test('screen circle falls back safely before map dimensions are ready', () => {
   assert.deepEqual(result.markers, markers);
 });
 
-test('screen circle reports when every server marker is outside', () => {
+test('screen circle keeps bbox markers when every marker is outside', () => {
   const outside = marker('outside', 48.1351, 11.6224);
   const result = filterParkingMarkersForScreenCircle([outside], {
     camera: {
@@ -228,7 +228,30 @@ test('screen circle reports when every server marker is outside', () => {
   });
 
   assert.equal(result.removedAllMarkers, true);
-  assert.deepEqual(result.markers, []);
+  assert.equal(result.usedServerFallback, true);
+  assert.deepEqual(result.markers, [outside]);
+});
+
+test('screen circle reports its approximate radius in pixels and meters', () => {
+  const result = filterParkingMarkersForScreenCircle(
+    [marker('center', 48.1351, 11.582)],
+    {
+      camera: {
+        latitude: 48.1351,
+        longitude: 11.582,
+        zoom: 14,
+        latitudeDelta: 0.04,
+        longitudeDelta: 0.04,
+      },
+      width: 400,
+      height: 800,
+    },
+  );
+
+  assert.equal(result.radiusPixels, 208);
+  assert.ok(result.radiusMeters);
+  assert.ok(result.radiusMeters > 1_150);
+  assert.ok(result.radiusMeters < 1_160);
 });
 
 test('selected marker bypasses the circular marker list', () => {
