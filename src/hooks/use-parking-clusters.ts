@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { Platform } from 'react-native';
 
 import {
@@ -14,6 +20,7 @@ import type {
   ParkingCoordinates,
   ParkingMapSize,
 } from '@/types/parking-map';
+import type { ParkingZonePolygon } from '@/types/parking-zone';
 import {
   deriveCameraViewportDeltas,
   getParkingClusterRequest,
@@ -21,6 +28,10 @@ import {
   zoomFromLongitudeDelta,
 } from '@/utils/parking-map-geo';
 import { parkingSegmentToMapRecord } from '@/utils/parking-segments';
+import {
+  assignParkingRecordsToZones,
+  createParkingZoneMatcher,
+} from '@/utils/parking-zones';
 
 const CAMERA_DEBOUNCE_MS = 350;
 const MAX_CLIENT_CACHE_ENTRIES = 80;
@@ -57,6 +68,7 @@ export function useParkingClusters(
   destination?: ParkingCoordinates,
   mapSize?: ParkingMapSize,
   isAutomaticFetchEnabled = true,
+  parkingZonePolygons: ParkingZonePolygon[] = [],
 ) {
   const [currentRegion, setCurrentRegion] = useState(initialCamera);
   const [displayCamera, setDisplayCamera] = useState(initialCamera);
@@ -71,9 +83,35 @@ export function useParkingClusters(
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const displayCameraFrameRef = useRef<number | null>(null);
   const latestCameraRef = useRef<ParkingCameraState>(initialCamera);
+  const requestedCameraRef = useRef<ParkingCameraState>(initialCamera);
   const currentZoomRef = useRef(initialCamera.zoom);
   const requestKeyRef = useRef<string | null>(null);
   const isMountedRef = useRef(true);
+  const parkingZoneMatcher = useMemo(
+    () => createParkingZoneMatcher(parkingZonePolygons),
+    [parkingZonePolygons],
+  );
+  const parkingZoneVersion = useMemo(
+    () =>
+      parkingZonePolygons.length === 0
+        ? 'none'
+        : parkingZonePolygons
+            .map((polygon) => {
+              const first = polygon.coordinates[0];
+              const last =
+                polygon.coordinates[polygon.coordinates.length - 1];
+              return [
+                polygon.id,
+                polygon.coordinates.length,
+                first?.latitude,
+                first?.longitude,
+                last?.latitude,
+                last?.longitude,
+              ].join(':');
+            })
+            .join(','),
+    [parkingZonePolygons],
+  );
   const markRequestLoaded = useCallback((request: ParkingClusterRequest) => {
     setLoadedRequestKey(request.tileKey);
     setLoadedRequestBounds(request.bbox);
@@ -97,16 +135,18 @@ export function useParkingClusters(
     preparedRequest?: ParkingClusterRequest,
   ) => {
     const request = preparedRequest ?? createRequest(camera);
+    const requestIdentity = `${request.tileKey}:zones:${parkingZoneVersion}`;
+    requestedCameraRef.current = camera;
     setCurrentRegion(camera);
     currentZoomRef.current = request.zoom;
 
-    if (request.tileKey === requestKeyRef.current) {
+    if (requestIdentity === requestKeyRef.current) {
       return;
     }
 
-    requestKeyRef.current = request.tileKey;
+    requestKeyRef.current = requestIdentity;
 
-    const cached = parkingCache.get(request.tileKey);
+    const cached = parkingCache.get(requestIdentity);
     if (cached) {
       setVisibleClusters(cached.clusters);
       setVisibleSpots(cached.spots);
@@ -116,7 +156,10 @@ export function useParkingClusters(
 
     try {
       const { segments, truncated } = await fetchParkingSegments(request.bbox);
-      const records = segments.map(parkingSegmentToMapRecord);
+      const records = assignParkingRecordsToZones(
+        segments.map(parkingSegmentToMapRecord),
+        parkingZoneMatcher,
+      );
       const spots = records.map((record) =>
         parkingRecordToResponse(record, request.destination),
       );
@@ -139,12 +182,22 @@ export function useParkingClusters(
           })),
           serverMarkers: clusters.length,
           serverSegments: segments.length,
+          zoneAssignedSegments: records.filter(
+            (record) => record.parkingZoneId !== null,
+          ).length,
+          zonesRepresented: new Set(
+            records.flatMap((record) =>
+              record.parkingZoneId === null
+                ? []
+                : [record.parkingZoneId],
+            ),
+          ).size,
         });
       }
 
       if (
         !isMountedRef.current ||
-        requestKeyRef.current !== request.tileKey
+        requestKeyRef.current !== requestIdentity
       ) {
         return;
       }
@@ -176,14 +229,14 @@ export function useParkingClusters(
         );
       }
 
-      cacheParkingData(request.tileKey, { clusters, spots });
+      cacheParkingData(requestIdentity, { clusters, spots });
       setVisibleClusters(clusters);
       setVisibleSpots(spots);
       markRequestLoaded(request);
     } catch (error) {
       if (
         !isMountedRef.current ||
-        requestKeyRef.current !== request.tileKey
+        requestKeyRef.current !== requestIdentity
       ) {
         return;
       }
@@ -199,10 +252,17 @@ export function useParkingClusters(
       setVisibleSpots([]);
       markRequestLoaded(request);
     }
-  }, [createRequest, mapSize, markRequestLoaded]);
+  }, [
+    createRequest,
+    mapSize,
+    markRequestLoaded,
+    parkingZoneMatcher,
+    parkingZoneVersion,
+  ]);
 
   const requestParkingForCamera = useCallback(
     (camera: ParkingCameraState) => {
+      latestCameraRef.current = camera;
       const request = createRequest(camera);
       void loadClusters(camera, request);
       return request.tileKey;
@@ -221,7 +281,11 @@ export function useParkingClusters(
   useEffect(() => {
     isMountedRef.current = true;
     if (isAutomaticFetchEnabled) {
-      void loadClusters(latestCameraRef.current);
+      void loadClusters(
+        requestKeyRef.current === null
+          ? latestCameraRef.current
+          : requestedCameraRef.current,
+      );
     }
 
     return () => {
@@ -253,7 +317,7 @@ export function useParkingClusters(
   );
 
   const onCameraMove = useCallback(
-    (event: CameraMoveEvent) => {
+    (event: CameraMoveEvent, shouldFetch = true) => {
       const latitude = event.coordinates.latitude;
       const longitude = event.coordinates.longitude;
       if (latitude === undefined || longitude === undefined) {
@@ -302,7 +366,7 @@ export function useParkingClusters(
           }
 
           setDisplayCamera(latestCameraRef.current);
-          if (isAutomaticFetchEnabled) {
+          if (isAutomaticFetchEnabled && shouldFetch) {
             void loadClusters(latestCameraRef.current);
           }
         },

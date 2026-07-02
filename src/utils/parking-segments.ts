@@ -41,6 +41,29 @@ function hasValidCoordinates(
   );
 }
 
+export function getParkingSegmentPageRange(
+  loadedRows: number,
+  rowLimit: number,
+  pageSize: number,
+) {
+  if (
+    !Number.isInteger(loadedRows) ||
+    !Number.isInteger(rowLimit) ||
+    !Number.isInteger(pageSize) ||
+    loadedRows < 0 ||
+    rowLimit <= loadedRows ||
+    pageSize <= 0
+  ) {
+    return null;
+  }
+
+  const size = Math.min(pageSize, rowLimit - loadedRows);
+  return {
+    from: loadedRows,
+    to: loadedRows + size - 1,
+  };
+}
+
 export function parkingSegmentFromRow(
   row: ParkingSegmentSelectRow,
 ): ParkingSegment | null {
@@ -108,6 +131,8 @@ export function parkingSegmentToMapRecord(
     longitude: segment.lon,
     zoneId: segment.prmName ?? segment.street ?? segment.id,
     zoneName: segment.prmName ?? segment.street ?? 'Unnamed parking segment',
+    parkingZoneId: null,
+    parkingZoneName: null,
     capacity,
     available,
     availabilityPercent:

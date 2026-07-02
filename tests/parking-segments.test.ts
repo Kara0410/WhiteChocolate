@@ -2,11 +2,28 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  getParkingSegmentPageRange,
   parkingSegmentFromRow,
   parkingSegmentToMapRecord,
 } from '../src/utils/parking-segments';
 import { parkingRecordToResponse } from '../src/services/parking-clustering';
 import type { ParkingSegmentRow } from '../src/types/database';
+
+test('paginates through the Supabase row cap and requests one overflow row', () => {
+  assert.deepEqual(getParkingSegmentPageRange(0, 2_001, 1_000), {
+    from: 0,
+    to: 999,
+  });
+  assert.deepEqual(getParkingSegmentPageRange(1_000, 2_001, 1_000), {
+    from: 1_000,
+    to: 1_999,
+  });
+  assert.deepEqual(getParkingSegmentPageRange(2_000, 2_001, 1_000), {
+    from: 2_000,
+    to: 2_000,
+  });
+  assert.equal(getParkingSegmentPageRange(2_001, 2_001, 1_000), null);
+});
 
 function row(overrides: Partial<ParkingSegmentRow> = {}): ParkingSegmentRow {
   return {

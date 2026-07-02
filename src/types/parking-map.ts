@@ -32,6 +32,8 @@ export type ParkingClusterResponse = {
   minPrice: number | null;
   avgPrice: number | null;
   bestSpot: ParkingBestSpot;
+  zoneId?: string | null;
+  zoneName?: string | null;
   expansionZoom?: number;
   distanceToDestination?: number;
   walkingCategory?: WalkingCategory;
@@ -43,6 +45,8 @@ export type ParkingMapRecord = {
   longitude: number;
   zoneId: string;
   zoneName: string;
+  parkingZoneId: string | null;
+  parkingZoneName: string | null;
   capacity: number;
   available: number;
   availabilityPercent: number;

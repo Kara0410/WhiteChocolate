@@ -17,6 +17,7 @@ import {
   getAvailabilityTheme,
   type AvailabilityStatus,
 } from './parking-availability-status';
+import { formatSpotCount } from './marker-visuals';
 
 export type BubbleType = 'cluster' | 'spot';
 export type BubbleSize = 'small' | 'medium' | 'large';
@@ -35,9 +36,9 @@ export type ParkingAvailabilityBubbleProps = {
 };
 
 const CLUSTER_SIZE = {
-  large: { canvasWidth: 70, canvasHeight: 44, width: 62, height: 38, font: 17 },
-  medium: { canvasWidth: 62, canvasHeight: 42, width: 54, height: 36, font: 16 },
-  small: { canvasWidth: 54, canvasHeight: 40, width: 46, height: 34, font: 15 },
+  large: { canvasWidth: 96, canvasHeight: 44, width: 88, height: 38, font: 15 },
+  medium: { canvasWidth: 90, canvasHeight: 42, width: 82, height: 36, font: 14 },
+  small: { canvasWidth: 84, canvasHeight: 40, width: 76, height: 34, font: 13 },
 } as const;
 
 const SPOT_SIZE = {
@@ -54,11 +55,6 @@ const SPRING_CONFIG = {
 
 export { getAvailabilityStatus };
 export type { AvailabilityStatus };
-
-function formatClusterCount(count: number) {
-  const safeCount = normalizeClusterCount(count);
-  return safeCount > 99 ? '99+' : `${safeCount}`;
-}
 
 function normalizeClusterCount(count: number) {
   return Number.isFinite(count) ? Math.max(0, Math.round(count)) : 0;
@@ -106,7 +102,7 @@ function ParkingAvailabilityBubble({
   const scale = useSharedValue(restingScale);
   const clusterCount = normalizeClusterCount(count ?? zoneCount);
   const label = isCluster
-    ? `${clusterCount} parking ${clusterCount === 1 ? 'spot' : 'spots'}`
+    ? `${formatSpotCount(clusterCount)} parking cluster`
     : `${clampedPercentage}% parking availability`;
 
   const animateScale = useCallback(
@@ -202,6 +198,7 @@ function ParkingAvailabilityBubble({
           ]}
         >
           <Text
+            className="text-center font-black"
             numberOfLines={1}
             style={[
               styles.markerText,
@@ -212,7 +209,9 @@ function ParkingAvailabilityBubble({
               },
             ]}
           >
-            {isCluster ? formatClusterCount(clusterCount) : `${clampedPercentage}%`}
+            {isCluster
+              ? formatSpotCount(clusterCount)
+              : `${clampedPercentage}%`}
           </Text>
         </View>
 
@@ -247,9 +246,7 @@ const styles = StyleSheet.create({
   },
   markerText: {
     fontVariant: ['tabular-nums'],
-    fontWeight: '900',
     letterSpacing: -0.45,
-    textAlign: 'center',
   },
   pill: {
     alignItems: 'center',

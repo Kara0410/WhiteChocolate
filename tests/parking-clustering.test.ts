@@ -25,6 +25,8 @@ function record(
     longitude: overrides.longitude ?? 11.5824,
     zoneId: overrides.zoneId ?? `zone-${overrides.id}`,
     zoneName: overrides.zoneName ?? `Zone ${overrides.id}`,
+    parkingZoneId: overrides.parkingZoneId ?? null,
+    parkingZoneName: overrides.parkingZoneName ?? null,
     capacity,
     available,
     availabilityPercent: Math.round((available / capacity) * 100),
@@ -229,6 +231,68 @@ test('returns individual records at street-level zoom', () => {
 
   assert.equal(results.length, 2);
   assert.ok(results.every((item) => item.type === 'spot'));
+});
+
+test('does not combine nearby records assigned to different polygon zones', () => {
+  const results = createParkingClusterEngine([
+    record({
+      id: 'a',
+      parkingZoneId: 'zone-a',
+      parkingZoneName: 'Zone A',
+    }),
+    record({
+      id: 'b',
+      latitude: 48.13511,
+      longitude: 11.58241,
+      parkingZoneId: 'zone-b',
+      parkingZoneName: 'Zone B',
+    }),
+  ]).getClusters(
+    {
+      minLng: 11.57,
+      minLat: 48.12,
+      maxLng: 11.59,
+      maxLat: 48.15,
+    },
+    12,
+  );
+
+  assert.equal(results.length, 2);
+  assert.deepEqual(
+    results.map((item) => item.zoneId).sort(),
+    ['zone-a', 'zone-b'],
+  );
+});
+
+test('clusters nearby records assigned to the same polygon zone', () => {
+  const results = createParkingClusterEngine([
+    record({
+      id: 'a',
+      parkingZoneId: 'zone-a',
+      parkingZoneName: 'Zone A',
+    }),
+    record({
+      id: 'b',
+      latitude: 48.13511,
+      longitude: 11.58241,
+      parkingZoneId: 'zone-a',
+      parkingZoneName: 'Zone A',
+    }),
+  ]).getClusters(
+    {
+      minLng: 11.57,
+      minLat: 48.12,
+      maxLng: 11.59,
+      maxLat: 48.15,
+    },
+    12,
+  );
+
+  assert.equal(results.length, 1);
+  assert.equal(results[0].type, 'cluster');
+  assert.equal(results[0].spotCount, 2);
+  assert.equal(results[0].zoneId, 'zone-a');
+  assert.equal(results[0].zoneName, 'Zone A');
 });
 
 test('keeps dense clustered viewports within the engine safety cap', () => {

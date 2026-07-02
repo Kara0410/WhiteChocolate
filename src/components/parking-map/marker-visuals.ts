@@ -21,11 +21,11 @@ export function getMarkerSizeTier(
 export function getMarkerDimensions(tier: MarkerSizeTier) {
   const base =
     tier === 'large'
-      ? { width: 70, height: 44, visualSize: 62 }
+      ? { width: 96, height: 44, visualSize: 88 }
       : tier === 'medium'
-        ? { width: 62, height: 42, visualSize: 54 }
+        ? { width: 90, height: 42, visualSize: 82 }
         : tier === 'small'
-          ? { width: 54, height: 40, visualSize: 46 }
+          ? { width: 84, height: 40, visualSize: 76 }
           : { width: 78, height: 50, visualSize: 68 };
   const width = base.width;
   const height = base.height;
@@ -37,6 +37,16 @@ export function getMarkerDimensions(tier: MarkerSizeTier) {
     height,
     glowPadding,
   };
+}
+
+export function formatSpotCount(count: number) {
+  const normalizedCount = Number.isFinite(count)
+    ? Math.max(0, Math.round(count))
+    : 0;
+  const displayedCount =
+    normalizedCount > 999 ? '999+' : String(normalizedCount);
+
+  return `${displayedCount} ${normalizedCount === 1 ? 'Spot' : 'Spots'}`;
 }
 
 export function displayZoneCount(zoneCount: number) {

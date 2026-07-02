@@ -2,7 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import type { ParkingZone } from '../src/types/parking-zone';
-import { parkingZonesToPolygons } from '../src/utils/parking-zones';
+import {
+  createParkingZoneMatcher,
+  isCoordinateInsidePolygon,
+  parkingZonesToPolygons,
+} from '../src/utils/parking-zones';
 
 function zone(geojson: unknown): ParkingZone {
   return {
@@ -63,4 +67,37 @@ test('ignores null, malformed, and unsupported geometry safely', () => {
   ]);
 
   assert.deepEqual(polygons, []);
+});
+
+test('matches points inside zones and treats polygon boundaries as contained', () => {
+  const polygon = [
+    { latitude: 48.1, longitude: 11.5 },
+    { latitude: 48.1, longitude: 11.6 },
+    { latitude: 48.2, longitude: 11.6 },
+    { latitude: 48.2, longitude: 11.5 },
+  ];
+  const matchZone = createParkingZoneMatcher([
+    {
+      id: 'zone-1:0',
+      zoneId: 'zone-1',
+      zoneName: 'Test zone',
+      coordinates: polygon,
+    },
+  ]);
+
+  assert.equal(
+    isCoordinateInsidePolygon(
+      { latitude: 48.15, longitude: 11.55 },
+      polygon,
+    ),
+    true,
+  );
+  assert.deepEqual(
+    matchZone({ latitude: 48.1, longitude: 11.55 }),
+    { zoneId: 'zone-1', zoneName: 'Test zone' },
+  );
+  assert.equal(
+    matchZone({ latitude: 48.3, longitude: 11.7 }),
+    null,
+  );
 });

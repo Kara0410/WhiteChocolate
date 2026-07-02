@@ -111,6 +111,7 @@ const GOOGLE_MAP_UI_SETTINGS = {
 
 const FULL_SHEET_RATIO = 0.5;
 const PROGRAMMATIC_CAMERA_GUARD_MS = 500;
+const INITIAL_CAMERA_SETTLE_MS = 750;
 const MAP_DRAG_SETTLE_MS = 180;
 const MARKER_MOVEMENT_SETTLE_MS = 150;
 const EMPTY_SEARCH_SPOTS: ParkingSpotWithDistance[] = [];
@@ -129,7 +130,7 @@ type ParkingMapProps = {
 };
 
 type ParkingSelectionSource = 'marker' | 'favorite' | 'search';
-type ParkingMapViewMode = 'munichOverview' | 'userLocation' | null;
+type ParkingMapMode = 'focusedArea' | 'munichOverview' | 'userLocation';
 
 type SelectParkingItemOptions = {
   source?: ParkingSelectionSource;
@@ -194,8 +195,9 @@ export function ParkingMap({
   const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
   const [isAutomaticParkingFetchEnabled, setAutomaticParkingFetchEnabled] =
     useState(false);
-  const [viewMode, setViewMode] =
-    useState<ParkingMapViewMode>('munichOverview');
+  const [mapMode, setMapMode] =
+    useState<ParkingMapMode>('munichOverview');
+  const { polygons: parkingZonePolygons } = useParkingZones();
   const {
     clearParkingData,
     currentRegion,
@@ -212,12 +214,14 @@ export function ParkingMap({
     destination,
     mapSize,
     isAutomaticParkingFetchEnabled,
+    parkingZonePolygons,
   );
-  const { polygons: parkingZonePolygons } = useParkingZones();
   const googleMapRef = useRef<GoogleMaps.MapView | null>(null);
   const appleMapRef = useRef<AppleMaps.MapView | null>(null);
   const bottomSheetRef = useRef<ParkingBottomSheetHandle>(null);
   const programmaticCameraTimerRef =
+    useRef<ReturnType<typeof setTimeout> | null>(null);
+  const initialCameraSettleTimerRef =
     useRef<ReturnType<typeof setTimeout> | null>(null);
   const mapDragSettleTimerRef =
     useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -230,6 +234,11 @@ export function ParkingMap({
       null,
     );
   const isProgrammaticCameraMoveRef = useRef(false);
+  const isInitialCameraSettledRef = useRef(false);
+  const lastCameraCommandRef = useRef<{
+    key: string;
+    startedAt: number;
+  } | null>(null);
   const isMapMovingRef = useRef(false);
   const hasCompactedForCurrentDragRef = useRef(false);
   const hasInitialCameraEventRef = useRef(false);
@@ -329,18 +338,20 @@ export function ParkingMap({
   const circularFilteredClusters = circleFilterResult.markers;
   const nativeZonePolygons = useMemo(
     () =>
-      parkingZonePolygons.map((polygon) => ({
-        id: polygon.id,
-        coordinates: polygon.coordinates,
-        color: '#2563EB20',
-        lineColor: '#1D4ED8B8',
-        lineWidth: 1,
-      })),
-    [parkingZonePolygons],
+      mapMode === 'munichOverview'
+        ? parkingZonePolygons.map((polygon) => ({
+            id: polygon.id,
+            coordinates: polygon.coordinates,
+            color: '#2563EB20',
+            lineColor: '#1D4ED8B8',
+            lineWidth: 1,
+          }))
+        : [],
+    [mapMode, parkingZonePolygons],
   );
 
   useEffect(() => {
-    if (!__DEV__) {
+    if (!__DEV__ || !isAutomaticParkingFetchEnabled) {
       return;
     }
 
@@ -381,6 +392,7 @@ export function ParkingMap({
     circleFilterResult.usedServerFallback,
     circularFilteredClusters.length,
     currentRegion,
+    isAutomaticParkingFetchEnabled,
     loadedRequestBounds,
     mapSize,
     visibleClusters,
@@ -404,16 +416,22 @@ export function ParkingMap({
     ],
   );
   const displayedMarkerItems = useMemo(
-    () =>
-      getDisplayedParkingMarkerItems(
+    () => {
+      if (mapMode === 'munichOverview') {
+        return [];
+      }
+
+      return getDisplayedParkingMarkerItems(
         densityFilteredMarkers,
         selectedParkingItem,
         selectedSearchPlace !== null ? nearestSearchSpots : null,
         activeOverlay !== 'none',
-      ),
+      );
+    },
     [
       activeOverlay,
       densityFilteredMarkers,
+      mapMode,
       nearestSearchSpots,
       selectedParkingItem,
       selectedSearchPlace,
@@ -515,6 +533,7 @@ export function ParkingMap({
 
   const projectedUserLocation = useMemo(() => {
     if (
+      mapMode === 'munichOverview' ||
       userLocation == null ||
       !hasValidParkingCoordinates(userLocation) ||
       mapSize.width <= 0 ||
@@ -539,7 +558,7 @@ export function ParkingMap({
     }
 
     return position;
-  }, [displayCamera, mapSize.height, mapSize.width, userLocation]);
+  }, [displayCamera, mapMode, mapSize.height, mapSize.width, userLocation]);
 
   const canFocusCamera = useCallback(
     () =>
@@ -568,6 +587,39 @@ export function ParkingMap({
       favoriteFocusInteractionRef.current = null;
     }
   }, []);
+
+  const beginProgrammaticCameraMove = useCallback(
+    (coordinates: ParkingCoordinates, zoom: number) => {
+      const key = [
+        coordinates.latitude.toFixed(6),
+        coordinates.longitude.toFixed(6),
+        zoom.toFixed(2),
+      ].join(':');
+      const now = Date.now();
+      const lastCommand = lastCameraCommandRef.current;
+
+      if (
+        isProgrammaticCameraMoveRef.current &&
+        lastCommand?.key === key &&
+        now - lastCommand.startedAt < PROGRAMMATIC_CAMERA_GUARD_MS
+      ) {
+        return false;
+      }
+
+      lastCameraCommandRef.current = { key, startedAt: now };
+      isProgrammaticCameraMoveRef.current = true;
+      if (programmaticCameraTimerRef.current) {
+        clearTimeout(programmaticCameraTimerRef.current);
+      }
+      programmaticCameraTimerRef.current = setTimeout(() => {
+        isProgrammaticCameraMoveRef.current = false;
+        programmaticCameraTimerRef.current = null;
+      }, PROGRAMMATIC_CAMERA_GUARD_MS);
+
+      return true;
+    },
+    [],
+  );
 
   const focusMarkerAboveSheetSafely = useCallback(
     (
@@ -610,14 +662,14 @@ export function ParkingMap({
         zoom: displayCamera.zoom,
       };
 
-      isProgrammaticCameraMoveRef.current = true;
-      if (programmaticCameraTimerRef.current) {
-        clearTimeout(programmaticCameraTimerRef.current);
+      if (
+        !beginProgrammaticCameraMove(
+          nextCamera.coordinates,
+          nextCamera.zoom,
+        )
+      ) {
+        return;
       }
-      programmaticCameraTimerRef.current = setTimeout(() => {
-        isProgrammaticCameraMoveRef.current = false;
-        programmaticCameraTimerRef.current = null;
-      }, PROGRAMMATIC_CAMERA_GUARD_MS);
 
       try {
         const cameraUpdate =
@@ -651,6 +703,7 @@ export function ParkingMap({
     },
     [
       canFocusCamera,
+      beginProgrammaticCameraMove,
       displayCamera.latitudeDelta,
       displayCamera.longitudeDelta,
       displayCamera.zoom,
@@ -679,9 +732,6 @@ export function ParkingMap({
         return;
       }
 
-      const startedAtVersion = loadedRequestVersion;
-      const key = requestParkingForCamera(searchCamera);
-      setSearchParkingRequest({ key, startedAtVersion });
       const nextCamera = {
         coordinates: {
           latitude: searchCamera.latitude,
@@ -690,14 +740,18 @@ export function ParkingMap({
         zoom: searchCamera.zoom,
       };
 
-      isProgrammaticCameraMoveRef.current = true;
-      if (programmaticCameraTimerRef.current) {
-        clearTimeout(programmaticCameraTimerRef.current);
+      if (
+        !beginProgrammaticCameraMove(
+          nextCamera.coordinates,
+          nextCamera.zoom,
+        )
+      ) {
+        return;
       }
-      programmaticCameraTimerRef.current = setTimeout(() => {
-        isProgrammaticCameraMoveRef.current = false;
-        programmaticCameraTimerRef.current = null;
-      }, PROGRAMMATIC_CAMERA_GUARD_MS);
+
+      const startedAtVersion = loadedRequestVersion;
+      const key = requestParkingForCamera(searchCamera);
+      setSearchParkingRequest({ key, startedAtVersion });
 
       try {
         const cameraUpdate =
@@ -720,6 +774,7 @@ export function ParkingMap({
       }
     },
     [
+      beginProgrammaticCameraMove,
       canFocusCamera,
       loadedRequestVersion,
       mapSize,
@@ -753,14 +808,9 @@ export function ParkingMap({
         tilt: 0,
       };
 
-      isProgrammaticCameraMoveRef.current = true;
-      if (programmaticCameraTimerRef.current) {
-        clearTimeout(programmaticCameraTimerRef.current);
+      if (!beginProgrammaticCameraMove(coordinates, zoom)) {
+        return;
       }
-      programmaticCameraTimerRef.current = setTimeout(() => {
-        isProgrammaticCameraMoveRef.current = false;
-        programmaticCameraTimerRef.current = null;
-      }, PROGRAMMATIC_CAMERA_GUARD_MS);
 
       try {
         const cameraUpdate =
@@ -778,7 +828,7 @@ export function ParkingMap({
         }
       }
     },
-    [canFocusCamera],
+    [beginProgrammaticCameraMove, canFocusCamera],
   );
 
   const selectParkingItem = useCallback(
@@ -789,7 +839,7 @@ export function ParkingMap({
       const { source = 'marker' } = options;
       const focusCamera = options.focusCamera ?? true;
 
-      setViewMode(null);
+      setMapMode('focusedArea');
       setSelectedParkingItem(item);
       if (!focusCamera) {
         cancelPendingCameraFocus();
@@ -832,10 +882,11 @@ export function ParkingMap({
         return;
       }
 
-      setViewMode(null);
+      setMapMode('focusedArea');
       setAutomaticParkingFetchEnabled(true);
       setSelectedParkingItem(null);
       cancelPendingCameraFocus();
+      clearParkingData();
       setSearchParkingRequest(null);
       setSearchSpotsSnapshot(null);
       setSelectedSearchPlace(place);
@@ -846,6 +897,7 @@ export function ParkingMap({
     },
     [
       cancelPendingCameraFocus,
+      clearParkingData,
       focusCoordinatesAboveSheetSafely,
     ],
   );
@@ -891,7 +943,8 @@ export function ParkingMap({
       coordinates &&
       requestId === locationActionRequestIdRef.current
     ) {
-      setViewMode('userLocation');
+      clearParkingData();
+      setMapMode('userLocation');
       setAutomaticParkingFetchEnabled(true);
       requestParkingForCamera({
         ...coordinates,
@@ -903,6 +956,7 @@ export function ParkingMap({
       );
     }
   }, [
+    clearParkingData,
     focusLocationSafely,
     isLocationLoading,
     onRequestUserLocation,
@@ -913,7 +967,7 @@ export function ParkingMap({
   const handleMunichOverviewPress = useCallback(() => {
     prepareForLocationFocus();
     locationActionRequestIdRef.current += 1;
-    setViewMode('munichOverview');
+    setMapMode('munichOverview');
     setAutomaticParkingFetchEnabled(false);
     clearParkingData();
     focusLocationSafely(
@@ -970,12 +1024,13 @@ export function ParkingMap({
 
   const handleCameraMove = useCallback(
     (event: Parameters<typeof onCameraMove>[0]) => {
-      onCameraMove(event);
+      onCameraMove(event, !isProgrammaticCameraMoveRef.current);
       if (
         hasInitialCameraEventRef.current &&
+        isInitialCameraSettledRef.current &&
         !isProgrammaticCameraMoveRef.current
       ) {
-        setViewMode(null);
+        setMapMode('focusedArea');
         setAutomaticParkingFetchEnabled(true);
       }
       if (!isMapMovingRef.current) {
@@ -994,6 +1049,10 @@ export function ParkingMap({
       if (!hasInitialCameraEventRef.current) {
         hasInitialCameraEventRef.current = true;
         setHasInitialCameraEvent(true);
+        initialCameraSettleTimerRef.current = setTimeout(() => {
+          isInitialCameraSettledRef.current = true;
+          initialCameraSettleTimerRef.current = null;
+        }, INITIAL_CAMERA_SETTLE_MS);
       }
 
       if (isProgrammaticCameraMoveRef.current || selectedParkingItem === null) {
@@ -1020,6 +1079,9 @@ export function ParkingMap({
     () => () => {
       if (programmaticCameraTimerRef.current) {
         clearTimeout(programmaticCameraTimerRef.current);
+      }
+      if (initialCameraSettleTimerRef.current) {
+        clearTimeout(initialCameraSettleTimerRef.current);
       }
       if (mapDragSettleTimerRef.current) {
         clearTimeout(mapDragSettleTimerRef.current);
@@ -1313,7 +1375,7 @@ export function ParkingMap({
             accessibilityLabel="Center map on current location"
             accessibilityRole="button"
             accessibilityState={{
-              selected: viewMode === 'userLocation',
+              selected: mapMode === 'userLocation',
             }}
             className="h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white active:bg-slate-100"
             disabled={isLocationLoading}
@@ -1331,7 +1393,7 @@ export function ParkingMap({
             accessibilityLabel="Show Munich parking zone overview"
             accessibilityRole="button"
             accessibilityState={{
-              selected: viewMode === 'munichOverview',
+              selected: mapMode === 'munichOverview',
             }}
             className="h-12 w-12 items-center justify-center rounded-full border border-blue-200 bg-blue-50 active:bg-blue-100"
             onPress={handleMunichOverviewPress}

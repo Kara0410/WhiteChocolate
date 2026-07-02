@@ -1,11 +1,16 @@
 import { supabase } from '@/lib/supabase';
 import type { ParkingBoundingBox } from '@/types/parking-map';
 import type { ParkingSegment } from '@/types/parking-segment';
-import { parkingSegmentFromRow } from '@/utils/parking-segments';
+import {
+  getParkingSegmentPageRange,
+  parkingSegmentFromRow,
+  type ParkingSegmentSelectRow,
+} from '@/utils/parking-segments';
 
 const PARKING_SEGMENT_COLUMNS =
   'id,strasse,angebot,parkregel_beschreibung,parkregel_gruppe,parkregel_name,prm_name,geoportal_class,lat,lon';
 const MAX_SEGMENTS_PER_REQUEST = 2_000;
+const SEGMENT_PAGE_SIZE = 1_000;
 const QUERY_TIMEOUT_MS = 10_000;
 
 async function withQueryTimeout<T>(
@@ -34,27 +39,45 @@ async function withQueryTimeout<T>(
 }
 
 export async function fetchParkingSegments(bounds: ParkingBoundingBox) {
-  const query = supabase
-    .from('parking_segments')
-    .select(PARKING_SEGMENT_COLUMNS)
-    .not('lat', 'is', null)
-    .not('lon', 'is', null)
-    .gte('lat', bounds.minLat)
-    .lte('lat', bounds.maxLat)
-    .gte('lon', bounds.minLng)
-    .lte('lon', bounds.maxLng)
-    .order('id')
-    .limit(MAX_SEGMENTS_PER_REQUEST + 1);
+  const rows: ParkingSegmentSelectRow[] = [];
+  const rowLimitWithOverflow = MAX_SEGMENTS_PER_REQUEST + 1;
 
-  const { data, error } = await withQueryTimeout(async (signal) =>
-    query.abortSignal(signal),
-  );
+  while (rows.length < rowLimitWithOverflow) {
+    const pageRange = getParkingSegmentPageRange(
+      rows.length,
+      rowLimitWithOverflow,
+      SEGMENT_PAGE_SIZE,
+    );
+    if (pageRange === null) {
+      break;
+    }
+    const pageSize = pageRange.to - pageRange.from + 1;
+    const { data, error } = await withQueryTimeout(async (signal) =>
+      supabase
+        .from('parking_segments')
+        .select(PARKING_SEGMENT_COLUMNS)
+        .not('lat', 'is', null)
+        .not('lon', 'is', null)
+        .gte('lat', bounds.minLat)
+        .lte('lat', bounds.maxLat)
+        .gte('lon', bounds.minLng)
+        .lte('lon', bounds.maxLng)
+        .order('id')
+        .range(pageRange.from, pageRange.to)
+        .abortSignal(signal),
+    );
 
-  if (error) {
-    throw new Error(`Unable to fetch parking segments: ${error.message}`);
+    if (error) {
+      throw new Error(`Unable to fetch parking segments: ${error.message}`);
+    }
+
+    const page = data ?? [];
+    rows.push(...page);
+    if (page.length < pageSize) {
+      break;
+    }
   }
 
-  const rows = data ?? [];
   const segments = rows
     .slice(0, MAX_SEGMENTS_PER_REQUEST)
     .map(parkingSegmentFromRow)

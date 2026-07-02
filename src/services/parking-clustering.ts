@@ -36,6 +36,19 @@ type ParkingClusterProperties = {
   bestSpot: ParkingBestSpot;
 };
 
+type ParkingClusterGroup = {
+  key: string;
+  records: ParkingMapRecord[];
+  zoneId: string | null;
+  zoneName: string | null;
+};
+
+type ParkingClusterGroupIndex = Omit<ParkingClusterGroup, 'records'> & {
+  index: Supercluster<ParkingPointProperties, ParkingClusterProperties>;
+};
+
+const OUTSIDE_ZONE_GROUP = '__outside_munich_parking_zones__';
+
 /**
  * Supercluster measures radius in screen pixels. Combined with Web Mercator
  * zoom, these buckets approximate how people make parking decisions:
@@ -60,7 +73,7 @@ export function getClusterRadiusForZoom(zoom: number): RadiusBucket {
 function toBestSpot(record: ParkingMapRecord): ParkingBestSpot {
   return {
     id: record.id,
-    zoneName: record.zoneName,
+    zoneName: record.parkingZoneName ?? record.zoneName,
     availableSpots: record.available,
     availabilityPercent: record.availabilityPercent,
     pricePerHour: record.pricePerHour,
@@ -111,7 +124,8 @@ function createIndex(records: ParkingMapRecord[], radius: RadiusBucket) {
         weightedLatitude: record.latitude * coordinateWeight,
         weightedLongitude: record.longitude * coordinateWeight,
         coordinateWeight,
-        zoneIds: [record.zoneId],
+        zoneIds:
+          record.parkingZoneId === null ? [] : [record.parkingZoneId],
         bestSpot: toBestSpot(record),
       };
     },
@@ -177,6 +191,8 @@ export function parkingRecordToResponse(
     minPrice: record.pricePerHour,
     avgPrice: record.pricePerHour,
     bestSpot: toBestSpot(record),
+    zoneId: record.parkingZoneId,
+    zoneName: record.parkingZoneName,
     ...destinationMetadata(record.latitude, record.longitude, destination),
   };
 }
@@ -185,6 +201,7 @@ function clusterToResponse(
   index: Supercluster<ParkingPointProperties, ParkingClusterProperties>,
   radius: RadiusBucket,
   feature: Supercluster.ClusterFeature<ParkingClusterProperties>,
+  group: Pick<ParkingClusterGroup, 'key' | 'zoneId' | 'zoneName'>,
   destination?: ParkingCoordinates,
 ): ParkingClusterResponse {
   const properties = feature.properties;
@@ -200,7 +217,7 @@ function clusterToResponse(
         );
 
   return {
-    id: `cluster:r${radius}:${properties.cluster_id}`,
+    id: `cluster:${group.key}:r${radius}:${properties.cluster_id}`,
     type: 'cluster',
     latitude,
     longitude,
@@ -218,6 +235,8 @@ function clusterToResponse(
         : Math.round((properties.priceSum / properties.pricedCount) * 100) /
           100,
     bestSpot: properties.bestSpot,
+    zoneId: group.zoneId,
+    zoneName: group.zoneName,
     expansionZoom: index.getClusterExpansionZoom(properties.cluster_id),
     ...destinationMetadata(latitude, longitude, destination),
   };
@@ -234,11 +253,51 @@ function isClusterFeature(
 }
 
 export function createParkingClusterEngine(records: ParkingMapRecord[]) {
-  const indexes = new Map(
-    RADIUS_BUCKETS.map(
-      (radius) => [radius, createIndex(records, radius)] as const,
-    ),
-  );
+  /*
+   * Clustering pipeline:
+   * 1. use only records returned for the current bbox/camera circle;
+   * 2. assign those records to real Munich polygon zones before this service;
+   * 3. run Supercluster independently per zone using zoom-based pixel radii;
+   * 4. let the map's circle and screen-collision passes limit final overlays.
+   *
+   * Separate zone indexes prevent a visual cluster from spanning two license
+   * zones while preserving the existing spot response and press behavior.
+   * Records outside every polygon share one fallback spatial group.
+   */
+  const groupedRecords = new Map<string, ParkingClusterGroup>();
+  for (const record of records) {
+    const key = record.parkingZoneId ?? OUTSIDE_ZONE_GROUP;
+    const existing = groupedRecords.get(key);
+    if (existing) {
+      existing.records.push(record);
+    } else {
+      groupedRecords.set(key, {
+        key,
+        records: [record],
+        zoneId: record.parkingZoneId,
+        zoneName: record.parkingZoneName,
+      });
+    }
+  }
+
+  const indexes = new Map<RadiusBucket, ParkingClusterGroupIndex[]>();
+  const getIndexes = (radius: RadiusBucket) => {
+    const cached = indexes.get(radius);
+    if (cached) {
+      return cached;
+    }
+
+    const created = [...groupedRecords.values()].map(
+      ({ key, records: groupRecords, zoneId, zoneName }) => ({
+        key,
+        zoneId,
+        zoneName,
+        index: createIndex(groupRecords, radius),
+      }),
+    );
+    indexes.set(radius, created);
+    return created;
+  };
 
   return {
     getClusters(
@@ -254,26 +313,38 @@ export function createParkingClusterEngine(records: ParkingMapRecord[]) {
         bbox.maxLat,
       ];
       let radius = baseRadius;
-      let index = indexes.get(radius)!;
-      let features = index.getClusters(clusterBbox, Math.round(zoom));
+      let groupFeatures = getIndexes(radius).flatMap((group) =>
+        group.index
+          .getClusters(clusterBbox, Math.round(zoom))
+          .map((feature) => ({ feature, group })),
+      );
 
       // Dense central areas still need a safety cap, but the overlay density
       // pass now handles the final visible marker count for compact pills.
       for (const candidateRadius of RADIUS_BUCKETS) {
         if (
           candidateRadius <= baseRadius ||
-          features.length <= MAX_VISIBLE_MARKERS
+          groupFeatures.length <= MAX_VISIBLE_MARKERS
         ) {
           continue;
         }
         radius = candidateRadius;
-        index = indexes.get(radius)!;
-        features = index.getClusters(clusterBbox, Math.round(zoom));
+        groupFeatures = getIndexes(radius).flatMap((group) =>
+          group.index
+            .getClusters(clusterBbox, Math.round(zoom))
+            .map((feature) => ({ feature, group })),
+        );
       }
 
-      return features.map((feature) =>
+      return groupFeatures.map(({ feature, group }) =>
         isClusterFeature(feature)
-          ? clusterToResponse(index, radius, feature, destination)
+          ? clusterToResponse(
+              group.index,
+              radius,
+              feature,
+              group,
+              destination,
+            )
           : parkingRecordToResponse(feature.properties.record, destination),
       );
     },

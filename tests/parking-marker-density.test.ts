@@ -12,7 +12,10 @@ import {
   selectSpatiallySeparatedMarkers,
 } from '../src/components/parking-map/marker-density';
 import { getAvailabilityStatus } from '../src/components/parking-map/parking-availability-status';
-import { getMarkerDimensions } from '../src/components/parking-map/marker-visuals';
+import {
+  formatSpotCount,
+  getMarkerDimensions,
+} from '../src/components/parking-map/marker-visuals';
 import type { ParkingClusterResponse } from '../src/types/parking-map';
 import {
   createBufferedViewportBounds,
@@ -51,6 +54,13 @@ function marker(
     },
   };
 }
+
+test('formats cluster labels with singular, plural, and a readable cap', () => {
+  assert.equal(formatSpotCount(1), '1 Spot');
+  assert.equal(formatSpotCount(2), '2 Spots');
+  assert.equal(formatSpotCount(99), '99 Spots');
+  assert.equal(formatSpotCount(1_500), '999+ Spots');
+});
 
 test('validates user coordinates before map projection', () => {
   assert.equal(
@@ -317,15 +327,18 @@ test('maps percentage thresholds to availability status', () => {
   assert.equal(getAvailabilityStatus(0), 'low');
 });
 
-test('uses compact pill canvases with room for selection effects', () => {
+test('uses readable spot-count pills with room for selection effects', () => {
   assert.equal(getMarkerDimensions('spot').visualSize, 68);
   assert.equal(getMarkerDimensions('spot').width, 78);
   assert.equal(getMarkerDimensions('spot').height, 50);
-  assert.equal(getMarkerDimensions('small').visualSize, 46);
+  assert.equal(getMarkerDimensions('small').visualSize, 76);
+  assert.equal(getMarkerDimensions('small').width, 84);
   assert.equal(getMarkerDimensions('small').height, 40);
-  assert.equal(getMarkerDimensions('medium').visualSize, 54);
+  assert.equal(getMarkerDimensions('medium').visualSize, 82);
+  assert.equal(getMarkerDimensions('medium').width, 90);
   assert.equal(getMarkerDimensions('medium').height, 42);
-  assert.equal(getMarkerDimensions('large').visualSize, 62);
+  assert.equal(getMarkerDimensions('large').visualSize, 88);
+  assert.equal(getMarkerDimensions('large').width, 96);
   assert.equal(getMarkerDimensions('large').height, 44);
 });
 
