@@ -151,6 +151,14 @@ const SEARCH_HIGHLIGHTED_MARKER_LIMIT = 3;
  * on pan; this is the only way to re-run them for a new area.
  */
 const SEARCH_AREA_REFRESH_DISTANCE_METERS = 600;
+/**
+ * Fallback acceptance for search results: if any loaded spot is this close
+ * to the destination, the loaded data is usable for recommendations even
+ * when request-key bookkeeping was bypassed (the clustering hook silently
+ * drops a fetch that was deduped or superseded, so waiting on an exact key
+ * can otherwise hang the sheet in its loading state forever).
+ */
+const SEARCH_FALLBACK_ACCEPT_RADIUS_METERS = 1200;
 
 const DETAIL_LAYER_ENTERING = FadeIn.duration(180).reduceMotion(
   ReduceMotion.System,
@@ -341,39 +349,101 @@ export function ParkingMap({
   const lastSearchSelectionIdRef = useRef<number | null>(null);
   const lastLocationFocusKeyRef = useRef<string | null>(null);
   useEffect(() => {
-    if (selectedSearchPlace === null || searchParkingRequest === null) {
+    if (selectedSearchPlace === null) {
       return;
     }
 
-    const snapshotIsCurrent =
+    const activeRequestKey = searchParkingRequest?.key ?? null;
+    const snapshotMatchesPlace =
       searchSpotsSnapshot !== null &&
-      searchSpotsSnapshot.placeId === selectedSearchPlace.placeId &&
-      searchSpotsSnapshot.requestKey === searchParkingRequest.key;
-    if (snapshotIsCurrent) {
+      searchSpotsSnapshot.placeId === selectedSearchPlace.placeId;
+    // Once a snapshot exists for the active request, panning never
+    // recomputes it; only a new request key ("Search this area") or a new
+    // place invalidates it.
+    const snapshotSatisfiesActiveRequest =
+      snapshotMatchesPlace &&
+      (activeRequestKey === null ||
+        searchSpotsSnapshot.requestKey === activeRequestKey);
+    if (snapshotSatisfiesActiveRequest) {
       return;
     }
 
     const loadedExpectedRequest =
-      loadedRequestKey === searchParkingRequest.key;
+      activeRequestKey !== null && loadedRequestKey === activeRequestKey;
     const loadedEquivalentCameraArea =
+      searchParkingRequest !== null &&
       loadedRequestVersion > searchParkingRequest.startedAtVersion &&
       loadedRequestBounds !== null &&
       isCoordinateInsideBounds(selectedSearchPlace, loadedRequestBounds);
-    if (!loadedExpectedRequest && !loadedEquivalentCameraArea) {
+    // Last resort: usable data near the destination always resolves the
+    // search, because the clustering hook can silently drop the tracked
+    // fetch (dedupe/supersede) and neither condition above would ever pass.
+    const hasSpotsNearDestination =
+      visibleSpots.length > 0 &&
+      visibleSpots.some(
+        (spot) =>
+          haversineDistanceMeters(spot, selectedSearchPlace) <=
+          SEARCH_FALLBACK_ACCEPT_RADIUS_METERS,
+      );
+
+    if (
+      !loadedExpectedRequest &&
+      !loadedEquivalentCameraArea &&
+      !hasSpotsNearDestination
+    ) {
+      if (__DEV__) {
+        // Temporary diagnostics for the stuck "Finding nearby spots" state.
+        console.debug('[parking-map] Search snapshot waiting', {
+          loadedBoundsExist: loadedRequestBounds !== null,
+          loadedRequestKey,
+          loadedRequestVersion,
+          placeId: selectedSearchPlace.placeId,
+          placeInsideLoadedBounds:
+            loadedRequestBounds !== null &&
+            isCoordinateInsideBounds(selectedSearchPlace, loadedRequestBounds),
+          reason:
+            searchParkingRequest === null
+              ? 'no active parking request yet'
+              : loadedRequestVersion <= searchParkingRequest.startedAtVersion
+                ? 'no fetch completed since the search started'
+                : 'loaded data does not cover the destination',
+          searchRequestKey: activeRequestKey,
+          startedAtVersion: searchParkingRequest?.startedAtVersion ?? null,
+          visibleSpots: visibleSpots.length,
+        });
+      }
       return;
     }
 
+    const curatedNearbyResults = getCuratedNearbyParkingSpots({
+      origin: {
+        latitude: selectedSearchPlace.latitude,
+        longitude: selectedSearchPlace.longitude,
+      },
+      spots: visibleSpots,
+      limit: SEARCH_NEARBY_RESULT_LIMIT,
+    });
+
+    if (__DEV__) {
+      // Temporary diagnostics for the stuck "Finding nearby spots" state.
+      console.debug('[parking-map] Search snapshot created', {
+        acceptedBy: loadedExpectedRequest
+          ? 'exact request key'
+          : loadedEquivalentCameraArea
+            ? 'equivalent camera area'
+            : 'spots near destination',
+        curatedNearbyResults: curatedNearbyResults.length,
+        placeId: selectedSearchPlace.placeId,
+        visibleSpots: visibleSpots.length,
+      });
+    }
+
+    // An empty curated list still becomes a snapshot: the sheet must show
+    // its real empty state instead of loading forever.
     setSearchSpotsSnapshot({
       placeId: selectedSearchPlace.placeId,
-      requestKey: searchParkingRequest.key,
-      spots: getCuratedNearbyParkingSpots({
-        origin: {
-          latitude: selectedSearchPlace.latitude,
-          longitude: selectedSearchPlace.longitude,
-        },
-        spots: visibleSpots,
-        limit: SEARCH_NEARBY_RESULT_LIMIT,
-      }),
+      requestKey: activeRequestKey ?? `loaded:v${loadedRequestVersion}`,
+      spots: curatedNearbyResults,
     });
   }, [
     loadedRequestBounds,
