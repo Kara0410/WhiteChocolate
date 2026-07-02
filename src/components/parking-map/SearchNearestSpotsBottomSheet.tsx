@@ -1,9 +1,9 @@
-import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import BottomSheet, {
   BottomSheetFlatList,
   useBottomSheetSpringConfigs,
 } from '@gorhom/bottom-sheet';
-import { MapPin, Navigation, X } from 'lucide-react-native';
+import { ChevronDown, ChevronUp, MapPin, Navigation, X } from 'lucide-react-native';
 import {
   ActivityIndicator,
   Pressable,
@@ -34,6 +34,11 @@ type SearchNearestSpotsBottomSheetProps = {
   onClose: () => void;
   onSpotPress: (spot: ParkingClusterResponse) => void;
 };
+
+/** Curated first page: enough to choose from without overwhelming. */
+const INITIAL_VISIBLE_RESULTS = 5;
+/** Hard cap for the expanded list; the rest stays available on the map flow. */
+const EXPANDED_VISIBLE_RESULTS = 12;
 
 const RING_SIZE = 42;
 const RING_STROKE = 5;
@@ -142,6 +147,7 @@ function SearchNearestSpotsBottomSheetComponent({
   const sheetRef = useRef<BottomSheet>(null);
   const insets = useSafeAreaInsets();
   const snapPoints = useMemo(() => ['18%', '50%'], []);
+  const [isExpandedNearbyList, setIsExpandedNearbyList] = useState(false);
   const animationConfigs = useBottomSheetSpringConfigs({
     damping: 32,
     mass: 0.9,
@@ -150,6 +156,7 @@ function SearchNearestSpotsBottomSheetComponent({
   });
 
   useEffect(() => {
+    setIsExpandedNearbyList(false);
     if (searchPlace) {
       sheetRef.current?.snapToIndex(1);
       return;
@@ -157,6 +164,27 @@ function SearchNearestSpotsBottomSheetComponent({
 
     sheetRef.current?.close();
   }, [searchPlace]);
+
+  const visibleSheetResults = useMemo(
+    () =>
+      spots.slice(
+        0,
+        isExpandedNearbyList
+          ? EXPANDED_VISIBLE_RESULTS
+          : INITIAL_VISIBLE_RESULTS,
+      ),
+    [isExpandedNearbyList, spots],
+  );
+  const hiddenResultCount = Math.max(
+    0,
+    Math.min(spots.length, EXPANDED_VISIBLE_RESULTS) -
+      visibleSheetResults.length,
+  );
+  const canToggleResultCount = spots.length > INITIAL_VISIBLE_RESULTS;
+
+  const toggleExpandedResults = useCallback(() => {
+    setIsExpandedNearbyList((current) => !current);
+  }, []);
 
   const closeSheet = useCallback(() => {
     sheetRef.current?.close();
@@ -205,6 +233,11 @@ function SearchNearestSpotsBottomSheetComponent({
                 {searchPlace?.address ?? searchPlace?.title ?? 'Selected place'}
               </Text>
             </View>
+            {spots.length > 0 ? (
+              <Text className="mt-1 text-[12px] font-medium text-slate-400">
+                Showing the closest recommended spots
+              </Text>
+            ) : null}
           </View>
           <Pressable
             accessibilityLabel="Close nearest spots"
@@ -224,10 +257,46 @@ function SearchNearestSpotsBottomSheetComponent({
           styles.listContent,
           { paddingBottom: Math.max(insets.bottom, 10) + 118 },
         ]}
-        data={spots}
+        data={visibleSheetResults}
         initialNumToRender={8}
         keyExtractor={(item) => item.id}
         keyboardShouldPersistTaps="handled"
+        ListFooterComponent={
+          canToggleResultCount ? (
+            <Pressable
+              accessibilityLabel={
+                isExpandedNearbyList
+                  ? 'Show fewer nearby spots'
+                  : 'Show more nearby spots'
+              }
+              accessibilityRole="button"
+              className="mt-1 flex-row items-center justify-center rounded-3xl border border-slate-200 bg-white px-4 py-3.5 active:bg-slate-50"
+              onPress={toggleExpandedResults}
+              style={styles.row}
+            >
+              <Text className="text-[14px] font-bold text-blue-700">
+                {isExpandedNearbyList
+                  ? 'Show less'
+                  : `Show more nearby spots (${hiddenResultCount})`}
+              </Text>
+              {isExpandedNearbyList ? (
+                <ChevronUp
+                  color="#1D4ED8"
+                  size={16}
+                  strokeWidth={2.6}
+                  style={styles.toggleIcon}
+                />
+              ) : (
+                <ChevronDown
+                  color="#1D4ED8"
+                  size={16}
+                  strokeWidth={2.6}
+                  style={styles.toggleIcon}
+                />
+              )}
+            </Pressable>
+          ) : null
+        }
         ListEmptyComponent={
           <View className="items-center justify-center rounded-[28px] border border-dashed border-slate-300 bg-white/80 px-6 py-10">
             {isLoading ? (
@@ -291,5 +360,8 @@ const styles = StyleSheet.create({
     boxShadow: '0 -4px 14px rgba(0,0,0,0.1)',
     elevation: MAP_ELEVATIONS.bottomSheet,
     zIndex: MAP_LAYERS.bottomSheet,
+  },
+  toggleIcon: {
+    marginLeft: 6,
   },
 });

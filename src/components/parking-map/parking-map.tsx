@@ -14,6 +14,7 @@ import Animated, {
   FadeIn,
   FadeOut,
   ReduceMotion,
+  ZoomIn,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -62,6 +63,7 @@ import type {
 import {
   createParkingSearchFocusCamera,
   hasValidParkingCoordinates,
+  haversineDistanceMeters,
   isCoordinateInsideBounds,
 } from '@/utils/parking-map-geo';
 import {
@@ -70,7 +72,8 @@ import {
   type ParkingZoneSummary,
 } from '@/utils/parking-zones';
 import {
-  getNearestParkingSpots,
+  getCuratedNearbyParkingSpots,
+  SEARCH_NEARBY_RESULT_LIMIT,
   type ParkingSpotWithDistance,
 } from '@/utils/parkingSearch';
 
@@ -140,11 +143,25 @@ const MAP_DRAG_SETTLE_MS = 180;
 const MARKER_MOVEMENT_SETTLE_MS = 150;
 const EMPTY_SEARCH_SPOTS: ParkingSpotWithDistance[] = [];
 const EMPTY_ZONE_SUMMARIES: ParkingZoneSummary[] = [];
+/** Only the top recommendations get map markers in active search mode. */
+const SEARCH_HIGHLIGHTED_MARKER_LIMIT = 3;
+/**
+ * How far the camera centre must drift from the searched destination before
+ * the "Search this area" action appears. Nearby results never auto-refresh
+ * on pan; this is the only way to re-run them for a new area.
+ */
+const SEARCH_AREA_REFRESH_DISTANCE_METERS = 600;
 
 const DETAIL_LAYER_ENTERING = FadeIn.duration(180).reduceMotion(
   ReduceMotion.System,
 );
 const DETAIL_LAYER_EXITING = FadeOut.duration(140).reduceMotion(
+  ReduceMotion.System,
+);
+const SEARCH_MARKER_ENTERING = ZoomIn.duration(180)
+  .withInitialValues({ opacity: 0, transform: [{ scale: 0.92 }] })
+  .reduceMotion(ReduceMotion.System);
+const SEARCH_MARKER_EXITING = FadeOut.duration(140).reduceMotion(
   ReduceMotion.System,
 );
 
@@ -177,6 +194,10 @@ type CameraFocusOptions = {
 
 type SearchSpotsSnapshot = {
   placeId: string;
+  /** Parking request the snapshot was computed for; a new key (e.g. from
+   * "Search this area") invalidates the snapshot without dropping it, so
+   * old results stay visible until the replacement set is ready. */
+  requestKey: string;
   spots: ParkingSpotWithDistance[];
 };
 
@@ -320,11 +341,15 @@ export function ParkingMap({
   const lastSearchSelectionIdRef = useRef<number | null>(null);
   const lastLocationFocusKeyRef = useRef<string | null>(null);
   useEffect(() => {
-    if (
-      selectedSearchPlace === null ||
-      searchParkingRequest === null ||
-      searchSpotsSnapshot?.placeId === selectedSearchPlace.placeId
-    ) {
+    if (selectedSearchPlace === null || searchParkingRequest === null) {
+      return;
+    }
+
+    const snapshotIsCurrent =
+      searchSpotsSnapshot !== null &&
+      searchSpotsSnapshot.placeId === selectedSearchPlace.placeId &&
+      searchSpotsSnapshot.requestKey === searchParkingRequest.key;
+    if (snapshotIsCurrent) {
       return;
     }
 
@@ -340,13 +365,14 @@ export function ParkingMap({
 
     setSearchSpotsSnapshot({
       placeId: selectedSearchPlace.placeId,
-      spots: getNearestParkingSpots({
+      requestKey: searchParkingRequest.key,
+      spots: getCuratedNearbyParkingSpots({
         origin: {
           latitude: selectedSearchPlace.latitude,
           longitude: selectedSearchPlace.longitude,
         },
         spots: visibleSpots,
-        limit: 25,
+        limit: SEARCH_NEARBY_RESULT_LIMIT,
       }),
     });
   }, [
@@ -354,11 +380,12 @@ export function ParkingMap({
     loadedRequestKey,
     loadedRequestVersion,
     searchParkingRequest,
-    searchSpotsSnapshot?.placeId,
+    searchSpotsSnapshot,
     selectedSearchPlace,
     visibleSpots,
   ]);
 
+  // Full ranked result set for the bottom sheet (curated, max 25).
   const nearestSearchSpots =
     selectedSearchPlace !== null &&
     searchSpotsSnapshot?.placeId === selectedSearchPlace.placeId
@@ -367,6 +394,46 @@ export function ParkingMap({
   const isSearchParkingLoading =
     selectedSearchPlace !== null &&
     searchSpotsSnapshot?.placeId !== selectedSearchPlace.placeId;
+  // Only the top recommendations become map markers. While a new place's
+  // results load, the previous snapshot keeps its markers on screen so the
+  // layer crossfades instead of blanking out.
+  const highlightedSearchSpots = useMemo(() => {
+    if (selectedSearchPlace === null || searchSpotsSnapshot === null) {
+      return EMPTY_SEARCH_SPOTS;
+    }
+
+    return searchSpotsSnapshot.spots.slice(
+      0,
+      SEARCH_HIGHLIGHTED_MARKER_LIMIT,
+    );
+  }, [searchSpotsSnapshot, selectedSearchPlace]);
+  const isSearchRecommendationMode =
+    selectedSearchPlace !== null && selectedParkingItem === null;
+  // Refresh of the current place's results is pending (Search this area).
+  const isSearchAreaRefreshing =
+    selectedSearchPlace !== null &&
+    searchParkingRequest !== null &&
+    searchSpotsSnapshot?.placeId === selectedSearchPlace.placeId &&
+    searchSpotsSnapshot.requestKey !== searchParkingRequest.key;
+  const cameraDistanceFromSearchPlace = useMemo(() => {
+    if (selectedSearchPlace === null) {
+      return null;
+    }
+
+    const cameraCenter = {
+      latitude: displayCamera.latitude,
+      longitude: displayCamera.longitude,
+    };
+    if (!hasValidParkingCoordinates(cameraCenter)) {
+      return null;
+    }
+
+    return haversineDistanceMeters(cameraCenter, selectedSearchPlace);
+  }, [
+    displayCamera.latitude,
+    displayCamera.longitude,
+    selectedSearchPlace,
+  ]);
 
   const detailLevel = useMapDetailLevel(displayCamera);
   const circleFilterResult = useMemo(
@@ -467,7 +534,7 @@ export function ParkingMap({
       return getDisplayedParkingMarkerItems(
         detailLevel === 'spotDetail' ? densityFilteredMarkers : [],
         selectedParkingItem,
-        selectedSearchPlace !== null ? nearestSearchSpots : null,
+        selectedSearchPlace !== null ? highlightedSearchSpots : null,
         activeOverlay !== 'none',
       );
     },
@@ -475,8 +542,8 @@ export function ParkingMap({
       activeOverlay,
       densityFilteredMarkers,
       detailLevel,
+      highlightedSearchSpots,
       mapMode,
-      nearestSearchSpots,
       selectedParkingItem,
       selectedSearchPlace,
     ],
@@ -1122,7 +1189,8 @@ export function ParkingMap({
       cancelPendingCameraFocus();
       clearParkingData();
       setSearchParkingRequest(null);
-      setSearchSpotsSnapshot(null);
+      // Deliberately keep the previous snapshot: its markers stay visible
+      // and crossfade out once the new place's recommendations arrive.
       setSelectedSearchPlace(place);
       focusCoordinatesAboveSheetSafely(
         { latitude: place.latitude, longitude: place.longitude },
@@ -1141,6 +1209,37 @@ export function ParkingMap({
     setSearchParkingRequest(null);
     setSearchSpotsSnapshot(null);
   }, []);
+
+  const handleSearchThisAreaPress = useCallback(() => {
+    if (selectedSearchPlace === null) {
+      return;
+    }
+
+    const camera: ParkingCameraState = {
+      latitude: displayCamera.latitude,
+      longitude: displayCamera.longitude,
+      zoom: Number.isFinite(displayCamera.zoom)
+        ? displayCamera.zoom
+        : MAP_DETAIL_THRESHOLDS.spotDetailEnterZoom,
+      latitudeDelta: displayCamera.latitudeDelta,
+      longitudeDelta: displayCamera.longitudeDelta,
+    };
+    const startedAtVersion = loadedRequestVersion;
+    const key = requestParkingForCamera(camera);
+    // A new request key invalidates the snapshot; the effect above rebuilds
+    // recommendations from the freshly fetched area once the fetch lands,
+    // still ranked by distance to the searched destination.
+    setSearchParkingRequest({ key, startedAtVersion });
+  }, [
+    displayCamera.latitude,
+    displayCamera.latitudeDelta,
+    displayCamera.longitude,
+    displayCamera.longitudeDelta,
+    displayCamera.zoom,
+    loadedRequestVersion,
+    requestParkingForCamera,
+    selectedSearchPlace,
+  ]);
 
   const handleSearchSpotPress = useCallback(
     (item: ParkingClusterResponse) => {
@@ -1536,13 +1635,30 @@ export function ParkingMap({
                 zIndex: selectedParkingItem?.id === item.id ? 2 : 1,
               }}
             >
-              <ParkingMarkerCard
-                item={item}
-                onPress={handleMarkerPress}
-                performanceMode={isMapMoving ? 'moving' : 'normal'}
-                selected={selectedParkingItem?.id === item.id}
-                tier={tier}
-              />
+              {isSearchRecommendationMode ? (
+                <Animated.View
+                  entering={SEARCH_MARKER_ENTERING}
+                  exiting={SEARCH_MARKER_EXITING}
+                  pointerEvents="box-none"
+                  style={{ flex: 1 }}
+                >
+                  <ParkingMarkerCard
+                    item={item}
+                    onPress={handleMarkerPress}
+                    performanceMode={isMapMoving ? 'moving' : 'normal'}
+                    selected={false}
+                    tier={tier}
+                  />
+                </Animated.View>
+              ) : (
+                <ParkingMarkerCard
+                  item={item}
+                  onPress={handleMarkerPress}
+                  performanceMode={isMapMoving ? 'moving' : 'normal'}
+                  selected={selectedParkingItem?.id === item.id}
+                  tier={tier}
+                />
+              )}
             </View>
           ))}
         </Animated.View>
@@ -1640,6 +1756,53 @@ export function ParkingMap({
           }}
         >
           <UserLocationMarker />
+        </View>
+      ) : null}
+
+      {isSearchRecommendationMode &&
+      activeOverlay === 'none' &&
+      !isSearchParkingLoading &&
+      cameraDistanceFromSearchPlace !== null &&
+      cameraDistanceFromSearchPlace > SEARCH_AREA_REFRESH_DISTANCE_METERS ? (
+        <View
+          pointerEvents="box-none"
+          style={{
+            alignItems: 'center',
+            elevation: MAP_ELEVATIONS.floatingControls,
+            left: 0,
+            position: 'absolute',
+            right: 0,
+            top: insets.top + 12,
+            zIndex: MAP_LAYERS.floatingControls,
+          }}
+        >
+          <Animated.View
+            entering={DETAIL_LAYER_ENTERING}
+            exiting={DETAIL_LAYER_EXITING}
+          >
+            <Pressable
+              accessibilityHint="Finds parking recommendations in the visible map area"
+              accessibilityLabel="Search this area"
+              accessibilityRole="button"
+              className="flex-row items-center rounded-full border border-slate-200 bg-white px-4 py-2.5 active:bg-slate-100"
+              disabled={isSearchAreaRefreshing}
+              onPress={handleSearchThisAreaPress}
+              style={{ boxShadow: '0 4px 14px rgba(15,23,42,0.16)' }}
+            >
+              {isSearchAreaRefreshing ? (
+                <ActivityIndicator color="#2563EB" size="small" />
+              ) : null}
+              <Text
+                className={`text-[14px] font-bold text-blue-700${
+                  isSearchAreaRefreshing ? ' ml-2' : ''
+                }`}
+              >
+                {isSearchAreaRefreshing
+                  ? 'Searching this area'
+                  : 'Search this area'}
+              </Text>
+            </Pressable>
+          </Animated.View>
         </View>
       ) : null}
 
