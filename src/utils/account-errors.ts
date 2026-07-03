@@ -1,3 +1,5 @@
+import { isAuthApiError } from '@supabase/supabase-js';
+
 import type {
   AccountError,
   AccountErrorCode,
@@ -21,6 +23,16 @@ export function accountLoadError(cause: unknown): AccountError {
 }
 
 export function signInFailedError(cause: unknown): AccountError {
+  // Supabase's built-in email sender has a low default rate limit; the
+  // generic "check the email address" copy is actively misleading here.
+  if (isAuthApiError(cause) && cause.code === 'over_email_send_rate_limit') {
+    return createAccountError(
+      'SIGNIN_FAILED',
+      'Too many sign-in codes were requested. Wait a few minutes and try again.',
+      cause,
+    );
+  }
+
   return createAccountError(
     'SIGNIN_FAILED',
     'The sign-in code could not be sent. Check the email address and try again.',

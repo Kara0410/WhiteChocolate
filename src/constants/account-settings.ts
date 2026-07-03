@@ -305,12 +305,11 @@ export function getDangerSettings(isSignedIn: boolean): SettingItem[] {
       id: 'data-controls',
       title: 'Data controls',
       subtitle: isSignedIn
-        ? 'Account deletion is being built and will appear here.'
-        : 'Review local data controls. No account is connected.',
+        ? 'Delete local device data. Account deletion is coming later.'
+        : 'Delete garage, favorites, and preferences from this device.',
       icon: Trash2,
       type: 'navigation',
       navigationTarget: '/account/delete',
-      action: 'delete-local-data',
       requiresLogin: isSignedIn,
       group: 'danger',
     },

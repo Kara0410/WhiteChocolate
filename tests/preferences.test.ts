@@ -2,10 +2,15 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  clearStoredPreferences,
   DEFAULT_PREFERENCES,
+  loadPreferences,
   normalizeStoredPreferences,
+  PREFERENCES_STORAGE_KEY,
+  savePreferences,
   updatePreference,
 } from '../src/utils/preferences-storage';
+import { createMemoryStorage } from './helpers/memory-storage';
 
 test('uses defaults when stored preferences are missing or malformed', () => {
   assert.deepEqual(
@@ -56,6 +61,22 @@ test('restores supported persisted preference values', () => {
       units: 'imperial',
     },
   );
+});
+
+test('saves, loads, and clears stored preferences', async () => {
+  const storage = createMemoryStorage();
+  const customized = {
+    ...DEFAULT_PREFERENCES,
+    notifications: true,
+    units: 'imperial' as const,
+  };
+
+  await savePreferences(customized, storage);
+  assert.deepEqual(await loadPreferences(storage), customized);
+
+  await clearStoredPreferences(storage);
+  assert.equal(storage.data.has(PREFERENCES_STORAGE_KEY), false);
+  assert.deepEqual(await loadPreferences(storage), DEFAULT_PREFERENCES);
 });
 
 test('falls back field-by-field for invalid persisted values', () => {

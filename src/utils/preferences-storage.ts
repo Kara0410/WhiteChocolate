@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import type { Preferences } from '@/types/preferences';
+import type { KeyValueStorage } from '@/types/storage';
 
 export const PREFERENCES_STORAGE_KEY =
   '@white-choclate/preferences/v1';
@@ -70,8 +71,10 @@ export function normalizeStoredPreferences(value: unknown): Preferences {
   };
 }
 
-export async function loadPreferences(): Promise<Preferences> {
-  const storedValue = await AsyncStorage.getItem(PREFERENCES_STORAGE_KEY);
+export async function loadPreferences(
+  storage: KeyValueStorage = AsyncStorage,
+): Promise<Preferences> {
+  const storedValue = await storage.getItem(PREFERENCES_STORAGE_KEY);
 
   if (storedValue === null) {
     return DEFAULT_PREFERENCES;
@@ -82,9 +85,16 @@ export async function loadPreferences(): Promise<Preferences> {
 
 export async function savePreferences(
   preferences: Preferences,
+  storage: KeyValueStorage = AsyncStorage,
 ): Promise<void> {
-  await AsyncStorage.setItem(
+  await storage.setItem(
     PREFERENCES_STORAGE_KEY,
     JSON.stringify(preferences),
   );
+}
+
+export async function clearStoredPreferences(
+  storage: KeyValueStorage = AsyncStorage,
+): Promise<void> {
+  await storage.removeItem(PREFERENCES_STORAGE_KEY);
 }

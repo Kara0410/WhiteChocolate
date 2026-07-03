@@ -99,6 +99,15 @@ export function useAccount() {
       });
 
       if (otpError) {
+        if (__DEV__) {
+          console.warn('[useAccount] signInWithOtp failed', {
+            name: otpError.name,
+            message: otpError.message,
+            status: otpError.status,
+            code: otpError.code,
+          });
+        }
+
         const sendError = signInFailedError(otpError);
         setError(sendError);
         return { ok: false, error: sendError };

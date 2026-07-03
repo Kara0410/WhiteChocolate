@@ -19,6 +19,7 @@ import {
   preferencesSaveError,
 } from '@/utils/account-errors';
 import {
+  clearStoredPreferences,
   DEFAULT_PREFERENCES,
   loadPreferences,
   savePreferences,
@@ -30,6 +31,7 @@ type PreferencesContextValue = {
   loading: boolean;
   error: PreferencesError | null;
   refresh: () => Promise<void>;
+  resetPreferences: () => void;
   setPreference: <Key extends PreferenceKey>(
     key: Key,
     value: Preferences[Key],
@@ -99,15 +101,31 @@ export function PreferencesProvider({ children }: PropsWithChildren) {
     [],
   );
 
+  const resetPreferences = useCallback(() => {
+    setError(null);
+    setPreferences(DEFAULT_PREFERENCES);
+
+    // Defaults are represented by an absent key, so reset removes it
+    // instead of writing the default values back.
+    writeQueueRef.current = writeQueueRef.current
+      .then(() => clearStoredPreferences())
+      .catch((saveError: unknown) => {
+        if (isMountedRef.current) {
+          setError(preferencesSaveError(saveError));
+        }
+      });
+  }, []);
+
   const value = useMemo(
     () => ({
       preferences,
       loading,
       error,
       refresh,
+      resetPreferences,
       setPreference,
     }),
-    [error, loading, preferences, refresh, setPreference],
+    [error, loading, preferences, refresh, resetPreferences, setPreference],
   );
 
   return (
