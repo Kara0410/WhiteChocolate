@@ -6,7 +6,6 @@ import {
 } from 'react';
 
 import {
-  SubscriptionStatus,
   type AccountActionResult,
   type AccountError,
   type AccountUser,
@@ -15,6 +14,7 @@ import {
   accountLoadError,
   createAccountError,
 } from '@/utils/account-errors';
+import { getCurrentAccountSnapshot } from '@/utils/account-state';
 
 const CURRENT_USER: AccountUser | null = null;
 
@@ -28,7 +28,7 @@ export function useAccount() {
     setError(null);
 
     try {
-      // Week 1 uses an anonymous local adapter. A future auth provider can
+      // The current app uses an anonymous local adapter. A future auth provider can
       // replace this boundary without changing the Account UI.
       await Promise.resolve();
     } catch (loadError) {
@@ -76,22 +76,14 @@ export function useAccount() {
     return { ok: false, error: upgradeError };
   }, []);
 
-  const isSignedIn = user !== null;
-  const isAnonymous = !isSignedIn;
-  const subscriptionStatus = SubscriptionStatus.FREE;
-  const displayName = user?.displayName ?? 'Munich driver';
-  const email = user?.email ?? null;
-  const avatar = user?.avatarUrl ?? null;
+  const accountSnapshot = useMemo(
+    () => getCurrentAccountSnapshot(user),
+    [user],
+  );
 
   return useMemo(
     () => ({
-      user,
-      isAnonymous,
-      isSignedIn,
-      subscriptionStatus,
-      displayName,
-      email,
-      avatar,
+      ...accountSnapshot,
       loading,
       error,
       refresh,
@@ -100,19 +92,13 @@ export function useAccount() {
       upgrade,
     }),
     [
-      avatar,
+      accountSnapshot,
       deleteAccount,
-      displayName,
-      email,
       error,
-      isAnonymous,
-      isSignedIn,
       loading,
       logout,
       refresh,
-      subscriptionStatus,
       upgrade,
-      user,
     ],
   );
 }

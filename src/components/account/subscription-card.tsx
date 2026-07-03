@@ -5,9 +5,10 @@ import { Pressable, Text, View } from 'react-native';
 import { SubscriptionStatus } from '@/types/account';
 
 type SubscriptionCardProps = {
+  disabled?: boolean;
   loading?: boolean;
   status: SubscriptionStatus;
-  onPress: () => void;
+  onPress?: () => void;
 };
 
 function statusCopy(status: SubscriptionStatus) {
@@ -24,12 +25,13 @@ function statusCopy(status: SubscriptionStatus) {
     case SubscriptionStatus.FREE:
       return {
         title: 'Free plan',
-        subtitle: 'Premium integration is prepared for a later phase',
+        subtitle: 'Premium is not configured in this build',
       };
   }
 }
 
 export const SubscriptionCard = memo(function SubscriptionCard({
+  disabled = false,
   loading = false,
   status,
   onPress,
@@ -46,6 +48,7 @@ export const SubscriptionCard = memo(function SubscriptionCard({
 
   const copy = statusCopy(status);
   const isFree = status === SubscriptionStatus.FREE;
+  const isActionDisabled = disabled || !onPress;
 
   return (
     <View className="mb-3 rounded-3xl bg-white p-5">
@@ -63,16 +66,38 @@ export const SubscriptionCard = memo(function SubscriptionCard({
         </View>
       </View>
       <Pressable
-        accessibilityHint="Opens the existing premium information page"
+        accessibilityHint={
+          isActionDisabled
+            ? 'Premium purchasing is not configured'
+            : 'Opens membership options'
+        }
         accessibilityLabel={
-          isFree ? 'Explore Premium' : 'Manage membership'
+          isActionDisabled
+            ? 'Premium coming later'
+            : isFree
+              ? 'Explore Premium'
+              : 'Manage membership'
         }
         accessibilityRole="button"
-        className="mt-4 min-h-12 items-center justify-center rounded-2xl bg-slate-950 px-4 active:bg-slate-800"
+        accessibilityState={{ disabled: isActionDisabled }}
+        className={`mt-4 min-h-12 items-center justify-center rounded-2xl px-4 ${
+          isActionDisabled
+            ? 'bg-slate-200'
+            : 'bg-slate-950 active:bg-slate-800'
+        }`}
+        disabled={isActionDisabled}
         onPress={onPress}
       >
-        <Text className="text-[14px] font-extrabold text-white">
-          {isFree ? 'Explore Premium' : 'Manage membership'}
+        <Text
+          className={`text-[14px] font-extrabold ${
+            isActionDisabled ? 'text-slate-500' : 'text-white'
+          }`}
+        >
+          {isActionDisabled
+            ? 'Coming later'
+            : isFree
+              ? 'Explore Premium'
+              : 'Manage membership'}
         </Text>
       </Pressable>
     </View>

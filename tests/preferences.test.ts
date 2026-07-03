@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   DEFAULT_PREFERENCES,
   normalizeStoredPreferences,
+  updatePreference,
 } from '../src/utils/preferences-storage';
 
 test('uses defaults when stored preferences are missing or malformed', () => {
@@ -15,6 +16,21 @@ test('uses defaults when stored preferences are missing or malformed', () => {
     normalizeStoredPreferences('invalid'),
     DEFAULT_PREFERENCES,
   );
+});
+
+test('updates only the selected preference', () => {
+  const updated = updatePreference(
+    DEFAULT_PREFERENCES,
+    'notifications',
+    true,
+  );
+
+  assert.deepEqual(updated, {
+    ...DEFAULT_PREFERENCES,
+    notifications: true,
+  });
+  assert.equal(updated.parkingReminders, true);
+  assert.equal(updated.analytics, false);
 });
 
 test('restores supported persisted preference values', () => {

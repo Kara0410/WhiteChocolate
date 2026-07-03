@@ -5,6 +5,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AccountScreenSkeleton } from '@/components/account/account-screen-skeleton';
+import { AppDataSection } from '@/components/account/app-data-section';
 import { DangerSection } from '@/components/account/danger-section';
 import { LegalSection } from '@/components/account/legal-section';
 import { PreferencesSection } from '@/components/account/preferences-section';
@@ -89,6 +90,7 @@ export function AccountScreen() {
               logout={account.logout}
               subscriptionStatus={account.subscriptionStatus}
             />
+            <AppDataSection />
             <PreferencesSection />
             <SupportSection />
             <LegalSection />

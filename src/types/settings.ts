@@ -10,7 +10,9 @@ export type AccountRoute =
   | '/account/help'
   | '/account/about'
   | '/account/licenses'
-  | '/account/delete';
+  | '/account/delete'
+  | '/favorites'
+  | '/garage';
 
 export type SettingItemType = 'action' | 'info' | 'navigation' | 'switch';
 
@@ -19,11 +21,13 @@ export type SettingAction =
   | 'delete-account'
   | 'delete-local-data'
   | 'logout'
+  | 'open-system-settings'
   | 'restore-purchases'
   | 'upgrade';
 
 export type SettingGroup =
   | 'quick-actions'
+  | 'app-data'
   | 'preferences'
   | 'support'
   | 'legal'
@@ -44,5 +48,6 @@ export type SettingItem = {
   group: SettingGroup;
   rightText?: string;
   disabled?: boolean;
+  accessibilityLabel?: string;
   accessibilityHint?: string;
 };

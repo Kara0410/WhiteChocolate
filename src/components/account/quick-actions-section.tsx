@@ -1,5 +1,4 @@
 import { memo, useCallback, useMemo } from 'react';
-import { useRouter } from 'expo-router';
 
 import { SettingItemList } from '@/components/settings/setting-item-list';
 import { SettingsSection } from '@/components/settings/settings-section';
@@ -25,7 +24,6 @@ export const QuickActionsSection = memo(function QuickActionsSection({
   subscriptionStatus,
   logout,
 }: QuickActionsSectionProps) {
-  const router = useRouter();
   const items = useMemo(
     () =>
       (isAnonymous
@@ -34,10 +32,6 @@ export const QuickActionsSection = memo(function QuickActionsSection({
       ).filter((item) => item.action !== 'upgrade'),
     [isAnonymous],
   );
-
-  const openPremium = useCallback(() => {
-    router.push('/billing');
-  }, [router]);
 
   const handleAction = useCallback(
     (action: SettingAction) => {
@@ -54,7 +48,7 @@ export const QuickActionsSection = memo(function QuickActionsSection({
       title="Account & membership"
     >
       <SubscriptionCard
-        onPress={openPremium}
+        disabled
         status={subscriptionStatus}
       />
       <SettingItemList items={items} onAction={handleAction} />

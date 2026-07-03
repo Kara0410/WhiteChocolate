@@ -1,12 +1,13 @@
 import type { ExpoConfig } from 'expo/config';
 import type { ConfigContext } from 'expo/config';
 
+const APP_NAME = 'Munich Parking';
 const LOCATION_PERMISSION_DESCRIPTION =
-  'Allow WhiteChocolate to use your location to show where you are and find nearby parking.';
+  `Allow ${APP_NAME} to use your location to show where you are and find nearby parking.`;
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: 'White_choclate',
+  name: APP_NAME,
   slug: 'White_choclate',
   version: '1.0.0',
   orientation: 'portrait',

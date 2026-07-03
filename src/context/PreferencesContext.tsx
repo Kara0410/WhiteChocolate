@@ -22,6 +22,7 @@ import {
   DEFAULT_PREFERENCES,
   loadPreferences,
   savePreferences,
+  updatePreference,
 } from '@/utils/preferences-storage';
 
 type PreferencesContextValue = {
@@ -82,7 +83,7 @@ export function PreferencesProvider({ children }: PropsWithChildren) {
     ) => {
       setError(null);
       setPreferences((current) => {
-        const next = { ...current, [key]: value };
+        const next = updatePreference(current, key, value);
 
         writeQueueRef.current = writeQueueRef.current
           .then(() => savePreferences(next))

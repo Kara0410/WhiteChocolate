@@ -21,7 +21,6 @@ export const AccountScreenSkeleton = memo(
         <SettingsSection title="Account & membership">
           <SubscriptionCard
             loading
-            onPress={() => undefined}
             status={SubscriptionStatus.UNKNOWN}
           />
           <SettingRow

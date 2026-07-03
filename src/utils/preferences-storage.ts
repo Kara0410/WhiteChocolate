@@ -16,6 +16,18 @@ export const DEFAULT_PREFERENCES: Preferences = {
   units: 'metric',
 };
 
+export function updatePreference<Key extends keyof Preferences>(
+  preferences: Preferences,
+  key: Key,
+  value: Preferences[Key],
+): Preferences {
+  if (Object.is(preferences[key], value)) {
+    return preferences;
+  }
+
+  return { ...preferences, [key]: value };
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

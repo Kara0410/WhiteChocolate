@@ -60,6 +60,14 @@ const PreferenceRow = memo(function PreferenceRow({
 
   return (
     <SettingRow
+      accessibilityHint={
+        item.accessibilityHint ??
+        (switchKey
+          ? `Turns ${item.title.toLowerCase()} on or off`
+          : item.navigationTarget
+            ? `Opens ${item.title.toLowerCase()} settings`
+            : undefined)
+      }
       badge={item.badge}
       disabled={item.disabled}
       icon={item.icon}
@@ -96,7 +104,7 @@ export const PreferencesSection = memo(function PreferencesSection() {
         />
       ) : null}
       <SettingsSection
-        subtitle="Stored only on this device during Week 1."
+        subtitle="Stored only on this device."
         title="Preferences"
       >
         {PREFERENCE_SETTINGS.map((item, index) => (

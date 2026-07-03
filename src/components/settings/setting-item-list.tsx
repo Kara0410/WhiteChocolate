@@ -40,6 +40,7 @@ const SettingItemRow = memo(function SettingItemRow({
   return (
     <SettingRow
       accessibilityHint={item.accessibilityHint}
+      accessibilityLabel={item.accessibilityLabel}
       badge={item.badge}
       danger={item.danger}
       disabled={item.disabled}

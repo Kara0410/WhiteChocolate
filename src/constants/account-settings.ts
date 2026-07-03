@@ -4,12 +4,15 @@ import {
   BellRing,
   BookOpen,
   Bug,
+  Car,
   CircleHelp,
   Crown,
   FileText,
   Gauge,
+  Heart,
   Languages,
   LogOut,
+  MapPin,
   Moon,
   RotateCcw,
   ShieldCheck,
@@ -40,16 +43,6 @@ export const ANONYMOUS_QUICK_ACTIONS: SettingItem[] = [
     navigationTarget: '/account/profile',
     group: 'quick-actions',
     accessibilityHint: 'Opens planned account benefits',
-  },
-  {
-    id: 'upgrade',
-    title: 'Explore Premium',
-    subtitle: 'Premium purchasing is not connected yet.',
-    icon: Crown,
-    type: 'action',
-    action: 'upgrade',
-    group: 'quick-actions',
-    accessibilityHint: 'Opens the existing premium information page',
   },
   {
     id: 'restore',
@@ -188,7 +181,7 @@ export const SUPPORT_SETTINGS: SettingItem[] = [
   {
     id: 'help',
     title: 'Help & support',
-    subtitle: 'Troubleshooting and support contact will live here.',
+    subtitle: 'Support contact is not configured in this development build.',
     icon: CircleHelp,
     type: 'navigation',
     navigationTarget: '/account/help',
@@ -209,7 +202,7 @@ export const LEGAL_SETTINGS: SettingItem[] = [
   {
     id: 'privacy',
     title: 'Privacy & data',
-    subtitle: 'Privacy controls and policy links will be added later.',
+    subtitle: 'Privacy policy URL is not configured in this development build.',
     icon: ShieldCheck,
     type: 'navigation',
     navigationTarget: '/account/privacy',
@@ -234,6 +227,73 @@ export const LEGAL_SETTINGS: SettingItem[] = [
     group: 'legal',
   },
 ];
+
+function countLabel(count: number, singular: string, plural: string) {
+  return `${count.toLocaleString()} ${count === 1 ? singular : plural}`;
+}
+
+export function getAppDataSettings({
+  favoriteCount,
+  locationDescription,
+  locationLabel,
+  locationLoading,
+  vehicleCount,
+}: {
+  favoriteCount: number;
+  locationDescription: string;
+  locationLabel: string;
+  locationLoading: boolean;
+  vehicleCount: number;
+}): SettingItem[] {
+  return [
+    {
+      id: 'garage',
+      title: 'Manage garage',
+      subtitle: countLabel(vehicleCount, 'saved car', 'saved cars'),
+      icon: Car,
+      type: 'navigation',
+      navigationTarget: '/garage',
+      rightText: vehicleCount.toLocaleString(),
+      group: 'app-data',
+      accessibilityLabel: `Manage garage, ${countLabel(
+        vehicleCount,
+        'saved car',
+        'saved cars',
+      )}`,
+      accessibilityHint: 'Opens My Garage',
+    },
+    {
+      id: 'favorites',
+      title: 'View favorites',
+      subtitle: countLabel(favoriteCount, 'favorite spot', 'favorite spots'),
+      icon: Heart,
+      type: 'navigation',
+      navigationTarget: '/favorites',
+      rightText: favoriteCount.toLocaleString(),
+      group: 'app-data',
+      accessibilityLabel: `View favorites, ${countLabel(
+        favoriteCount,
+        'favorite spot',
+        'favorite spots',
+      )}`,
+      accessibilityHint: 'Opens favorite parking spots on the map',
+    },
+    {
+      id: 'location-permission',
+      title: 'Location permission',
+      subtitle: locationDescription,
+      icon: MapPin,
+      type: 'action',
+      action: 'open-system-settings',
+      rightText: locationLabel,
+      group: 'app-data',
+      disabled: locationLoading,
+      accessibilityLabel: `Location permission, ${locationLabel}`,
+      accessibilityHint:
+        'Opens system Settings. Location is not requested from this page.',
+    },
+  ];
+}
 
 export function getDangerSettings(isSignedIn: boolean): SettingItem[] {
   return [
