@@ -1,7 +1,14 @@
 # Auth Foundation Plan (Supabase Auth, anonymous-first)
 
-Status: **planning + schema drafts only.** No login/signup is implemented.
-Drafted 2026-07-03. The SQL in `supabase/migrations/` is NOT applied.
+Status: **email OTP login implemented (2026-07-03).** Session persists via
+AsyncStorage; sign-out keeps local data. The SQL in `supabase/migrations/`
+is still NOT applied — cloud sync and account deletion remain future phases.
+
+> Supabase dashboard prerequisites for the OTP flow:
+> 1. Email provider enabled (Authentication → Providers → Email).
+> 2. The "Magic Link" email template must include `{{ .Token }}` so the
+>    6-digit code appears in the email — the app verifies codes and does not
+>    handle magic-link deep links yet.
 
 ## 1. Auth readiness audit (2026-07-03)
 
@@ -152,20 +159,20 @@ After applying, regenerate types:
 5. **Local data is deleted only after the remote write is confirmed** — and
    even then only if the product decision is to stop mirroring locally.
    Default plan: local remains the offline cache; sync is additive.
-6. **Sign-out:** default to *keeping* local cached state (anonymous-first
-   means the app must stay useful), but wipe it if the user chooses
-   "sign out and remove my data from this device". Session tokens are always
-   cleared. This is a product decision to confirm before implementation.
+6. **Sign-out (decision confirmed 2026-07-03):** local cached data (garage,
+   favorites, preferences) is kept by default; sign-out only ends the
+   session and never deletes remote data. A separate explicit "Remove my
+   data from this device" action will be added later.
 
 ## 6. `useAccount` future interface
 
 `AuthStatus = 'anonymous' | 'signingIn' | 'authenticated' | 'signingOut' | 'error'`
-(added to `src/types/account.ts`). `useAccount` now returns `status`, which
-today is only ever `'anonymous'` or `'error'` — no fake signed-in state. When
-auth lands, the hook swaps its internal adapter for
-`supabase.auth.onAuthStateChange` + `getSession()` without changing the
-Account UI contract (`user`, `isAnonymous`, `isSignedIn`, `status`,
-`logout`, `deleteAccount`, `refresh`).
+(in `src/types/account.ts`). Implemented: `useAccount` is backed by
+`supabase.auth.getSession()` + `onAuthStateChange`. `'signingIn'` means an
+OTP code was sent (`pendingEmail` is set) and verification is pending;
+`'error'` is reserved for session-load failures. The Account UI contract is
+unchanged (`user`, `isAnonymous`, `isSignedIn`, `status`, `logout`,
+`deleteAccount`, `refresh`) plus the new sign-in actions.
 
 ## 7. Compliance notes (before shipping auth)
 
@@ -187,10 +194,26 @@ Account UI contract (`user`, `isAnonymous`, `isSignedIn`, `status`,
   SDKs installed. When they become real, every change must also append a
   `consent_events` row for signed-in users.
 
-## 8. What was deliberately NOT done in this phase
+## 8. Phase status
 
-- No auth UI flows, no `supabase.auth` calls, no session persistence.
-- No new dependencies (`expo-secure-store`, `aes-js`, Apple/Google sign-in).
-- No RevenueCat / premium work.
+Done in the login phase (2026-07-03):
+
+- Supabase client auth config (`src/lib/supabase.ts`): AsyncStorage session
+  storage on native, `autoRefreshToken` + `persistSession`,
+  `detectSessionInUrl` only on web, AppState-driven `start/stopAutoRefresh`.
+- `useAccount` (`src/hooks/use-account.ts`): real session load,
+  `onAuthStateChange` subscription with cleanup, `startEmailSignIn`,
+  `verifyEmailOtp`, `cancelEmailSignIn`, `logout`, truthful `status`.
+- Sign-in UI on `/account/profile` (`EmailSignInCard`): email → code →
+  verify, loading/error/success states. Anonymous mode stays first-class.
+- Sign-out keeps local data (see §5.6) and the UI says so explicitly.
+
+Still deliberately NOT done:
+
+- No Apple/Google sign-in, no magic-link deep linking (OTP codes only).
+- No cloud sync — nothing is uploaded; `useAccount` only exposes auth state
+  that a later sync phase can build on.
+- No new dependencies (`expo-secure-store`, `aes-js`), no RevenueCat.
 - Migrations not applied; `src/types/database.ts` not regenerated (it must
   only be regenerated after the migrations actually run).
+- No "Delete account" UI — backend deletion flow does not exist yet.

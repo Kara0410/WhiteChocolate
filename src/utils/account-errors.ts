@@ -20,6 +20,30 @@ export function accountLoadError(cause: unknown): AccountError {
   );
 }
 
+export function signInFailedError(cause: unknown): AccountError {
+  return createAccountError(
+    'SIGNIN_FAILED',
+    'The sign-in code could not be sent. Check the email address and try again.',
+    cause,
+  );
+}
+
+export function verifyFailedError(cause: unknown): AccountError {
+  return createAccountError(
+    'VERIFY_FAILED',
+    'That code did not work. Check the latest email or request a new code.',
+    cause,
+  );
+}
+
+export function logoutFailedError(cause: unknown): AccountError {
+  return createAccountError(
+    'LOGOUT_FAILED',
+    'Sign out did not complete. Try again.',
+    cause,
+  );
+}
+
 export function preferencesLoadError(cause: unknown): PreferencesError {
   return {
     code: 'LOAD_FAILED',

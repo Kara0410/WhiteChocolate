@@ -6,9 +6,9 @@ export enum SubscriptionStatus {
 }
 
 /**
- * Auth lifecycle states for the future Supabase Auth adapter. Today only
- * 'anonymous' and 'error' occur; the rest are reserved so UI can be written
- * against the final contract. See docs/auth-foundation.md.
+ * Auth lifecycle states produced by the Supabase Auth adapter in
+ * useAccount. 'signingIn' means an OTP code was sent and is awaiting
+ * verification. See docs/auth-foundation.md.
  */
 export type AuthStatus =
   | 'anonymous'
@@ -26,6 +26,8 @@ export type AccountUser = {
 
 export type AccountErrorCode =
   | 'LOAD_FAILED'
+  | 'SIGNIN_FAILED'
+  | 'VERIFY_FAILED'
   | 'LOGOUT_FAILED'
   | 'DELETE_NOT_IMPLEMENTED'
   | 'UPGRADE_NOT_IMPLEMENTED';

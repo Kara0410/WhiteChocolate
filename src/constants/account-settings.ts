@@ -38,12 +38,12 @@ export const ANONYMOUS_QUICK_ACTIONS: SettingItem[] = [
     id: 'account-benefits',
     title: 'Sign in to sync garage and favorites',
     subtitle:
-      'Optional sign-in is planned. Parking always works without an account.',
+      'Email sign-in with a one-time code. Sync itself arrives in a later phase.',
     icon: Sparkles,
     type: 'navigation',
     navigationTarget: '/account/profile',
     group: 'quick-actions',
-    accessibilityHint: 'Opens planned account benefits',
+    accessibilityHint: 'Opens email sign-in',
   },
   {
     id: 'restore',
@@ -62,7 +62,7 @@ export const SIGNED_IN_QUICK_ACTIONS: SettingItem[] = [
   {
     id: 'edit-profile',
     title: 'Profile details',
-    subtitle: 'Update account identity and contact information.',
+    subtitle: 'View your signed-in email and session controls.',
     icon: UserRound,
     type: 'navigation',
     navigationTarget: '/account/profile',
@@ -91,6 +91,7 @@ export const SIGNED_IN_QUICK_ACTIONS: SettingItem[] = [
   {
     id: 'logout',
     title: 'Sign out',
+    subtitle: 'Your garage, favorites, and preferences stay on this device.',
     icon: LogOut,
     type: 'action',
     action: 'logout',
@@ -296,19 +297,20 @@ export function getAppDataSettings({
   ];
 }
 
+// "Delete account" must not appear until the backend deletion flow exists,
+// even for signed-in users (docs/auth-foundation.md §7).
 export function getDangerSettings(isSignedIn: boolean): SettingItem[] {
   return [
     {
-      id: isSignedIn ? 'delete-account' : 'delete-local-data',
-      title: isSignedIn ? 'Delete account' : 'Delete local data',
+      id: 'data-controls',
+      title: 'Data controls',
       subtitle: isSignedIn
-        ? 'Backend deletion is intentionally not implemented yet.'
-        : 'Review local data controls. No account currently exists.',
+        ? 'Account deletion is being built and will appear here.'
+        : 'Review local data controls. No account is connected.',
       icon: Trash2,
       type: 'navigation',
       navigationTarget: '/account/delete',
-      action: isSignedIn ? 'delete-account' : 'delete-local-data',
-      danger: true,
+      action: 'delete-local-data',
       requiresLogin: isSignedIn,
       group: 'danger',
     },
