@@ -5,6 +5,18 @@ export enum SubscriptionStatus {
   UNKNOWN = 'UNKNOWN',
 }
 
+/**
+ * Auth lifecycle states for the future Supabase Auth adapter. Today only
+ * 'anonymous' and 'error' occur; the rest are reserved so UI can be written
+ * against the final contract. See docs/auth-foundation.md.
+ */
+export type AuthStatus =
+  | 'anonymous'
+  | 'signingIn'
+  | 'authenticated'
+  | 'signingOut'
+  | 'error';
+
 export type AccountUser = {
   id: string;
   displayName: string;

@@ -3,7 +3,7 @@ import { AccountPlaceholderScreen } from '@/components/account/account-placehold
 export default function AccountDeleteScreen() {
   return (
     <AccountPlaceholderScreen
-      description="No app account currently exists. Backend account deletion is intentionally not implemented in Week 1."
+      description="No app account currently exists. Account deletion will appear here when an account is connected."
       title="Data controls"
     />
   );

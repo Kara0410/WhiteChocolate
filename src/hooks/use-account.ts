@@ -9,6 +9,7 @@ import {
   type AccountActionResult,
   type AccountError,
   type AccountUser,
+  type AuthStatus,
 } from '@/types/account';
 import {
   accountLoadError,
@@ -81,9 +82,19 @@ export function useAccount() {
     [user],
   );
 
+  // Truthful auth lifecycle state: with the anonymous local adapter, only
+  // 'anonymous' and 'error' can occur. 'signingIn' / 'authenticated' /
+  // 'signingOut' are produced by the future Supabase Auth adapter.
+  const status: AuthStatus = error
+    ? 'error'
+    : user
+      ? 'authenticated'
+      : 'anonymous';
+
   return useMemo(
     () => ({
       ...accountSnapshot,
+      status,
       loading,
       error,
       refresh,
@@ -98,6 +109,7 @@ export function useAccount() {
       loading,
       logout,
       refresh,
+      status,
       upgrade,
     ],
   );

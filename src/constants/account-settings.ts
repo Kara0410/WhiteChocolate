@@ -36,8 +36,9 @@ export const ANONYMOUS_QUICK_ACTIONS: SettingItem[] = [
   },
   {
     id: 'account-benefits',
-    title: 'Benefits of creating an account',
-    subtitle: 'Cloud sync and personalization are planned for a later phase.',
+    title: 'Sign in to sync garage and favorites',
+    subtitle:
+      'Optional sign-in is planned. Parking always works without an account.',
     icon: Sparkles,
     type: 'navigation',
     navigationTarget: '/account/profile',
