@@ -14,7 +14,6 @@ export type MapOverlayMode =
   | 'none'
   | 'parking'
   | 'favorites'
-  | 'you'
   | 'search';
 
 type SearchSelection = {

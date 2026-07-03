@@ -4,6 +4,7 @@ import { BackHandler, View } from 'react-native';
 import BottomNavBar from '@/components/BottomNavBar';
 import { FavoriteParkingProvider } from '@/context/FavoriteParkingContext';
 import { VehicleProvider } from '@/context/VehicleContext';
+import { PreferencesProvider } from '@/context/PreferencesContext';
 import {
   MapOverlayProvider,
   useMapOverlay,
@@ -23,6 +24,8 @@ function TabNavigation() {
     toggleOverlay,
   } = useMapOverlay();
   const isMapRoute = pathname.endsWith('/map');
+  const isAccountRoute =
+    pathname.endsWith('/account') || pathname.includes('/account/');
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener(
@@ -53,7 +56,7 @@ function TabNavigation() {
   const activeKey =
     pathname.endsWith('/garage')
       ? 'car'
-      : activeOverlay === 'you'
+      : isAccountRoute
       ? 'profile'
       : activeOverlay === 'favorites'
         ? 'favorite'
@@ -66,16 +69,21 @@ function TabNavigation() {
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="map"       />
-        <Stack.Screen name="garage"    />
-        <Stack.Screen name="list"      />
+        <Stack.Screen name="map" />
+        <Stack.Screen name="garage" />
+        <Stack.Screen name="list" />
         <Stack.Screen name="favorites" />
-        <Stack.Screen name="account"   />
+        <Stack.Screen name="account" />
       </Stack>
       <BottomNavBar
         activeKey={activeKey}
         isSearchActive={isSearchActive}
-        onProfilePress={() => showOverlay('you')}
+        onProfilePress={() => {
+          closeOverlay();
+          if (!isAccountRoute) {
+            router.push('/account');
+          }
+        }}
         onSearchCancel={closeSearch}
         onSearchPress={() => {
           openSearch();
@@ -104,9 +112,11 @@ export default function TabLayout() {
   return (
     <FavoriteParkingProvider>
       <VehicleProvider>
-        <MapOverlayProvider>
-          <TabNavigation />
-        </MapOverlayProvider>
+        <PreferencesProvider>
+          <MapOverlayProvider>
+            <TabNavigation />
+          </MapOverlayProvider>
+        </PreferencesProvider>
       </VehicleProvider>
     </FavoriteParkingProvider>
   );

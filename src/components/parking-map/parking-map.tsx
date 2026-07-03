@@ -43,7 +43,6 @@ import { ParkingListBottomSheet } from '@/components/parking-map/ParkingListBott
 import { ParkingMarkerCard } from '@/components/parking-map/parking-marker-card';
 import { SearchDestinationMarker } from '@/components/parking-map/search-destination-marker';
 import { SearchNearestSpotsBottomSheet } from '@/components/parking-map/SearchNearestSpotsBottomSheet';
-import { YouBottomSheet } from '@/components/parking-map/YouBottomSheet';
 import { UserLocationMarker } from '@/components/parking-map/user-location-marker';
 import { useFavoriteParking } from '@/context/FavoriteParkingContext';
 import { useMapOverlay } from '@/context/MapOverlayContext';
@@ -1790,7 +1789,7 @@ export function ParkingMap({
           collapsable={false}
           pointerEvents="none"
           style={{
-            elevation: MAP_ELEVATIONS.searchDestination,
+            elevation: MAP_ELEVATIONS.markerHighlights,
             height: 44,
             left: 0,
             position: 'absolute',
@@ -1800,7 +1799,7 @@ export function ParkingMap({
               { translateY: projectedSearchDestination.y - 38 },
             ],
             width: 40,
-            zIndex: MAP_LAYERS.searchDestination,
+            zIndex: MAP_LAYERS.markerHighlights,
           }}
         >
           <SearchDestinationMarker />
@@ -1812,7 +1811,7 @@ export function ParkingMap({
           collapsable={false}
           pointerEvents="none"
           style={{
-            elevation: MAP_ELEVATIONS.userLocation,
+            elevation: MAP_ELEVATIONS.markerHighlights,
             height: 28,
             left: 0,
             position: 'absolute',
@@ -1822,7 +1821,7 @@ export function ParkingMap({
               { translateY: projectedUserLocation.y - 14 },
             ],
             width: 28,
-            zIndex: MAP_LAYERS.userLocation,
+            zIndex: MAP_LAYERS.markerHighlights,
           }}
         >
           <UserLocationMarker />
@@ -1931,39 +1930,46 @@ export function ParkingMap({
         </View>
       ) : null}
 
-      <ParkingBottomSheet
-        ref={bottomSheetRef}
-        item={selectedParkingItem}
-        onClose={clearSelection}
-      />
-
-      <SearchNearestSpotsBottomSheet
-        isLoading={isSearchParkingLoading}
-        onClose={closeSearchResults}
-        onSpotPress={handleSearchSpotPress}
-        searchPlace={selectedSearchPlace}
-        spots={nearestSearchSpots}
-      />
-
-      {activeOverlay === 'parking' ? (
-        <ParkingListBottomSheet
-          onClose={closeOverlay}
-          onSpotPress={handleParkingOverlaySpotPress}
-          spots={visibleSpots}
+      <View
+        collapsable={false}
+        pointerEvents="box-none"
+        style={{
+          elevation: MAP_ELEVATIONS.bottomSheetHost,
+          inset: 0,
+          position: 'absolute',
+          zIndex: MAP_LAYERS.bottomSheetHost,
+        }}
+      >
+        <ParkingBottomSheet
+          ref={bottomSheetRef}
+          item={selectedParkingItem}
+          onClose={clearSelection}
         />
-      ) : null}
 
-      {activeOverlay === 'favorites' ? (
-        <FavoriteParkingBottomSheet
-          onClose={closeOverlay}
-          onSpotPress={handleFavoriteOverlaySpotPress}
+        <SearchNearestSpotsBottomSheet
+          isLoading={isSearchParkingLoading}
+          onClose={closeSearchResults}
+          onSpotPress={handleSearchSpotPress}
+          searchPlace={selectedSearchPlace}
+          spots={nearestSearchSpots}
         />
-      ) : null}
 
-      {activeOverlay === 'you' ? (
-        <YouBottomSheet onClose={closeOverlay} />
-      ) : null}
+        {activeOverlay === 'parking' ? (
+          <ParkingListBottomSheet
+            onClose={closeOverlay}
+            onSpotPress={handleParkingOverlaySpotPress}
+            spots={visibleSpots}
+          />
+        ) : null}
 
+        {activeOverlay === 'favorites' ? (
+          <FavoriteParkingBottomSheet
+            onClose={closeOverlay}
+            onSpotPress={handleFavoriteOverlaySpotPress}
+          />
+        ) : null}
+
+      </View>
     </View>
   );
 }

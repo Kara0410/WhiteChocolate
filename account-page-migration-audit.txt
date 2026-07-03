@@ -1,0 +1,1129 @@
+ACCOUNT / PROFILE PAGE MIGRATION AUDIT
+======================================
+
+Date: 2026-07-03
+Scope: Current repository state on branch master
+Status: Audit only. No account, navigation, privacy, subscription, or permission
+logic was changed.
+
+This is an engineering and store-readiness audit, not legal advice. Store
+requirements and local law should be reviewed again immediately before release.
+
+
+AUDIT SUMMARY
+-------------
+
+The current "You" experience is not an account system. It is a bottom sheet
+containing hard-coded profile, permission, reporting, and subscription labels.
+
+Repository evidence shows:
+
+1. There is no implemented user authentication or account creation.
+2. There is no Supabase Auth usage and no user/profile table in the generated
+   database types.
+3. There is no RevenueCat, StoreKit, Google Play Billing, Expo IAP, or Stripe
+   client/server integration.
+4. Favorites and garage vehicles are held only in React state. They are not
+   persisted to disk or Supabase and disappear when the JavaScript app state is
+   recreated.
+5. Location permission is real, but YouBottomSheet always displays "Allowed"
+   without checking the current permission.
+6. "Anonymous reporting enabled" is hard-coded. The repository contains no
+   reporting write path or device-attribution implementation.
+7. "Munich pilot Active" is hard-coded. There is no subscription entitlement.
+8. The Privacy row is not interactive and no in-app privacy policy, consent
+   controls, retention policy, deletion policy, terms, or support link exists.
+9. The billing screen is a nonfunctional mock. It describes Stripe checkout for
+   digital premium functionality, but the CTA has no handler.
+10. The existing `(tabs)/account.tsx` route is not a page. It opens the `you`
+    overlay and redirects to `/map`.
+
+Account deletion is not currently required by Apple/Google account-creation
+rules because this codebase does not create accounts. A truthful "Delete local
+data" or "Reset app data" flow is still appropriate. If authentication or an
+automatically generated guest account is added later, in-app account deletion
+becomes mandatory. Google Play will also require a usable outside-app deletion
+web resource.
+
+The clean migration is to keep `/account` inside the existing `(tabs)` Stack,
+render a dedicated AccountScreen there, and navigate to it exactly as Garage is
+navigated to. This preserves the persistent bottom navigation and access to the
+FavoriteParkingProvider and VehicleProvider.
+
+
+FILES CONNECTED TO THE CURRENT YOU FLOW
+---------------------------------------
+
+Direct dependencies:
+
+  src/components/BottomNavBar.tsx
+    Defines the YOU navigation item and invokes onProfilePress.
+
+  src/app/(tabs)/_layout.tsx
+    Maps onProfilePress to showOverlay('you'), computes the profile active state,
+    registers the account route, handles Android back for overlays, and mounts
+    MapOverlayProvider.
+
+  src/context/MapOverlayContext.tsx
+    Defines `you` as a MapOverlayMode and provides open/toggle/close behavior.
+
+  src/app/(tabs)/account.tsx
+    Is currently a deep-link adapter. It opens the `you` overlay and redirects
+    to `/map`; it does not render account content.
+
+  src/components/parking-map/parking-map.tsx
+    Imports YouBottomSheet and renders it when activeOverlay === 'you'.
+
+  src/components/parking-map/YouBottomSheet.tsx
+    Implements the current profile/account UI as a Gorhom bottom sheet.
+
+  src/components/parking-map/map-layers.ts
+    Supplies the bottom-sheet body zIndex/elevation used by YouBottomSheet.
+
+  src/app/billing.tsx
+    Destination of the sheet's "Manage subscription" action.
+
+  src/app/_layout.tsx
+    Registers `/billing` as a root Stack card.
+
+Indirect dependencies needed by the proposed account page:
+
+  src/context/FavoriteParkingContext.tsx
+    Owns runtime-only favorite parking data.
+
+  src/context/VehicleContext.tsx
+    Owns runtime-only vehicle and active vehicle data.
+
+  src/components/garage/GarageScreen.tsx
+    Provides the existing full-page navigation/back-button pattern.
+
+  src/app/(tabs)/garage.tsx
+    Exports GarageScreen as a route.
+
+  src/hooks/use-map-location.ts
+    Implements the map's real foreground-location permission flow.
+
+  src/hooks/useLocation.ts
+    A second location hook with a separate foreground permission flow; it does
+    not appear to be used by the current map route.
+
+  src/components/ConsentModal.tsx
+    Contains privacy/location copy but has no call site in the repository.
+
+  app.config.ts
+    Declares foreground location permissions and permission purpose strings.
+
+  package.json
+    Shows installed dependencies and confirms the absence of auth storage and
+    in-app purchase SDKs.
+
+
+CURRENT RENDER AND NAVIGATION FLOW
+----------------------------------
+
+Application hierarchy:
+
+  RootLayout
+  └─ GestureHandlerRootView
+     └─ Root Expo Router Stack
+        ├─ (tabs)
+        │  └─ TabNavigation
+        │     ├─ Nested Stack
+        │     │  ├─ map
+        │     │  ├─ garage
+        │     │  ├─ list
+        │     │  ├─ favorites
+        │     │  └─ account
+        │     └─ BottomNavBar
+        ├─ parking/[id]
+        ├─ billing
+        └─ fresh-check
+
+How You opens:
+
+1. BottomNavBar defines:
+
+     key: profile
+     label: YOU
+     callback: onProfilePress
+
+2. `(tabs)/_layout.tsx` passes:
+
+     onProfilePress={() => showOverlay('you')}
+
+3. showOverlay toggles the MapOverlayContext state. If the current route is not
+   `/map`, it replaces the current nested route with `/map`.
+
+4. `parking-map.tsx` renders YouBottomSheet when:
+
+     activeOverlay === 'you'
+
+5. Opening any non-none overlay clears selected parking/search state.
+
+How You closes:
+
+  - Tapping the close button calls `sheetRef.current?.close()`.
+  - Swiping down closes the bottom sheet.
+  - Tapping the YOU navigation item again toggles the overlay to `none`.
+  - Android hardware back calls closeOverlay when an overlay is active.
+  - The sheet's onClose callback calls closeOverlay.
+
+How billing opens:
+
+1. "Manage subscription" sets a mutable `shouldOpenBillingRef`.
+2. The You sheet closes first.
+3. Its onClose callback closes the overlay.
+4. If the ref was set, it pushes `/billing`.
+
+Current `/account` deep link:
+
+1. AccountDeepLink mounts.
+2. Its effect calls openOverlay('you').
+3. It redirects to `/map`.
+4. The map then renders YouBottomSheet.
+
+Garage comparison:
+
+  - `/garage` renders GarageScreen directly.
+  - Bottom navigation remains visible because it is outside the nested Stack.
+  - Garage provides a custom Back button.
+  - The Back button uses router.back() when history exists and otherwise
+    router.replace('/map').
+  - Garage reads VehicleContext directly because the providers wrap the nested
+    Stack.
+
+
+CURRENT PROFILE / AUTHENTICATION STATE
+--------------------------------------
+
+Authentication conclusion:
+
+  The app is anonymous-only. It does not currently have a real account or local
+  profile system.
+
+Evidence:
+
+  - No supabase.auth calls exist.
+  - No sign-up, sign-in, sign-out, password, magic-link, OAuth, or session
+    handling exists.
+  - No AsyncStorage, SecureStore, MMKV, or similar persistence dependency exists.
+  - Database types contain only parking_segments and parking_zones.
+  - Supabase queries only perform public/anonymous SELECT operations.
+  - Supabase SQL grants public read access; the use of Supabase's generic
+    `authenticated` database role in one read policy is not evidence that this
+    app creates authenticated users.
+  - Billing text mentions sign-in, but no sign-in behavior exists.
+
+Current profile labels:
+
+  Display name:
+    Hard-coded "Munich driver".
+
+  Avatar:
+    Hard-coded letter "M".
+
+  Reporting:
+    Hard-coded "Anonymous reporting enabled".
+
+  Email/login status:
+    Not displayed and not implemented.
+
+There is no profile record to edit, sync, export, or delete.
+
+
+CURRENT USER DATA FLOW
+----------------------
+
+1. Favorites
+
+Owner:
+  FavoriteParkingProvider
+
+Stored fields:
+  Full ParkingClusterResponse objects for selected favorite parking items.
+
+Storage location:
+  React useState only.
+
+Persistence:
+  None. No disk or backend persistence.
+
+Deletion:
+  Individual favorites can be removed in FavoriteParkingBottomSheet or toggled
+  from parking detail. No bulk clear/reset API exists.
+
+Lifetime:
+  Survives navigation while the provider remains mounted. It is lost when the
+  provider/app JavaScript state is recreated.
+
+
+2. Garage / cars
+
+Owner:
+  VehicleProvider
+
+Stored fields:
+  - id generated from timestamp plus an in-memory sequence
+  - nickname
+  - normalized license plate
+  - createdAt timestamp
+  - optional updatedAt type field, currently not set by add
+  - activeVehicleId
+
+Storage location:
+  React useReducer state only.
+
+Persistence:
+  None. No disk or backend persistence.
+
+Deletion:
+  Individual vehicles can be deleted from GarageScreen. Deleting the active
+  vehicle selects the first remaining vehicle. No bulk clear/reset API exists.
+
+Privacy classification:
+  A license plate can be personal data. If vehicle persistence or backend sync
+  is added, it must be covered by the privacy policy, retention/deletion flow,
+  store disclosures, and account deletion where applicable.
+
+
+3. Location permission and coordinates
+
+Configuration:
+  app.config.ts requests foreground coarse/fine location only. Background
+  location and Android foreground-service location are disabled.
+
+iOS purpose text:
+  "Allow WhiteChocolate to use your location to show where you are and find
+  nearby parking."
+
+Android permissions:
+  ACCESS_COARSE_LOCATION
+  ACCESS_FINE_LOCATION
+
+Runtime flow:
+  - The app does not request location automatically on map mount.
+  - The map starts at the Munich overview.
+  - Tapping the current-location control checks existing foreground permission.
+  - If permission can be requested, it requests permission.
+  - It checks whether location services are enabled.
+  - It requests one high-accuracy current fix with a 15-second timeout.
+  - On failure it may use an OS-provided last-known position no older than two
+    minutes and no less accurate than 500 meters.
+  - Coordinates are stored in React state and projected as a map marker.
+
+Network implication:
+  After obtaining location, parking-map calls requestParkingForCamera with the
+  device coordinates at zoom 17. That produces a geographic bounding box and
+  sends the bounds to Supabase to retrieve nearby parking segments. The exact
+  GPS object is not inserted into a user table, but a user-centered map area and
+  the network request IP are processed by Supabase infrastructure. The privacy
+  policy and Play Data safety analysis must account for the actual provider and
+  server logging configuration.
+
+Current account UI problem:
+  YouBottomSheet always says "Allowed". It does not query whether the permission
+  is granted, denied, restricted, or askable.
+
+Missing controls:
+  - No open-system-settings action.
+  - No permission refresh after returning from Settings.
+  - No in-app location explanation tied to actual current state.
+  - No explicit explanation that nearby map bounds are sent to Supabase.
+
+
+4. Anonymous reporting
+
+Current UI:
+  Claims "Anonymous reporting enabled".
+
+ConsentModal copy:
+  Claims reports are device-attributed for rate limiting.
+
+Repository implementation:
+  No reporting POST/INSERT/UPDATE path was found.
+  FreshCheckScreen only runs a local timer and returns.
+  No device identifier, rate-limit identifier, report table, or report API was
+  found.
+
+Conclusion:
+  The reporting and device-attribution statements are unsupported by current
+  code and should not be shown as real status. Either remove/relabel them before
+  release or implement the feature with accurate consent, retention, security,
+  and deletion disclosures.
+
+
+5. Subscription state
+
+Current UI:
+  YouBottomSheet always displays:
+
+    Munich pilot
+    Active
+
+Current billing page:
+  - Hard-coded price: EUR 6 per month.
+  - Lists three premium benefits.
+  - Says checkout will be hosted by Stripe.
+  - Says cancellation will be managed in a Stripe portal.
+  - Shows "Sign in and continue to Stripe".
+  - The CTA has no onPress handler.
+
+Implementation:
+  None.
+
+No evidence was found for:
+  - RevenueCat
+  - StoreKit / Apple In-App Purchase
+  - Google Play Billing
+  - Expo in-app purchase library
+  - Stripe SDK
+  - Checkout URL creation
+  - Customer portal URL
+  - Product identifiers
+  - Purchase receipt validation
+  - Entitlement state
+  - Restore purchases
+  - Manage subscription action
+  - Cancellation state
+  - Trial/introductory offer state
+  - Account-to-purchase association
+
+Conclusion:
+  "Active" and "Manage subscription" are misleading in the current build.
+  The billing page is a design placeholder, not a working subscription system.
+
+
+6. Privacy consent
+
+ConsentModal exists but is not mounted anywhere.
+
+Therefore:
+  - It does not gate the OS location prompt.
+  - Its Continue and Not now actions are not reachable.
+  - No consent decision is stored.
+  - No consent withdrawal control exists.
+  - No consent timestamp/version exists.
+  - No privacy policy is linked.
+
+The actual map permission flow goes directly to the OS foreground-location
+permission prompt after the user taps the location control.
+
+
+7. Device and session identifiers
+
+Explicit stable user/device identifier:
+  None found.
+
+Identifiers that do exist:
+
+  Google Places session token:
+    Generated from Date.now() plus Math.random(). It is sent to Google's Places
+    Autocomplete and Place Details APIs and replaced between search sessions.
+    It is not an authentication session.
+
+  Vehicle ID:
+    Timestamp plus in-memory sequence. It is local runtime data, not a device or
+    account identifier.
+
+  Supabase anon key:
+    Identifies the application/public API role, not an individual user.
+
+  EAS project ID, package name, and bundle identifier:
+    Identify the app/build, not an individual user.
+
+Potential provider data:
+  Supabase and Google receive normal network metadata such as IP address
+  according to their infrastructure and configuration. Exact retention and
+  logging cannot be determined from this repository.
+
+Unsupported claim:
+  ConsentModal says reports are device-attributed, but no such identifier or
+  reporting implementation was found.
+
+
+SUPABASE AUDIT
+--------------
+
+Client:
+  `createClient` is configured with an Expo public URL and anon key.
+
+Application queries:
+  - SELECT parking_segments within a map bounding box.
+  - SELECT one parking segment by ID.
+  - SELECT parking_zones.
+
+Writes:
+  No application INSERT, UPDATE, UPSERT, DELETE, RPC, or auth flow was found.
+
+Generated database types:
+  - parking_segments
+  - parking_zones
+
+User/account tables:
+  None in repository-generated types.
+
+SQL files:
+  - Prepare public parking segments and grant anon SELECT.
+  - Grant anon/authenticated SELECT for public parking zones.
+
+Limitation:
+  This audit cannot prove that the remote Supabase project has no additional
+  unseen auth users, tables, functions, logs, or retention rules. It proves only
+  that this repository does not reference them.
+
+
+LEGAL AND SUPPORT LINKS
+-----------------------
+
+No in-app links or text were found for:
+
+  - Privacy policy
+  - Terms of service
+  - Data retention/deletion policy
+  - Account deletion website
+  - Contact support
+  - Subscription terms
+  - Refund policy
+
+The repository LICENSE file is a source-code license and is not exposed in the
+app as user-facing legal content.
+
+No centralized legal-link constants file exists.
+
+No app version/build display exists.
+
+Version sources:
+  - package.json version: 1.0.0
+  - app.config.ts version: 1.0.0
+  - EAS production builds use remote appVersionSource and autoIncrement.
+
+expo-constants is installed and can provide the configured app version without
+adding a dependency. The current repository does not reliably expose the
+remote native build number through account UI. Do not display a guessed build
+number.
+
+
+ACCOUNT DELETION DECISION
+-------------------------
+
+Current app:
+  Account deletion is not currently required because no app account is created.
+
+Current local-data responsibility:
+  A clear "Delete local data" / "Reset app data" action is still recommended.
+  It should clear:
+
+  - Favorites
+  - Vehicles
+  - Active vehicle selection
+  - Any future persisted consent preferences
+  - Any future cached local profile/subscription metadata
+
+It must state what it does not do:
+
+  - It does not revoke the OS location permission.
+  - It does not clear provider/server logs outside the app.
+  - It does not cancel an App Store or Google Play subscription.
+  - It is not "Delete account" because no account exists.
+
+If account creation is added:
+
+  Apple:
+    The app must let every user initiate deletion of the full account and
+    associated data in the app. Automatically created guest accounts are also
+    covered. Deactivation alone is insufficient.
+
+  Google Play:
+    The app must provide a discoverable in-app account deletion path and a
+    functional outside-app web resource where account and associated-data
+    deletion can be requested.
+
+  Both:
+    Any retained data and legal/security retention reason must be explained.
+    Subscription cancellation and account deletion must be treated as separate
+    operations.
+
+
+APP STORE AND GOOGLE PLAY COMPLIANCE GAPS
+------------------------------------------
+
+Priority 0: Misleading/nonfunctional status
+
+  - "Munich pilot Active" is not backed by an entitlement.
+  - "Manage subscription" opens a mock billing page.
+  - Billing CTA has no action.
+  - "Location permission Allowed" is not read from the OS.
+  - "Anonymous reporting enabled" is not implemented.
+  - The Privacy row implies controls that do not exist.
+
+  Release impact:
+    Apple requires submitted features, purchase items, and URLs to be complete
+    and functional. Misleading account/subscription status is a rejection and
+    user-trust risk.
+
+
+Priority 0: Digital subscription payment path
+
+  The proposed premium benefits unlock app functionality. Under the standard
+  rules, Apple requires In-App Purchase and Google Play requires Play Billing
+  for in-app digital features/subscriptions unless a documented exception or
+  enrolled regional alternative-billing program applies.
+
+  The current generic "hosted by Stripe" plan should not be implemented as the
+  default cross-store purchase path without a storefront-by-storefront policy
+  and entitlement review.
+
+
+Priority 0: No privacy policy
+
+  Apple:
+    All apps need a privacy-policy link in App Store Connect and an easily
+    accessible in-app policy. It must explain collection/use, third parties,
+    retention/deletion, consent withdrawal, and data deletion requests.
+
+  Google Play:
+    All apps need a privacy-policy URL in Play Console and a privacy-policy link
+    or text in the app, including apps that collect no personal/sensitive data.
+    The hosted policy must be public, active, non-geofenced, non-editable, and
+    not a PDF. It must identify the app/developer, data practices, third parties,
+    security, retention/deletion, and a privacy contact.
+
+
+Priority 0: Store data disclosures not established
+
+  Google Play Data safety and Apple App Privacy answers must be based on:
+
+  - Foreground precise/approximate location access.
+  - User-centered Supabase bounding-box requests.
+  - Google Places search text, selected place IDs, and session tokens.
+  - Supabase and Google network metadata/logging.
+  - License plates if persistence or backend sync is added.
+  - Any future crash, analytics, reporting, auth, or billing SDK.
+
+  No store metadata files or completed disclosure records are present in the
+  repository. The app-store consoles may contain external configuration, so
+  their absence here is not proof that they are unconfigured.
+
+
+Priority 1: Consent withdrawal and permission management
+
+  - ConsentModal is unused.
+  - No stored consent state exists.
+  - No anonymous-reporting toggle exists.
+  - No location permission status is displayed accurately.
+  - No Open Settings control exists.
+  - No explanation covers the Supabase map-area request.
+
+  The account page should distinguish:
+
+  - OS permission state
+  - Optional app-level data/reporting consent
+  - Privacy-policy information
+
+
+Priority 1: Retention and deletion
+
+  - No user-facing retention statement exists.
+  - No bulk local reset exists.
+  - No provider deletion/request process exists.
+  - No account deletion path exists; not required yet, but needed immediately
+    if auth or automatic guest-account creation is introduced.
+
+
+Priority 1: Subscription transparency
+
+  Before a real purchase flow is shown, it needs:
+
+  - Product/plan name
+  - Exact localized price from the store product, not a hard-coded price
+  - Billing period and auto-renewal statement
+  - Trial/introductory offer terms where applicable
+  - Exact benefits and what remains free
+  - Manage/cancel path
+  - Restore purchases
+  - Terms and privacy links
+  - Entitlement/purchase-state error handling
+  - Account deletion versus subscription cancellation explanation
+
+
+Priority 1: Support and legal discoverability
+
+  Missing:
+
+  - Contact support
+  - Privacy policy
+  - Terms of service
+  - Data deletion/retention information
+  - App version/build display
+
+
+Priority 2: App identity inconsistency
+
+  User-facing/repository names vary:
+
+  - White_choclate
+  - WhiteChocolate
+  - ParkMunich
+  - Munich Parking
+
+  Store listing, privacy policy, deletion page, support identity, permission
+  strings, and in-app branding should use one approved product/developer name.
+
+
+RECOMMENDED DEDICATED PAGE ROUTE
+--------------------------------
+
+Route:
+  src/app/(tabs)/account.tsx
+
+Recommended component:
+  src/components/account/AccountScreen.tsx
+
+Recommended route implementation pattern:
+  Export AccountScreen from `(tabs)/account.tsx`, matching the Garage route:
+
+    export { AccountScreen as default } from
+      '@/components/account/AccountScreen';
+
+Why it should remain inside `(tabs)`:
+
+  - BottomNavBar stays visible.
+  - The page remains inside the existing nested Stack.
+  - FavoriteParkingProvider and VehicleProvider remain available.
+  - It matches Garage.
+  - A pushed page receives normal Stack back behavior.
+
+Back behavior:
+
+  Match GarageScreen:
+
+  - If router.canGoBack(), call router.back().
+  - Otherwise replace `/map`.
+
+Bottom-nav behavior:
+
+  Replace showOverlay('you') with route navigation.
+
+  Recommended intent:
+
+  - Close any existing map overlay.
+  - If already on `/account`, do not push another account route.
+  - Otherwise push `/account`.
+  - Set activeKey to `profile` when pathname ends with `/account`.
+
+Deep-link behavior:
+
+  `/account` should render the page directly. Remove the current open-overlay
+  effect and redirect.
+
+Map behavior:
+
+  Once the page is verified:
+
+  - Remove YouBottomSheet import from parking-map.tsx.
+  - Remove activeOverlay === 'you' rendering.
+  - Remove `you` from MapOverlayMode.
+  - Remove profile-specific overlay active-key handling.
+  - Delete YouBottomSheet only after `rg YouBottomSheet` and `rg \"'you'\"`
+    confirm no remaining dependencies.
+
+
+RECOMMENDED ACCOUNT PAGE SECTIONS
+---------------------------------
+
+1. Profile
+
+Current truthful state:
+
+  - Title: "Munich driver" or "Using without an account"
+  - Status: "No account connected"
+  - Do not claim anonymous reporting is enabled.
+
+Future optional auth:
+
+  - Show email/login provider only when a real session exists.
+  - Keep login optional unless an actual account-based feature requires it.
+
+
+2. Subscription / Premium
+
+Until billing exists:
+
+  - Do not show Active.
+  - Show "Free plan" or hide purchase management.
+  - Mark premium as unavailable only if product intent requires a placeholder in
+    non-production builds.
+
+When billing exists:
+
+  - Bind status to a verified entitlement.
+  - Show restore purchases.
+  - Show platform manage-subscription action.
+  - Use store-localized product price and renewal period.
+  - Explain benefits and free functionality clearly.
+  - Link terms and privacy.
+
+
+3. Privacy & Data
+
+Include:
+
+  - Privacy policy
+  - What data the app uses
+  - Third-party processors/providers
+  - Retention and deletion summary
+  - Location-data explanation
+  - Anonymous reporting explanation only if reporting is implemented
+  - Delete local data / reset app data
+  - Account deletion only if account creation exists
+
+
+4. Permissions
+
+Include:
+
+  - Actual foreground location status
+  - Why location is used
+  - Open system settings
+  - Refresh state when the page regains focus
+  - Explain that the app works from the Munich overview without permission
+
+
+5. Garage shortcut
+
+Include:
+
+  - Link to `/garage`
+  - Live saved-car count from VehicleContext
+
+The current vehicle provider is already available to the account route.
+
+
+6. Support & Legal
+
+Include:
+
+  - Contact support
+  - Terms of service
+  - Privacy policy
+  - Retention/deletion policy or section
+  - Version
+  - Build number only from a reliable runtime source
+
+
+FILES LIKELY AFFECTED BY THE MIGRATION
+--------------------------------------
+
+Create:
+
+  src/components/account/AccountScreen.tsx
+
+Optional supporting files:
+
+  src/constants/legal.ts
+  src/hooks/use-location-permission-status.ts
+  src/context/PrivacyConsentContext.tsx
+
+Modify:
+
+  src/app/(tabs)/account.tsx
+  src/app/(tabs)/_layout.tsx
+  src/components/BottomNavBar.tsx
+  src/context/MapOverlayContext.tsx
+  src/components/parking-map/parking-map.tsx
+  src/context/FavoriteParkingContext.tsx
+  src/context/VehicleContext.tsx
+  src/app/billing.tsx
+  app.config.ts, only if product name or purpose text is corrected
+
+Remove after verification:
+
+  src/components/parking-map/YouBottomSheet.tsx
+
+No change is required to @gorhom/bottom-sheet for the account migration.
+
+
+MINIMAL IMPLEMENTATION PLAN
+---------------------------
+
+Phase 1: Make the route real
+
+1. Add AccountScreen under `src/components/account`.
+2. Make `(tabs)/account.tsx` render AccountScreen.
+3. Copy Garage's back/fallback and bottom padding pattern.
+4. Change the YOU nav callback to close overlays and push `/account`.
+5. Mark YOU active from the account pathname.
+6. Prevent duplicate account pushes.
+
+Result:
+  Full account page with the bottom nav still present.
+
+
+Phase 2: Bind only truthful current state
+
+1. Show anonymous/no-account profile status.
+2. Read vehicle count from VehicleContext.
+3. Query actual foreground-location permission.
+4. Show Free plan or "Subscription not configured".
+5. Remove hard-coded Active, Allowed, and reporting-enabled claims.
+
+Result:
+  Page reflects the current app instead of planned features.
+
+
+Phase 3: Add privacy/legal controls
+
+1. Centralize approved privacy, terms, support, and deletion URLs/contact.
+2. Add in-app privacy and retention/deletion access.
+3. Add Open Settings for location.
+4. Add explicit local-data reset with confirmation.
+5. Add `clearFavorites` and `clearVehicles` context APIs.
+6. Explain what reset does and does not delete.
+
+Result:
+  Reviewers and users can discover privacy/support controls.
+
+
+Phase 4: Remove the old You overlay
+
+1. Confirm AccountScreen works from map, Garage, deep links, and cold launch.
+2. Remove YouBottomSheet rendering/import.
+3. Remove `you` from MapOverlayContext.
+4. Remove obsolete overlay active-state logic.
+5. Delete YouBottomSheet after repository reference checks.
+
+Result:
+  One account navigation model, no duplicate sheet path.
+
+
+Phase 5: Treat real subscription work as a separate feature
+
+1. Decide the store-compliant billing architecture.
+2. Configure store products and product IDs.
+3. Add purchase, restore, entitlement, and manage/cancel flows.
+4. Bind UI to verified status.
+5. Add terms, privacy, renewal, localized price, and failure states.
+6. Validate App Store/Play billing program eligibility before any external
+   Stripe link or checkout.
+
+Result:
+  Subscription UI can be enabled without misleading users or reviewers.
+
+
+Phase 6: Add account deletion only with accounts
+
+If auth is later introduced:
+
+1. Define account data ownership and retention.
+2. Add in-app full-account deletion initiation.
+3. Delete/anonymize all linked user data subject to disclosed legal retention.
+4. Revoke auth/session tokens.
+5. Explain subscription cancellation separately.
+6. Publish the Google Play outside-app deletion web resource.
+7. Update privacy/store disclosures.
+
+
+RISKS AND EDGE CASES
+--------------------
+
+Navigation:
+
+  - Pressing YOU repeatedly can push duplicate account screens unless guarded.
+  - Navigating from Garage should close stale map overlay state.
+  - A cold deep link to `/account` may have no back history; use map fallback.
+  - Android hardware back should be handled by the nested Stack once `you` is no
+    longer an overlay.
+  - Bottom content needs enough inset/padding to remain above BottomNavBar.
+
+Provider lifetime:
+
+  - AccountScreen must stay within `(tabs)` to access vehicle/favorite contexts.
+  - Moving account to the root Stack would hide the bottom nav and may lose
+    direct provider access.
+
+Permission state:
+
+  - Permission can change while the app is backgrounded in system Settings.
+  - Distinguish denied-but-askable from permanently denied.
+  - iOS limited/restricted and Android service-disabled states need clear copy.
+  - Opening Settings does not guarantee permission changes.
+
+Local reset:
+
+  - Require confirmation.
+  - Reset active vehicle when vehicles are cleared.
+  - Do not label local reset as account deletion.
+  - Do not claim it clears OS permission or provider logs.
+  - If persistence is added later, ensure reset removes both memory and storage.
+
+Subscription:
+
+  - Account deletion does not automatically cancel store billing.
+  - Hard-coded EUR pricing is wrong for other storefronts/taxes/currencies.
+  - Purchase status must survive reinstall and work across the user's devices.
+  - Restore and entitlement verification need offline/error states.
+  - Mock purchase controls should not ship in a review build.
+
+Privacy:
+
+  - Provider logs and retention cannot be inferred solely from app source.
+  - Google Places search text can be personal/sensitive depending on queries.
+  - User-centered Supabase bounds may constitute location processing.
+  - License plates become a disclosure/deletion concern once persisted.
+  - Store console disclosures must match every release and third-party SDK.
+
+Product identity:
+
+  - Legal documents and deletion pages must use the same app/developer identity
+    as the store listing.
+
+
+TESTING CHECKLIST
+-----------------
+
+Navigation:
+
+[ ] Tap YOU on the map and confirm `/account` opens as a full page.
+[ ] Confirm the bottom nav remains visible and YOU is active.
+[ ] Tap YOU repeatedly and confirm routes are not duplicated.
+[ ] Open account from Garage and verify navigation history.
+[ ] Use the account Back button and verify return to the prior route.
+[ ] Cold-open/deep-link `/account` and verify Back falls back to `/map`.
+[ ] Test Android hardware back.
+[ ] Confirm search/parking/favorites overlays are not left stale.
+
+Old-flow removal:
+
+[ ] Confirm YouBottomSheet no longer renders.
+[ ] Confirm `you` is removed from MapOverlayMode only after all references move.
+[ ] Confirm no other route imports YouBottomSheet.
+[ ] Confirm billing remains reachable from AccountScreen if it is intentionally
+    exposed.
+
+Profile/data:
+
+[ ] Show truthful no-account state.
+[ ] Show live vehicle count.
+[ ] Add/remove vehicles and verify the count.
+[ ] Add/remove favorites and verify reset behavior.
+[ ] Confirm app restart behavior is documented until persistence exists.
+[ ] Confirm local reset clears favorites, vehicles, and active vehicle.
+[ ] Confirm canceling reset changes nothing.
+
+Permissions:
+
+[ ] Test location status before request.
+[ ] Test granted precise location.
+[ ] Test approximate/coarse location where supported.
+[ ] Test denied but askable.
+[ ] Test permanently denied.
+[ ] Test location services disabled.
+[ ] Open Settings, change permission, return, and verify status refresh.
+[ ] Confirm map still works without location.
+
+Privacy/legal/support:
+
+[ ] Privacy policy opens from the app.
+[ ] Privacy URL is public, active, non-geofenced, and not a PDF.
+[ ] Terms link opens.
+[ ] Support contact works.
+[ ] Retention/deletion policy is discoverable.
+[ ] Version is correct.
+[ ] Build number is shown only if sourced reliably.
+[ ] Offline/broken-link behavior is understandable.
+
+Subscription, when implemented:
+
+[ ] Free, active, expired, grace-period, billing-retry, canceled, and unknown
+    states render correctly.
+[ ] Store-localized price and billing period display correctly.
+[ ] Benefits and free functionality are clear before purchase.
+[ ] Purchase completes.
+[ ] Restore purchases works.
+[ ] Manage/cancel opens the platform subscription controls.
+[ ] Terms and privacy are visible before purchase.
+[ ] Account deletion copy explains that subscription cancellation is separate.
+[ ] No generic external Stripe purchase path appears where store billing is
+    required.
+
+Accessibility and release:
+
+[ ] Screen reader labels and navigation order are correct.
+[ ] Dynamic Type does not clip account rows or legal text.
+[ ] Destructive reset/delete controls require explicit confirmation.
+[ ] Test iOS and Android release builds.
+[ ] Verify Apple App Privacy and Google Play Data safety disclosures against the
+    final binary and SDK list.
+[ ] Verify all store-review URLs are functional before submission.
+
+
+OFFICIAL POLICY REFERENCES
+--------------------------
+
+Apple App Review Guidelines:
+  https://developer.apple.com/app-store/review/guidelines/
+
+Relevant Apple sections:
+  - 2.1 App Completeness
+  - 3.1.1 In-App Purchase
+  - 3.1.2 Subscriptions
+  - 5.1.1 Privacy, permissions, sign-in, and account deletion
+
+Apple account deletion guidance:
+  https://developer.apple.com/support/offering-account-deletion-in-your-app/
+
+Google Play Developer Program Policy:
+  https://support.google.com/googleplay/android-developer/answer/17105854?hl=en
+
+Google Play account deletion requirements:
+  https://support.google.com/googleplay/android-developer/answer/13327111?hl=en
+
+Google Play Data safety:
+  https://support.google.com/googleplay/android-developer/answer/10787469?hl=en-EN
+
+Google Play Payments policy:
+  https://support.google.com/googleplay/android-developer/answer/9858738?hl=en-GB
+
+Google Play subscription transparency:
+  https://support.google.com/googleplay/android-developer/answer/140504?hl=en
+
+Expo SDK 56 reference required by repository instructions:
+  https://docs.expo.dev/versions/v56.0.0/
+
+
+RESEARCH COVERAGE
+-----------------
+
+Repository areas reviewed:
+
+  - package and Expo/EAS configuration
+  - root and nested Expo Router layouts/routes
+  - BottomNavBar and MapOverlayContext
+  - YouBottomSheet and billing screen
+  - Garage route, component, context, vehicle types/utilities/tests
+  - favorites context and consumers
+  - foreground-location hooks and app permission configuration
+  - consent modal
+  - Supabase client, database types, read services, and SQL policies
+  - Google Places search/session flow
+  - fresh-check/reporting placeholder
+  - legal/support/version references
+
+Public user-facing surfaces identified:
+
+  - YOU bottom-nav item
+  - account deep link
+  - You bottom sheet
+  - billing screen
+  - Garage page
+  - location permission prompt/control
+  - favorites and vehicle deletion controls
+
+Key architecture decisions:
+
+  1. Keep the new account route inside `(tabs)`.
+  2. Keep login optional while the product is anonymous.
+  3. Show only real state.
+  4. Separate local-data reset, account deletion, and subscription cancellation.
+  5. Treat real store billing as a separate implementation project.
+  6. Remove the old You sheet only after the full route is verified.
