@@ -57,7 +57,7 @@ function normalizeStoredBestSpot(value: unknown): ParkingBestSpot | null {
   };
 }
 
-function normalizeStoredFavorite(
+export function normalizeStoredFavorite(
   value: unknown,
 ): ParkingClusterResponse | null {
   if (!isRecord(value)) {

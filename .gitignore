@@ -36,6 +36,9 @@ expo-*.log
 .env*.local
 .env.eas-simulator
 
+# Supabase CLI local state
+supabase/.temp/
+
 # typescript
 *.tsbuildinfo
 
