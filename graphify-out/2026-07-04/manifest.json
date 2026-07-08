@@ -1,0 +1,907 @@
+{
+  ".claude/settings.json": {
+    "mtime": 1783112507.044791,
+    "ast_hash": "88c97080dcd73d3c55a7a47316348a96",
+    "semantic_hash": ""
+  },
+  ".claude/settings.local.json": {
+    "mtime": 1783199508.1970582,
+    "ast_hash": "54865247588b75babf21a9240a5ef072",
+    "semantic_hash": ""
+  },
+  ".codex/hooks.json": {
+    "mtime": 1783111833.4771898,
+    "ast_hash": "7511f06d51f6bfc886f9ad22b9b904f1",
+    "semantic_hash": ""
+  },
+  ".vscode/extensions.json": {
+    "mtime": 1780260634.2160394,
+    "ast_hash": "b2354ba0225f5689d13651ec0fac0de0",
+    "semantic_hash": ""
+  },
+  ".vscode/settings.json": {
+    "mtime": 1780260634.2248487,
+    "ast_hash": "6b9302c1f72c315e90233c7539c48c9f",
+    "semantic_hash": ""
+  },
+  "Munich-Parking-App-Pages-App-2026-06-22-072318/manifest.json": {
+    "mtime": 1782113000.0,
+    "ast_hash": "7f1a044a433e86a9fdbb6bcdbb0cc104",
+    "semantic_hash": ""
+  },
+  "Munich-Parking-App-Pages-App-2026-06-22-072318/source/App.jsx": {
+    "mtime": 1782113000.0,
+    "ast_hash": "197bc1ac65664af1585f4c81eee348f9",
+    "semantic_hash": ""
+  },
+  "app.config.ts": {
+    "mtime": 1783076296.984264,
+    "ast_hash": "d6fb44b3cb59e1e0cd044e6f5d54897a",
+    "semantic_hash": ""
+  },
+  "assets/expo.icon/icon.json": {
+    "mtime": 1780260634.2185602,
+    "ast_hash": "35cb915a0bebbebbe69cf7815e174462",
+    "semantic_hash": ""
+  },
+  "babel.config.js": {
+    "mtime": 1780389485.0343585,
+    "ast_hash": "4ffbd56b9f2b3bd2bc237e98268f42c6",
+    "semantic_hash": ""
+  },
+  "eas.json": {
+    "mtime": 1781886952.9666224,
+    "ast_hash": "eee004933651e81508dc70b5a11c1ca3",
+    "semantic_hash": ""
+  },
+  "eslint.config.js": {
+    "mtime": 1781871205.072452,
+    "ast_hash": "b713dd66aa3ad59ed5098d7b9f8dc202",
+    "semantic_hash": ""
+  },
+  "metro.config.js": {
+    "mtime": 1780389486.7451997,
+    "ast_hash": "97de46c04da85e2e0d7b70ccabe9a608",
+    "semantic_hash": ""
+  },
+  "nativewind-env.d.ts": {
+    "mtime": 1780389487.167762,
+    "ast_hash": "b02bcf4fde15f746f6e5248537d0b156",
+    "semantic_hash": ""
+  },
+  "package.json": {
+    "mtime": 1783199239.5131216,
+    "ast_hash": "8ae0cda6a0c6eccda9daa0a6a0611844",
+    "semantic_hash": ""
+  },
+  "src/app/(tabs)/_layout.tsx": {
+    "mtime": 1783074852.0535495,
+    "ast_hash": "fa075a22d74dd5ac986e01dfeb6c6342",
+    "semantic_hash": ""
+  },
+  "src/app/(tabs)/account/_layout.tsx": {
+    "mtime": 1783074721.2823029,
+    "ast_hash": "a680a12e50ca69f64172cdac6ac4f6e9",
+    "semantic_hash": ""
+  },
+  "src/app/(tabs)/account/about.tsx": {
+    "mtime": 1783076297.9062595,
+    "ast_hash": "41f8e6fd354504fdf136e7410e5f7766",
+    "semantic_hash": ""
+  },
+  "src/app/(tabs)/account/delete.tsx": {
+    "mtime": 1783100154.1271641,
+    "ast_hash": "5bfd56d0fcaaaa43be047d24e78ec344",
+    "semantic_hash": ""
+  },
+  "src/app/(tabs)/account/help.tsx": {
+    "mtime": 1783074727.9595313,
+    "ast_hash": "226cd87ba0458fed779a307af7fc31b0",
+    "semantic_hash": ""
+  },
+  "src/app/(tabs)/account/index.tsx": {
+    "mtime": 1783074722.2594473,
+    "ast_hash": "60a79217170d6326dbcc7d8bbc3bb0a8",
+    "semantic_hash": ""
+  },
+  "src/app/(tabs)/account/licenses.tsx": {
+    "mtime": 1783074729.9428146,
+    "ast_hash": "f4805bfcb4245eb90bfb47a5cfd1d84b",
+    "semantic_hash": ""
+  },
+  "src/app/(tabs)/account/notifications.tsx": {
+    "mtime": 1783074725.944701,
+    "ast_hash": "19f05b6c0476d713daf0949bdacb3800",
+    "semantic_hash": ""
+  },
+  "src/app/(tabs)/account/preferences.tsx": {
+    "mtime": 1783074724.976054,
+    "ast_hash": "88604d15322b4cfd4b98251d5aee8a3e",
+    "semantic_hash": ""
+  },
+  "src/app/(tabs)/account/privacy.tsx": {
+    "mtime": 1783074726.949112,
+    "ast_hash": "ef0b96104033e896b7cf989e9a158172",
+    "semantic_hash": ""
+  },
+  "src/app/(tabs)/account/profile.tsx": {
+    "mtime": 1783079703.735459,
+    "ast_hash": "9de2d4cd6b91ca0fd80cf03eb30f7eb7",
+    "semantic_hash": ""
+  },
+  "src/app/(tabs)/favorites.tsx": {
+    "mtime": 1782727763.4833415,
+    "ast_hash": "6b8c4a446cb987a5f03c0de96793bfdd",
+    "semantic_hash": ""
+  },
+  "src/app/(tabs)/garage.tsx": {
+    "mtime": 1782746819.4191687,
+    "ast_hash": "1aabf2100144b3c35dd8e77313928c33",
+    "semantic_hash": ""
+  },
+  "src/app/(tabs)/index.tsx": {
+    "mtime": 1781202276.7403681,
+    "ast_hash": "75c51a70f1b5d690c54a846fceb25c97",
+    "semantic_hash": ""
+  },
+  "src/app/(tabs)/list.tsx": {
+    "mtime": 1782727764.4190116,
+    "ast_hash": "b6eabb5b4064f632b0135653a785c1c6",
+    "semantic_hash": ""
+  },
+  "src/app/(tabs)/map.tsx": {
+    "mtime": 1782758734.7996361,
+    "ast_hash": "134eacac5d84f4ccef0c52e7309d0ad7",
+    "semantic_hash": ""
+  },
+  "src/app/+not-found.tsx": {
+    "mtime": 1780389547.254423,
+    "ast_hash": "73e2f3dc591cab49388e49fcf38fa99e",
+    "semantic_hash": ""
+  },
+  "src/app/_layout.tsx": {
+    "mtime": 1782809043.817528,
+    "ast_hash": "12b930b4211bfdf966ec0218a988d064",
+    "semantic_hash": ""
+  },
+  "src/app/billing.tsx": {
+    "mtime": 1782119289.5242338,
+    "ast_hash": "992a63ebc4084ed08cb75b5acd96fcb8",
+    "semantic_hash": ""
+  },
+  "src/app/fresh-check.tsx": {
+    "mtime": 1782758962.9454234,
+    "ast_hash": "88a5e9dd3a59162c1c44035b6dc2bf3e",
+    "semantic_hash": ""
+  },
+  "src/app/parking/[id].tsx": {
+    "mtime": 1782813018.4033134,
+    "ast_hash": "36d9b9cdc0891dd4328ec638fab5d164",
+    "semantic_hash": ""
+  },
+  "src/components/BottomNavBar.tsx": {
+    "mtime": 1782914714.4808395,
+    "ast_hash": "5b36c7bb64856e7ef63da74f5002d6d6",
+    "semantic_hash": ""
+  },
+  "src/components/InfoRow.tsx": {
+    "mtime": 1780389506.736331,
+    "ast_hash": "035f700e750c8d3d868b98f7d9542963",
+    "semantic_hash": ""
+  },
+  "src/components/account/account-placeholder-screen.tsx": {
+    "mtime": 1783074718.3356025,
+    "ast_hash": "3726eb68e15c32dc2e7d41438b19c431",
+    "semantic_hash": ""
+  },
+  "src/components/account/account-screen-skeleton.tsx": {
+    "mtime": 1783076236.477361,
+    "ast_hash": "561e39fb2e376d096276e4a24ab9c100",
+    "semantic_hash": ""
+  },
+  "src/components/account/account-screen.tsx": {
+    "mtime": 1783076233.6816537,
+    "ast_hash": "8ec48f30e09ff5bfbd0bfbc5f28eb2b3",
+    "semantic_hash": ""
+  },
+  "src/components/account/app-data-section.tsx": {
+    "mtime": 1783076335.436963,
+    "ast_hash": "0ea492270dd9bad93e15c459a2d26c4f",
+    "semantic_hash": ""
+  },
+  "src/components/account/danger-section.tsx": {
+    "mtime": 1783074665.504822,
+    "ast_hash": "a8081d7af76ebc2ed54860ca72b2efd9",
+    "semantic_hash": ""
+  },
+  "src/components/account/email-sign-in-card.tsx": {
+    "mtime": 1783079566.969952,
+    "ast_hash": "89fb5397fba9f342ebbc9546289425a6",
+    "semantic_hash": ""
+  },
+  "src/components/account/legal-section.tsx": {
+    "mtime": 1783074664.5263698,
+    "ast_hash": "7dfd9aa8f61c1d3a426e6f9690d41d58",
+    "semantic_hash": ""
+  },
+  "src/components/account/preferences-section.tsx": {
+    "mtime": 1783076237.3969333,
+    "ast_hash": "5859c051a4512aec8818257d5acf3010",
+    "semantic_hash": ""
+  },
+  "src/components/account/profile-header.tsx": {
+    "mtime": 1783074911.8689752,
+    "ast_hash": "d40ed477d7b0b9d5fe9bfacc5a7e5573",
+    "semantic_hash": ""
+  },
+  "src/components/account/quick-actions-section.tsx": {
+    "mtime": 1783076234.6075985,
+    "ast_hash": "7e0b3521f286a82e5ae7f6cb127a75c1",
+    "semantic_hash": ""
+  },
+  "src/components/account/subscription-card.tsx": {
+    "mtime": 1783076235.5300846,
+    "ast_hash": "1590bc78f56e613960eb367ae13d5537",
+    "semantic_hash": ""
+  },
+  "src/components/account/support-section.tsx": {
+    "mtime": 1783074663.549399,
+    "ast_hash": "98ef45b6d09a31750580abdaed43f1be",
+    "semantic_hash": ""
+  },
+  "src/components/garage/GarageScreen.tsx": {
+    "mtime": 1782758867.5558965,
+    "ast_hash": "0f94c393a7ac9c786dcef3b2e4761e7c",
+    "semantic_hash": ""
+  },
+  "src/components/parking-map/FavoriteParkingBottomSheet.tsx": {
+    "mtime": 1782914703.7726362,
+    "ast_hash": "baa4d92feccec99255d1c3d65199294f",
+    "semantic_hash": ""
+  },
+  "src/components/parking-map/ParkingAvailabilityBubble.tsx": {
+    "mtime": 1783022943.2659647,
+    "ast_hash": "edaeb3eeb3a701c25063110fbcfb6d37",
+    "semantic_hash": ""
+  },
+  "src/components/parking-map/ParkingAvailabilitySection.tsx": {
+    "mtime": 1782389917.705244,
+    "ast_hash": "59f23c2e4297fe1a15afb3c068fec964",
+    "semantic_hash": ""
+  },
+  "src/components/parking-map/ParkingBottomSheet.tsx": {
+    "mtime": 1782914701.8594315,
+    "ast_hash": "b8c8bf26e19cc62f1d8ceaee55011cb4",
+    "semantic_hash": ""
+  },
+  "src/components/parking-map/ParkingDetailHeader.tsx": {
+    "mtime": 1782480428.7526727,
+    "ast_hash": "512574db15df33588fbd1eb1e845a38b",
+    "semantic_hash": ""
+  },
+  "src/components/parking-map/ParkingDetailSection.tsx": {
+    "mtime": 1782389684.5459795,
+    "ast_hash": "af42ae297ab00e0fbc92f3bcd70df6bc",
+    "semantic_hash": ""
+  },
+  "src/components/parking-map/ParkingInfoRow.tsx": {
+    "mtime": 1782389685.5672297,
+    "ast_hash": "eb21fbe0bb955544fbcc09aa6a24d5e5",
+    "semantic_hash": ""
+  },
+  "src/components/parking-map/ParkingListBottomSheet.tsx": {
+    "mtime": 1782914704.725075,
+    "ast_hash": "ff8e683c03f880a33058b9738b567846",
+    "semantic_hash": ""
+  },
+  "src/components/parking-map/SearchNearestSpotsBottomSheet.tsx": {
+    "mtime": 1783025349.2711813,
+    "ast_hash": "49ab26167f4fb008e7d58c103a4b0eac",
+    "semantic_hash": ""
+  },
+  "src/components/parking-map/map-detail-level.ts": {
+    "mtime": 1783022736.366308,
+    "ast_hash": "1066e5a144c009184e290bcdac8cf929",
+    "semantic_hash": ""
+  },
+  "src/components/parking-map/map-layers.ts": {
+    "mtime": 1783071900.6209123,
+    "ast_hash": "4b0f750923cb90e12a12b2a8b6ddfbc8",
+    "semantic_hash": ""
+  },
+  "src/components/parking-map/marker-density.ts": {
+    "mtime": 1783010135.2093794,
+    "ast_hash": "84c8ef6da042112adc3f40e40497b7c0",
+    "semantic_hash": ""
+  },
+  "src/components/parking-map/marker-visuals.ts": {
+    "mtime": 1783022744.779068,
+    "ast_hash": "b955058a2b3882aab10cb4c45747097f",
+    "semantic_hash": ""
+  },
+  "src/components/parking-map/parking-availability-status.ts": {
+    "mtime": 1782819449.0106502,
+    "ast_hash": "bdc6b59ed7a86a697e9bafeb9f8adbf5",
+    "semantic_hash": ""
+  },
+  "src/components/parking-map/parking-map.tsx": {
+    "mtime": 1783074733.8656192,
+    "ast_hash": "9809fd2c9441b82f452ab81a17fb07d6",
+    "semantic_hash": ""
+  },
+  "src/components/parking-map/parking-marker-card.tsx": {
+    "mtime": 1783022939.5564497,
+    "ast_hash": "e52dc78defb38c8575c5d91168854869",
+    "semantic_hash": ""
+  },
+  "src/components/parking-map/search-destination-marker.tsx": {
+    "mtime": 1782945315.985642,
+    "ast_hash": "6b86cb1236a77d29e02a2ea8836c747c",
+    "semantic_hash": ""
+  },
+  "src/components/parking-map/user-location-marker.tsx": {
+    "mtime": 1782758796.7845988,
+    "ast_hash": "e37b3a53b4a81c1fefda0ab81ad748c2",
+    "semantic_hash": ""
+  },
+  "src/components/parking-map/zone-summary-marker.tsx": {
+    "mtime": 1783022793.1232738,
+    "ast_hash": "a18f580b2eba4811c0ca157d1b07911d",
+    "semantic_hash": ""
+  },
+  "src/components/settings/setting-item-list.tsx": {
+    "mtime": 1783076333.5609848,
+    "ast_hash": "bffc64f629757e27859c2714f7c16586",
+    "semantic_hash": ""
+  },
+  "src/components/settings/setting-row.tsx": {
+    "mtime": 1783074547.0015588,
+    "ast_hash": "aa282754b6fea2b613b75e06db713abc",
+    "semantic_hash": ""
+  },
+  "src/components/settings/settings-error-panel.tsx": {
+    "mtime": 1783074549.103456,
+    "ast_hash": "4a2bdcd8748191b58fc01822c65a500f",
+    "semantic_hash": ""
+  },
+  "src/components/settings/settings-section.tsx": {
+    "mtime": 1783074548.0182395,
+    "ast_hash": "58ac01a61af78c26f2cf9d2bc69d5a57",
+    "semantic_hash": ""
+  },
+  "src/config/googleMaps.ts": {
+    "mtime": 1782483553.6740446,
+    "ast_hash": "5cdee944ba4a47c491084c81f15477f3",
+    "semantic_hash": ""
+  },
+  "src/constants/account-settings.ts": {
+    "mtime": 1783100157.7365324,
+    "ast_hash": "969ca5806b9f58a8e4e12544b102a103",
+    "semantic_hash": ""
+  },
+  "src/constants/parking.ts": {
+    "mtime": 1782813462.3512514,
+    "ast_hash": "314be52f0257f41a300910f62cdec04c",
+    "semantic_hash": ""
+  },
+  "src/constants/theme.ts": {
+    "mtime": 1782119051.9646914,
+    "ast_hash": "103431a0d86abedfce87e03caa4aeae1",
+    "semantic_hash": ""
+  },
+  "src/constants/zones.ts": {
+    "mtime": 1782119069.5891984,
+    "ast_hash": "1b28ad8461da94065a4a220abc6e4518",
+    "semantic_hash": ""
+  },
+  "src/context/FavoriteParkingContext.tsx": {
+    "mtime": 1783100118.3367784,
+    "ast_hash": "6bb48457203d9cef87c5f4c4416faa2b",
+    "semantic_hash": ""
+  },
+  "src/context/MapOverlayContext.tsx": {
+    "mtime": 1783074731.9379134,
+    "ast_hash": "0f879f66187e1be9b8f32ae3344f17e6",
+    "semantic_hash": ""
+  },
+  "src/context/PreferencesContext.tsx": {
+    "mtime": 1783100130.9512603,
+    "ast_hash": "4fdd44eacd93ce925797e3bceceed302",
+    "semantic_hash": ""
+  },
+  "src/context/VehicleContext.tsx": {
+    "mtime": 1783100098.7525294,
+    "ast_hash": "f1fdc8857ceec80066013ec379136e69",
+    "semantic_hash": ""
+  },
+  "src/hooks/use-account.ts": {
+    "mtime": 1783089832.521339,
+    "ast_hash": "74f9c85db188ff70c2e0e3916192c945",
+    "semantic_hash": ""
+  },
+  "src/hooks/use-google-place-search.ts": {
+    "mtime": 1782758732.7992573,
+    "ast_hash": "e08c3f91096657893fb7bc1da857f3dc",
+    "semantic_hash": ""
+  },
+  "src/hooks/use-location-permission-status.ts": {
+    "mtime": 1783076226.1188226,
+    "ast_hash": "cfae52c2e337543450975b8cdc095aa1",
+    "semantic_hash": ""
+  },
+  "src/hooks/use-map-detail-level.ts": {
+    "mtime": 1783022736.4136937,
+    "ast_hash": "36cacb0f58e87ea913464adfb8699d15",
+    "semantic_hash": ""
+  },
+  "src/hooks/use-map-location.ts": {
+    "mtime": 1783011897.7943192,
+    "ast_hash": "5004fd9a8a06d6d519edfb20c314d546",
+    "semantic_hash": ""
+  },
+  "src/hooks/use-parking-clusters.ts": {
+    "mtime": 1783020613.5787458,
+    "ast_hash": "7f732d0806f26a0fdb22fe6ebf938d26",
+    "semantic_hash": ""
+  },
+  "src/hooks/use-parking-zones.ts": {
+    "mtime": 1783016061.4991307,
+    "ast_hash": "2347f83c5ae6ca83d9d267bfab5628fa",
+    "semantic_hash": ""
+  },
+  "src/hooks/use-stopwatch.ts": {
+    "mtime": 1782758750.100762,
+    "ast_hash": "7076aef143ccd5c8b7bd1ed71df2e685",
+    "semantic_hash": ""
+  },
+  "src/lib/supabase.ts": {
+    "mtime": 1783079453.9139662,
+    "ast_hash": "9618aeffdf836103a68c996e83895534",
+    "semantic_hash": ""
+  },
+  "src/services/googlePlaces.ts": {
+    "mtime": 1782483554.8450558,
+    "ast_hash": "9ef60a7a529c7801f1c11437ee29d6c3",
+    "semantic_hash": ""
+  },
+  "src/services/parking-clustering.ts": {
+    "mtime": 1783018070.172166,
+    "ast_hash": "38e0debb64727d1847975ef057d077f3",
+    "semantic_hash": ""
+  },
+  "src/services/parkingSegments.ts": {
+    "mtime": 1783020192.7091346,
+    "ast_hash": "5a264dd90ec29eef799a1c4e6cee72bb",
+    "semantic_hash": ""
+  },
+  "src/services/parkingZones.ts": {
+    "mtime": 1783018013.6121848,
+    "ast_hash": "0187aa302bf77729bccd37185e4e5166",
+    "semantic_hash": ""
+  },
+  "src/services/sync/favorite-merge.ts": {
+    "mtime": 1783104774.9058723,
+    "ast_hash": "7edd687f5f365b3148cfe57d0f5410fa",
+    "semantic_hash": ""
+  },
+  "src/services/sync/preference-merge.ts": {
+    "mtime": 1783104789.2527635,
+    "ast_hash": "75be242f8c1b1a49785ff9e4833cee91",
+    "semantic_hash": ""
+  },
+  "src/services/sync/sync-decision.ts": {
+    "mtime": 1783104714.9307559,
+    "ast_hash": "dd4fe5b9dc4dfed62c47294cf83f4a21",
+    "semantic_hash": ""
+  },
+  "src/services/sync/sync-manager.ts": {
+    "mtime": 1783104827.5338175,
+    "ast_hash": "d7c97a42fac35faf725827ed95f28258",
+    "semantic_hash": ""
+  },
+  "src/services/sync/sync-results.ts": {
+    "mtime": 1783104877.9719417,
+    "ast_hash": "2ae6d66949a72a5c07bc75a32cc53e39",
+    "semantic_hash": ""
+  },
+  "src/services/sync/sync-types.ts": {
+    "mtime": 1783104703.2407038,
+    "ast_hash": "ee7c4f8492f7d7d16c9acabdd22b6037",
+    "semantic_hash": ""
+  },
+  "src/services/sync/sync-validation.ts": {
+    "mtime": 1783104708.298633,
+    "ast_hash": "5538862097961fe8d6dc9e387b48ad42",
+    "semantic_hash": ""
+  },
+  "src/services/sync/vehicle-merge.ts": {
+    "mtime": 1783104748.4659042,
+    "ast_hash": "d4487cf16b07df6a88f7903b8882085a",
+    "semantic_hash": ""
+  },
+  "src/types/account.ts": {
+    "mtime": 1783079471.7711327,
+    "ast_hash": "8b88faeaf062ae68db7c27626de04198",
+    "semantic_hash": ""
+  },
+  "src/types/database.ts": {
+    "mtime": 1783104502.0134878,
+    "ast_hash": "cb9dc1531e130de5a4072f514abd6bd9",
+    "semantic_hash": ""
+  },
+  "src/types/parking-map.ts": {
+    "mtime": 1783018011.4920588,
+    "ast_hash": "3f3e0c2455a2e76e09dad064a5859db5",
+    "semantic_hash": ""
+  },
+  "src/types/parking-segment.ts": {
+    "mtime": 1782814180.2378452,
+    "ast_hash": "d6fba8820fe784bb867f7c966f7f0e17",
+    "semantic_hash": ""
+  },
+  "src/types/parking-zone.ts": {
+    "mtime": 1783011805.6434536,
+    "ast_hash": "94f9f093706181d7aeeef3eb5df32f42",
+    "semantic_hash": ""
+  },
+  "src/types/preferences.ts": {
+    "mtime": 1783074453.749987,
+    "ast_hash": "4244e9a4c6f6edbe609e175cb65ae81b",
+    "semantic_hash": ""
+  },
+  "src/types/settings.ts": {
+    "mtime": 1783076332.5672102,
+    "ast_hash": "5987ca1e8b4cd64a79629f82e86dfd36",
+    "semantic_hash": ""
+  },
+  "src/types/storage.ts": {
+    "mtime": 1783100035.194655,
+    "ast_hash": "84a403729bfa47d7d7c4041910110ed6",
+    "semantic_hash": ""
+  },
+  "src/types/vehicle.ts": {
+    "mtime": 1782746710.3823805,
+    "ast_hash": "fe095aaca84b19dfb6323e04f4471330",
+    "semantic_hash": ""
+  },
+  "src/utils/account-errors.ts": {
+    "mtime": 1783090224.4790196,
+    "ast_hash": "390d6e65e1f7ac2b4d2b6dbc4422b3c2",
+    "semantic_hash": ""
+  },
+  "src/utils/account-state.ts": {
+    "mtime": 1783076225.1711223,
+    "ast_hash": "690a8704c591bf441896abd1fc8664ab",
+    "semantic_hash": ""
+  },
+  "src/utils/auth-user.ts": {
+    "mtime": 1783079480.7170825,
+    "ast_hash": "2c85fd41ab2fbd2929150fe805d00d23",
+    "semantic_hash": ""
+  },
+  "src/utils/favorite-parking-storage.ts": {
+    "mtime": 1783104799.7970607,
+    "ast_hash": "3cc91c5c214502938e95c321c865ca4b",
+    "semantic_hash": ""
+  },
+  "src/utils/geo.ts": {
+    "mtime": 1780354356.9121728,
+    "ast_hash": "7a89f8f76ca2219ba936b0803d9ac1da",
+    "semantic_hash": ""
+  },
+  "src/utils/openParkingNavigation.ts": {
+    "mtime": 1782480426.4284933,
+    "ast_hash": "46bde9dc3e11eac8c26e75eab36f1e76",
+    "semantic_hash": ""
+  },
+  "src/utils/parking-map-geo.ts": {
+    "mtime": 1782945284.9420612,
+    "ast_hash": "264455f541c01b32f024d94cf9f30f7f",
+    "semantic_hash": ""
+  },
+  "src/utils/parking-segments.ts": {
+    "mtime": 1783020191.5433862,
+    "ast_hash": "29a75ad8836104337f2f9b699abe5473",
+    "semantic_hash": ""
+  },
+  "src/utils/parking-zones.ts": {
+    "mtime": 1783023130.7941298,
+    "ast_hash": "64f8ef7e9460aaa3151daafe3e071d3d",
+    "semantic_hash": ""
+  },
+  "src/utils/parking.ts": {
+    "mtime": 1782813016.4173365,
+    "ast_hash": "4df44c8b1c493093cb413638d5b8388e",
+    "semantic_hash": ""
+  },
+  "src/utils/parkingSearch.ts": {
+    "mtime": 1783025115.2752168,
+    "ast_hash": "7fd4c714f73262672533cbe85c6eb632",
+    "semantic_hash": ""
+  },
+  "src/utils/preferences-storage.ts": {
+    "mtime": 1783100074.9254107,
+    "ast_hash": "afe12dd93ab6f80950bcfafe001c77b6",
+    "semantic_hash": ""
+  },
+  "src/utils/vehicle-storage.ts": {
+    "mtime": 1783100044.2457318,
+    "ast_hash": "cc21c1af0a564ba2e1d014b90b739da5",
+    "semantic_hash": ""
+  },
+  "src/utils/vehicles.ts": {
+    "mtime": 1782747271.9872866,
+    "ast_hash": "d4b692b1a39c08037a362550e2fa7ca2",
+    "semantic_hash": ""
+  },
+  "supabase/migrations/20260703000100_auth_foundation_profiles.sql": {
+    "mtime": 1783078003.2221837,
+    "ast_hash": "e22bdec9f402e9f9d9e88b42dbb6ded1",
+    "semantic_hash": ""
+  },
+  "supabase/migrations/20260703000200_auth_foundation_user_data.sql": {
+    "mtime": 1783078027.885376,
+    "ast_hash": "7022cb6fc5b6724f3ef422bb2277eac7",
+    "semantic_hash": ""
+  },
+  "supabase/migrations/20260703000300_auth_foundation_compliance.sql": {
+    "mtime": 1783078047.8140094,
+    "ast_hash": "0924488452b812facb4a01a0295f5a09",
+    "semantic_hash": ""
+  },
+  "supabase/parking_segments_prepare.sql": {
+    "mtime": 1782811900.0735824,
+    "ast_hash": "f4471b0f17982efa4553e1df6a829811",
+    "semantic_hash": ""
+  },
+  "supabase/parking_zones_read_policy.sql": {
+    "mtime": 1783016062.656736,
+    "ast_hash": "0665edd2a84fc240b17d1eedd8d112fa",
+    "semantic_hash": ""
+  },
+  "tailwind.config.js": {
+    "mtime": 1781630005.8537748,
+    "ast_hash": "dfc0b4cd053601b0d9b04dcc65c5732d",
+    "semantic_hash": ""
+  },
+  "tests/account-state.test.ts": {
+    "mtime": 1783076228.015962,
+    "ast_hash": "91c12f33f8ddcbcfc4bb0ab1c9a3f39b",
+    "semantic_hash": ""
+  },
+  "tests/favorite-merge.test.ts": {
+    "mtime": 1783104943.804358,
+    "ast_hash": "58993014cbd7830e4a4314ab4f1b376b",
+    "semantic_hash": ""
+  },
+  "tests/favorite-parking-storage.test.ts": {
+    "mtime": 1783100197.0273252,
+    "ast_hash": "64c6cbe6c9f2e9af5458b4549a13aaf5",
+    "semantic_hash": ""
+  },
+  "tests/helpers/deep-freeze.ts": {
+    "mtime": 1783104879.8375652,
+    "ast_hash": "15ff8303ff7946f0a4832ef8ce11ac4f",
+    "semantic_hash": ""
+  },
+  "tests/helpers/memory-storage.ts": {
+    "mtime": 1783100166.4971423,
+    "ast_hash": "3ca583810879517ee09ba1474764cef9",
+    "semantic_hash": ""
+  },
+  "tests/map-detail-level.test.ts": {
+    "mtime": 1783022961.3687968,
+    "ast_hash": "d0779d814347aa2564666068ee990f88",
+    "semantic_hash": ""
+  },
+  "tests/parking-clustering.test.ts": {
+    "mtime": 1783018188.2080698,
+    "ast_hash": "87ed1b692735aa9a0a6755e5e9c31e7b",
+    "semantic_hash": ""
+  },
+  "tests/parking-marker-density.test.ts": {
+    "mtime": 1783022966.2309206,
+    "ast_hash": "ef5ee2c5f2964d5f1905e29959141330",
+    "semantic_hash": ""
+  },
+  "tests/parking-search.test.ts": {
+    "mtime": 1783025387.6798446,
+    "ast_hash": "4b21e151b20a9ebe1af2fb86b42c65dc",
+    "semantic_hash": ""
+  },
+  "tests/parking-segments.test.ts": {
+    "mtime": 1783020231.4035463,
+    "ast_hash": "f799b32f162541e87a1a7fe4e3190f7a",
+    "semantic_hash": ""
+  },
+  "tests/parking-zones.test.ts": {
+    "mtime": 1783023010.7860105,
+    "ast_hash": "e20dd6fdeb7bb4ae731b65d86414ab6c",
+    "semantic_hash": ""
+  },
+  "tests/preference-merge.test.ts": {
+    "mtime": 1783104972.9120162,
+    "ast_hash": "deffa54406b2f2ab037538ad433103b0",
+    "semantic_hash": ""
+  },
+  "tests/preferences.test.ts": {
+    "mtime": 1783100210.1751983,
+    "ast_hash": "8006e76dffda54bc14858af79af3de5e",
+    "semantic_hash": ""
+  },
+  "tests/sync-decision.test.ts": {
+    "mtime": 1783104890.7543583,
+    "ast_hash": "3771ae8da827799d5dbde4690cbb878b",
+    "semantic_hash": ""
+  },
+  "tests/sync-manager.test.ts": {
+    "mtime": 1783105009.0114655,
+    "ast_hash": "98ec2dfbfc85eb201b4e5af581a67694",
+    "semantic_hash": ""
+  },
+  "tests/sync-results.test.ts": {
+    "mtime": 1783104985.129452,
+    "ast_hash": "251c820a3d9b31cdee8ed6003a73fac1",
+    "semantic_hash": ""
+  },
+  "tests/vehicle-merge.test.ts": {
+    "mtime": 1783104926.673632,
+    "ast_hash": "7144ed00484a66fc7674b5b301189811",
+    "semantic_hash": ""
+  },
+  "tests/vehicle-storage.test.ts": {
+    "mtime": 1783100477.8714316,
+    "ast_hash": "f8ceb72a94a776585a41514721c5eeaf",
+    "semantic_hash": ""
+  },
+  "tests/vehicles.test.ts": {
+    "mtime": 1782747274.7037473,
+    "ast_hash": "d0173c8d329fa2542d4415ea3fde4154",
+    "semantic_hash": ""
+  },
+  "tsconfig.json": {
+    "mtime": 1781870756.3501608,
+    "ast_hash": "e10052b56eb468f4f2eb8e893561723b",
+    "semantic_hash": ""
+  },
+  ".codex/skills/graphify/SKILL.md": {
+    "mtime": 1783111833.4711819,
+    "ast_hash": "21f78a7f96e2f9aecc0f7afc053bd3cc",
+    "semantic_hash": ""
+  },
+  ".codex/skills/graphify/references/add-watch.md": {
+    "mtime": 1783111025.8371098,
+    "ast_hash": "d59d027fe449f06aa03905a01184e779",
+    "semantic_hash": ""
+  },
+  ".codex/skills/graphify/references/exports.md": {
+    "mtime": 1783111025.8449874,
+    "ast_hash": "9da2a2152e60a22f07f05fed5158f287",
+    "semantic_hash": ""
+  },
+  ".codex/skills/graphify/references/extraction-spec.md": {
+    "mtime": 1783111025.8475032,
+    "ast_hash": "bf895ec4d4e40f5f66f7d31c2a9bd4a7",
+    "semantic_hash": ""
+  },
+  ".codex/skills/graphify/references/github-and-merge.md": {
+    "mtime": 1783111025.8487115,
+    "ast_hash": "cde13df085e4c492aeb7ba298a996d0d",
+    "semantic_hash": ""
+  },
+  ".codex/skills/graphify/references/hooks.md": {
+    "mtime": 1783111025.85072,
+    "ast_hash": "3f545db6ce646650bb9de588f5512a27",
+    "semantic_hash": ""
+  },
+  ".codex/skills/graphify/references/query.md": {
+    "mtime": 1783111025.8527267,
+    "ast_hash": "9e5aadc2c57ab561bc56600fcfa70735",
+    "semantic_hash": ""
+  },
+  ".codex/skills/graphify/references/transcribe.md": {
+    "mtime": 1783111025.8547287,
+    "ast_hash": "67b6a5fa6c0974e18f60db9f8932fbd8",
+    "semantic_hash": ""
+  },
+  ".codex/skills/graphify/references/update.md": {
+    "mtime": 1783111025.8559928,
+    "ast_hash": "c698309979460d0f02ba616417844399",
+    "semantic_hash": ""
+  },
+  "AGENTS.md": {
+    "mtime": 1783111833.4731886,
+    "ast_hash": "51a1c9ab6c5cb59da223ea07f1da52c2",
+    "semantic_hash": ""
+  },
+  "CLAUDE.md": {
+    "mtime": 1783112507.043791,
+    "ast_hash": "b0517ee048d45b5cd5463430230eb52f",
+    "semantic_hash": ""
+  },
+  "Munich-Parking-App-Pages-App-2026-06-22-072318/DESIGN.md": {
+    "mtime": 1782113000.0,
+    "ast_hash": "db508a511eaea74dcb6ad6557a1dd1aa",
+    "semantic_hash": ""
+  },
+  "Munich-Parking-App-Pages-App-2026-06-22-072318/README.md": {
+    "mtime": 1782113000.0,
+    "ast_hash": "465cb144d60423e99dd82cd064b344aa",
+    "semantic_hash": ""
+  },
+  "Munich-Parking-App-Pages-App-2026-06-22-072318/index.html": {
+    "mtime": 1782113000.0,
+    "ast_hash": "18b1ce65e5ea15e7690ad35b5e3f9e57",
+    "semantic_hash": ""
+  },
+  "README.md": {
+    "mtime": 1783199263.5682096,
+    "ast_hash": "c5992cc7dad8932e8ba14a7ed4c42700",
+    "semantic_hash": ""
+  },
+  "docs/account-cloud-sync.md": {
+    "mtime": 1783105050.5591235,
+    "ast_hash": "d58e697efc48d315cca9a43344a2eb6a",
+    "semantic_hash": ""
+  },
+  "memory/2026-06-24-expo-linear-gradient-android.md": {
+    "mtime": 1782290333.9385273,
+    "ast_hash": "4289c4e01309414a01e45bb9100562b1",
+    "semantic_hash": ""
+  },
+  "memory/2026-06-24-expo-maps-android-authorization.md": {
+    "mtime": 1782293921.389768,
+    "ast_hash": "b92acedf930343cca2279d3e1c4dc549",
+    "semantic_hash": ""
+  },
+  "memory/2026-06-26-google-places-android-empty-client.md": {
+    "mtime": 1782483586.2929552,
+    "ast_hash": "ca3ae3e26154f14dd1b9325a464714c8",
+    "semantic_hash": ""
+  },
+  "memory/2026-06-26-place-search-geocode-permission.md": {
+    "mtime": 1782482475.0133686,
+    "ast_hash": "c8420db5bc465768c5a48de67bbb3113",
+    "semantic_hash": ""
+  },
+  "assets/expo.icon/Assets/expo-symbol 2.svg": {
+    "mtime": 1780260634.2816424,
+    "ast_hash": "6979b664c1ce82c10426a051082412a7",
+    "semantic_hash": ""
+  },
+  "assets/expo.icon/Assets/grid.png": {
+    "mtime": 1780260634.254749,
+    "ast_hash": "37cdeda9d1af5d7432716d9671b098da",
+    "semantic_hash": ""
+  },
+  "assets/images/android-icon-background.png": {
+    "mtime": 1780260634.2308602,
+    "ast_hash": "2d65569cc0e2afdcea0af9f9902d4173",
+    "semantic_hash": ""
+  },
+  "assets/images/android-icon-foreground.png": {
+    "mtime": 1780260634.2338605,
+    "ast_hash": "72e71a9c846c6aa4ae32476641a00e18",
+    "semantic_hash": ""
+  },
+  "assets/images/android-icon-monochrome.png": {
+    "mtime": 1780260634.2357469,
+    "ast_hash": "1e097dab989759fc0b69440092ca22cd",
+    "semantic_hash": ""
+  },
+  "assets/images/favicon.png": {
+    "mtime": 1780260634.251215,
+    "ast_hash": "d9f444efbdfbe7931aa93beada07318a",
+    "semantic_hash": ""
+  },
+  "assets/images/icon.png": {
+    "mtime": 1780260634.2692842,
+    "ast_hash": "8d892ef03dbd43e8d899c1d605ad42df",
+    "semantic_hash": ""
+  },
+  "assets/images/splash-icon.png": {
+    "mtime": 1780260634.279642,
+    "ast_hash": "5ee5db91d59518c45ebcc99a2f5afc57",
+    "semantic_hash": ""
+  }
+}
