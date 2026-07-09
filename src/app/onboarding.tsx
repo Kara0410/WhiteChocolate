@@ -289,15 +289,6 @@ export default function OnboardingScreen() {
     goNext();
   }, [goNext, markAccountSkipped]);
 
-  const continueAsGuest = useCallback(() => {
-    if (!account.isSignedIn) {
-      markAccountSkipped();
-    }
-
-    setLocalAccountError(null);
-    enterApp();
-  }, [account.isSignedIn, enterApp, markAccountSkipped]);
-
   const submitAccount = useCallback(async () => {
     if (isSubmittingAccount) {
       return;
@@ -653,13 +644,6 @@ export default function OnboardingScreen() {
                 disabled={isLocationLoading}
                 label="Not now"
                 onPress={skipLocation}
-              />
-            ) : null}
-
-            {isReadyStep ? (
-              <SecondaryButton
-                label="Set up my account later"
-                onPress={continueAsGuest}
               />
             ) : null}
 

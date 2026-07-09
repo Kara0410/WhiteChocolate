@@ -37,9 +37,30 @@ export type ParkingAvailabilityBubbleProps = {
 };
 
 const CLUSTER_SIZE = {
-  large: { canvasWidth: 96, canvasHeight: 44, width: 88, height: 38, font: 15 },
-  medium: { canvasWidth: 90, canvasHeight: 42, width: 82, height: 36, font: 14 },
-  small: { canvasWidth: 84, canvasHeight: 40, width: 76, height: 34, font: 13 },
+  large: {
+    canvasWidth: 132,
+    canvasHeight: 52,
+    minWidth: 86,
+    height: 44,
+    font: 15,
+    horizontalPadding: 18,
+  },
+  medium: {
+    canvasWidth: 124,
+    canvasHeight: 50,
+    minWidth: 80,
+    height: 42,
+    font: 14,
+    horizontalPadding: 17,
+  },
+  small: {
+    canvasWidth: 116,
+    canvasHeight: 48,
+    minWidth: 74,
+    height: 40,
+    font: 13,
+    horizontalPadding: 16,
+  },
 } as const;
 
 const SPOT_SIZE = {
@@ -71,10 +92,19 @@ function clampPercentage(percentage: number) {
 function markerShadow(
   selected: boolean,
   moving: boolean,
+  isCluster: boolean,
   glowStrong: string,
 ): ViewStyle['boxShadow'] {
   if (moving) {
-    return '0 1px 3px rgba(15, 23, 42, 0.18)';
+    return isCluster
+      ? '0 3px 8px rgba(15, 23, 42, 0.16)'
+      : '0 1px 3px rgba(15, 23, 42, 0.18)';
+  }
+  if (isCluster && selected) {
+    return '0 9px 20px rgba(37, 99, 235, 0.26)';
+  }
+  if (isCluster) {
+    return '0 8px 18px rgba(15, 23, 42, 0.22)';
   }
   if (selected) {
     return `0 7px 18px 2px ${glowStrong}`;
@@ -99,8 +129,16 @@ function ParkingAvailabilityBubble({
   const forcedPressed = state === 'pressed';
   const moving = performanceMode === 'moving';
   const isCluster = type === 'cluster';
-  const dimensions = isCluster ? CLUSTER_SIZE[size] : SPOT_SIZE[size];
-  const restingScale = selected ? 1.12 : forcedPressed ? 0.95 : 1;
+  const clusterDimensions = isCluster ? CLUSTER_SIZE[size] : null;
+  const spotDimensions = isCluster ? null : SPOT_SIZE[size];
+  const dimensions = clusterDimensions ?? spotDimensions ?? SPOT_SIZE.medium;
+  const restingScale = selected
+    ? isCluster
+      ? 1.05
+      : 1.12
+    : forcedPressed
+      ? 0.95
+      : 1;
   const scale = useSharedValue(restingScale);
   const clusterCount = normalizeClusterCount(count ?? zoneCount);
   const label = isCluster
@@ -123,8 +161,8 @@ function ParkingAvailabilityBubble({
   }));
 
   const handlePressIn = useCallback(() => {
-    animateScale(0.95);
-  }, [animateScale]);
+    animateScale(isCluster ? 0.97 : 0.95);
+  }, [animateScale, isCluster]);
 
   const handlePressOut = useCallback(() => {
     animateScale(restingScale);
@@ -135,8 +173,12 @@ function ParkingAvailabilityBubble({
     : moving
       ? theme.movingFill
       : theme.fill;
-  const textColor = isCluster ? '#172033' : theme.text;
-  const borderColor = isCluster ? '#D7DCE3' : theme.border;
+  const textColor = isCluster ? '#0F172A' : theme.text;
+  const borderColor = isCluster
+    ? selected
+      ? '#2563EB'
+      : '#DBEAFE'
+    : theme.border;
 
   return (
     <Animated.View
@@ -156,8 +198,8 @@ function ParkingAvailabilityBubble({
             styles.selectedAura,
             {
               backgroundColor: theme.glow,
-              height: dimensions.height + 8,
-              width: dimensions.width + 8,
+              height: (spotDimensions?.height ?? 0) + 8,
+              width: (spotDimensions?.width ?? 0) + 8,
             },
           ]}
         />
@@ -186,16 +228,20 @@ function ParkingAvailabilityBubble({
             {
               backgroundColor: fillColor,
               borderColor,
-              borderWidth: isCluster ? 1.5 : selected ? 3.5 : 3,
+              borderWidth: isCluster ? (selected ? 2 : 1) : selected ? 3.5 : 3,
               boxShadow: markerShadow(
                 selected,
                 moving,
+                isCluster,
                 isCluster
                   ? 'rgba(15, 23, 42, 0.28)'
                   : theme.glowStrong,
               ),
+              elevation: isCluster ? (selected ? 8 : 6) : selected ? 5 : 3,
               height: dimensions.height,
-              width: dimensions.width,
+              paddingHorizontal: clusterDimensions?.horizontalPadding,
+              minWidth: clusterDimensions?.minWidth,
+              width: spotDimensions?.width,
             },
           ]}
         >

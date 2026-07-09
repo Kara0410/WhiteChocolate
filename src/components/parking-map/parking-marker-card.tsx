@@ -15,7 +15,7 @@ type ParkingMarkerCardProps = {
   onPress: (item: ParkingClusterResponse) => void;
 };
 
-const MARKER_ENTERING_TRANSITION = ZoomIn.duration(160)
+const MARKER_ENTERING_TRANSITION = ZoomIn.duration(200)
   .withInitialValues({
     opacity: 0,
     transform: [{ scale: 0.92 }],

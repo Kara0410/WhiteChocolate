@@ -21,11 +21,11 @@ export function getMarkerSizeTier(
 export function getMarkerDimensions(tier: MarkerSizeTier) {
   const base =
     tier === 'large'
-      ? { width: 96, height: 44, visualSize: 88 }
+      ? { width: 132, height: 52, visualSize: 86 }
       : tier === 'medium'
-        ? { width: 90, height: 42, visualSize: 82 }
+        ? { width: 124, height: 50, visualSize: 80 }
         : tier === 'small'
-          ? { width: 84, height: 40, visualSize: 76 }
+          ? { width: 116, height: 48, visualSize: 74 }
           : { width: 78, height: 50, visualSize: 68 };
   const width = base.width;
   const height = base.height;

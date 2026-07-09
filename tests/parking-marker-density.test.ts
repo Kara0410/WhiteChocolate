@@ -340,15 +340,15 @@ test('uses readable spot-count pills with room for selection effects', () => {
   assert.equal(getMarkerDimensions('spot').visualSize, 68);
   assert.equal(getMarkerDimensions('spot').width, 78);
   assert.equal(getMarkerDimensions('spot').height, 50);
-  assert.equal(getMarkerDimensions('small').visualSize, 76);
-  assert.equal(getMarkerDimensions('small').width, 84);
-  assert.equal(getMarkerDimensions('small').height, 40);
-  assert.equal(getMarkerDimensions('medium').visualSize, 82);
-  assert.equal(getMarkerDimensions('medium').width, 90);
-  assert.equal(getMarkerDimensions('medium').height, 42);
-  assert.equal(getMarkerDimensions('large').visualSize, 88);
-  assert.equal(getMarkerDimensions('large').width, 96);
-  assert.equal(getMarkerDimensions('large').height, 44);
+  assert.equal(getMarkerDimensions('small').visualSize, 74);
+  assert.equal(getMarkerDimensions('small').width, 116);
+  assert.equal(getMarkerDimensions('small').height, 48);
+  assert.equal(getMarkerDimensions('medium').visualSize, 80);
+  assert.equal(getMarkerDimensions('medium').width, 124);
+  assert.equal(getMarkerDimensions('medium').height, 50);
+  assert.equal(getMarkerDimensions('large').visualSize, 86);
+  assert.equal(getMarkerDimensions('large').width, 132);
+  assert.equal(getMarkerDimensions('large').height, 52);
 });
 
 test('allows progressively more compact pills at closer zoom levels', () => {
