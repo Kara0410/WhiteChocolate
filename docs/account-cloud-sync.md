@@ -22,6 +22,15 @@ were applied — verified live on 2026-07-03).
 | `sync-manager.ts` | Local snapshot loader, remote snapshot placeholder, `determineAccountSyncState()` |
 | `index.ts` | Public surface of the sync layer |
 
+## Auth setup for this product phase
+
+The app uses Supabase email + password authentication only. Do not enable
+magic links, email OTP codes, website callback URLs, or deep-link auth
+callbacks for this phase.
+
+For immediate sign-in after registration, disable email confirmation in:
+Supabase Dashboard -> Authentication -> Providers -> Email -> Confirm email.
+
 ## Sync domains
 
 Three domains sync independently: `vehicles`, `favorites`, `preferences`

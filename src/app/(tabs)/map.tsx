@@ -1,9 +1,14 @@
-import { useLocalSearchParams } from 'expo-router';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ParkingMap } from '@/components/parking-map/parking-map';
+import { useOnboarding } from '@/context/OnboardingContext';
 import { useMapLocation } from '@/hooks/use-map-location';
+
 export default function MapScreen() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { favoriteFocusKey, favoriteSpotId, focusSearch, locate } =
     useLocalSearchParams<{
     favoriteFocusKey?: string;
@@ -11,6 +16,7 @@ export default function MapScreen() {
     focusSearch?: string;
     locate?: string;
   }>();
+  const { resetOnboardingForDev } = useOnboarding();
   const {
     initialCamera,
     isLocationLoading,
@@ -32,16 +38,35 @@ export default function MapScreen() {
   }
 
   return (
-    <ParkingMap
-      currentLocationFocusKey={locate}
-      favoriteFocusKey={favoriteFocusKey}
-      favoriteSpotId={favoriteSpotId}
-      initialCamera={initialCamera}
-      isLocationLoading={isLocationLoading}
-      locationMessage={locationMessage}
-      onRequestUserLocation={requestCurrentLocation}
-      searchFocusKey={focusSearch}
-      userLocation={userLocation}
-    />
+    <View className="flex-1">
+      <ParkingMap
+        currentLocationFocusKey={locate}
+        favoriteFocusKey={favoriteFocusKey}
+        favoriteSpotId={favoriteSpotId}
+        initialCamera={initialCamera}
+        isLocationLoading={isLocationLoading}
+        locationMessage={locationMessage}
+        onRequestUserLocation={requestCurrentLocation}
+        searchFocusKey={focusSearch}
+        userLocation={userLocation}
+      />
+      <Pressable
+        accessibilityLabel="Reset onboarding"
+        accessibilityRole="button"
+        className="absolute right-4 min-h-10 items-center justify-center rounded-full bg-slate-950/85 px-4 active:bg-slate-800"
+        onPress={() => {
+          resetOnboardingForDev();
+          router.replace('/onboarding');
+        }}
+        style={{
+          top: Math.max(insets.top, 12) + 12,
+          zIndex: 50,
+        }}
+      >
+        <Text className="text-[12px] font-black text-white">
+          Reset onboarding
+        </Text>
+      </Pressable>
+    </View>
   );
 }

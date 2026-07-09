@@ -22,28 +22,66 @@ export function accountLoadError(cause: unknown): AccountError {
   );
 }
 
-export function signInFailedError(cause: unknown): AccountError {
-  // Supabase's built-in email sender has a low default rate limit; the
-  // generic "check the email address" copy is actively misleading here.
-  if (isAuthApiError(cause) && cause.code === 'over_email_send_rate_limit') {
+function authErrorMatches(cause: unknown, terms: string[]) {
+  if (!isAuthApiError(cause)) {
+    return false;
+  }
+
+  const code = cause.code?.toLowerCase() ?? '';
+  const message = cause.message.toLowerCase();
+
+  return terms.some((term) => code.includes(term) || message.includes(term));
+}
+
+export function invalidEmailError(): AccountError {
+  return createAccountError(
+    'INVALID_EMAIL',
+    'Enter a valid email address.',
+  );
+}
+
+export function weakPasswordError(): AccountError {
+  return createAccountError(
+    'WEAK_PASSWORD',
+    'Use a password with at least 8 characters.',
+  );
+}
+
+export function loginFailedError(cause: unknown): AccountError {
+  if (authErrorMatches(cause, ['invalid_credentials', 'invalid login'])) {
     return createAccountError(
-      'SIGNIN_FAILED',
-      'Too many sign-in codes were requested. Wait a few minutes and try again.',
+      'LOGIN_FAILED',
+      'The email or password is incorrect.',
       cause,
     );
   }
 
   return createAccountError(
-    'SIGNIN_FAILED',
-    'The sign-in code could not be sent. Check the email address and try again.',
+    'LOGIN_FAILED',
+    'Sign in did not complete. Check your email and password, then try again.',
     cause,
   );
 }
 
-export function verifyFailedError(cause: unknown): AccountError {
+export function registerFailedError(cause: unknown): AccountError {
+  if (
+    authErrorMatches(cause, [
+      'already registered',
+      'already exists',
+      'email_exists',
+      'user_already_exists',
+    ])
+  ) {
+    return createAccountError(
+      'REGISTER_FAILED',
+      'An account with this email already exists. Sign in instead.',
+      cause,
+    );
+  }
+
   return createAccountError(
-    'VERIFY_FAILED',
-    'That code did not work. Check the latest email or request a new code.',
+    'REGISTER_FAILED',
+    'Account creation did not complete. Check your details and try again.',
     cause,
   );
 }

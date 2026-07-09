@@ -27,14 +27,14 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
     // On native the session must be stored explicitly; AsyncStorage is used
     // because expo-secure-store is not installed and SecureStore's ~2KB iOS
-    // value limit does not fit a Supabase session JSON (docs/auth-foundation.md).
+    // value limit does not fit a Supabase session JSON.
     // On web, supabase-js defaults to localStorage with its own SSR guards.
     ...(isWeb ? {} : { storage: AsyncStorage }),
     autoRefreshToken: true,
     persistSession: true,
-    // URL fragment detection only exists in browsers; native sign-in uses
-    // email OTP codes, not callback URLs.
-    detectSessionInUrl: isWeb,
+    // Email/password auth does not use website callbacks, magic links, or
+    // deep-link session detection in this product phase.
+    detectSessionInUrl: false,
   },
 });
 

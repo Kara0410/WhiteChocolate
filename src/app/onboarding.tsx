@@ -36,7 +36,7 @@ type OnboardingStep = {
   icon: ComponentType<LucideProps>;
 };
 
-type AccountMode = 'benefit' | 'email' | 'otp';
+type AccountMode = 'benefit' | 'login' | 'register';
 
 const STEPS: OnboardingStep[] = [
   {
@@ -204,7 +204,11 @@ export default function OnboardingScreen() {
   const [accountMode, setAccountMode] =
     useState<AccountMode>('benefit');
   const [email, setEmail] = useState('');
-  const [code, setCode] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [localAccountError, setLocalAccountError] = useState<string | null>(
+    null,
+  );
   const [isSubmittingAccount, setIsSubmittingAccount] = useState(false);
 
   const steps = useMemo(
@@ -221,12 +225,6 @@ export default function OnboardingScreen() {
   useEffect(() => {
     setActiveIndex((current) => Math.min(current, steps.length - 1));
   }, [steps.length]);
-
-  useEffect(() => {
-    if (account.pendingEmail && isAccountStep) {
-      setAccountMode('otp');
-    }
-  }, [account.pendingEmail, isAccountStep]);
 
   const enterApp = useCallback(() => {
     completeOnboarding();
@@ -262,62 +260,62 @@ export default function OnboardingScreen() {
   }, [goNext]);
 
   const skipAccount = useCallback(() => {
-    account.cancelEmailSignIn();
+    setLocalAccountError(null);
     markAccountSkipped();
     goNext();
-  }, [account, goNext, markAccountSkipped]);
+  }, [goNext, markAccountSkipped]);
 
   const continueAsGuest = useCallback(() => {
     if (!account.isSignedIn) {
       markAccountSkipped();
     }
 
-    account.cancelEmailSignIn();
+    setLocalAccountError(null);
     enterApp();
-  }, [account, enterApp, markAccountSkipped]);
+  }, [account.isSignedIn, enterApp, markAccountSkipped]);
 
-  const sendCode = useCallback(async () => {
+  const submitAccount = useCallback(async () => {
     if (isSubmittingAccount) {
       return;
     }
 
-    setIsSubmittingAccount(true);
-    try {
-      const result = await account.startEmailSignIn(email);
-      if (result.ok) {
-        setCode('');
-        setAccountMode('otp');
-      }
-    } finally {
-      setIsSubmittingAccount(false);
-    }
-  }, [account, email, isSubmittingAccount]);
-
-  const verifyCode = useCallback(async () => {
-    if (isSubmittingAccount) {
+    if (accountMode === 'register' && password !== confirmPassword) {
+      setLocalAccountError('Passwords do not match.');
       return;
     }
 
     setIsSubmittingAccount(true);
+    setLocalAccountError(null);
+
     try {
-      const result = await account.verifyEmailOtp(
-        account.pendingEmail ?? email,
-        code,
-      );
+      const result =
+        accountMode === 'register'
+          ? await account.registerWithEmailPassword(email, password)
+          : await account.loginWithEmailPassword(email, password);
+
       if (result.ok) {
-        setCode('');
+        setPassword('');
+        setConfirmPassword('');
         goNext();
       }
     } finally {
       setIsSubmittingAccount(false);
     }
-  }, [account, code, email, goNext, isSubmittingAccount]);
+  }, [
+    account,
+    accountMode,
+    confirmPassword,
+    email,
+    goNext,
+    isSubmittingAccount,
+    password,
+  ]);
 
-  const useDifferentEmail = useCallback(() => {
-    account.cancelEmailSignIn();
-    setCode('');
-    setAccountMode('email');
-  }, [account]);
+  const switchAccountMode = useCallback((nextMode: AccountMode) => {
+    setAccountMode(nextMode);
+    setConfirmPassword('');
+    setLocalAccountError(null);
+  }, []);
 
   const primaryAction = useMemo(() => {
     if (isLocationStep) {
@@ -355,10 +353,15 @@ export default function OnboardingScreen() {
     requestLocationAndContinue,
   ]);
 
-  const canSendCode =
-    !isSubmittingAccount && email.trim().length > 0;
-  const canVerifyCode =
-    !isSubmittingAccount && code.trim().length >= 6;
+  const isPasswordMode =
+    accountMode === 'login' || accountMode === 'register';
+  const passwordsMatch = password === confirmPassword;
+  const canSubmitAccount =
+    !isSubmittingAccount &&
+    email.trim().length > 0 &&
+    password.length > 0 &&
+    (accountMode !== 'register' ||
+      (confirmPassword.length > 0 && passwordsMatch));
 
   return (
     <View className="flex-1 bg-slate-100">
@@ -416,20 +419,25 @@ export default function OnboardingScreen() {
                     </View>
                     <PrimaryButton
                       label="Continue with email"
-                      onPress={() => setAccountMode('email')}
+                      onPress={() => switchAccountMode('register')}
                     />
                     <SecondaryButton
                       label="Continue as guest"
                       onPress={skipAccount}
                     />
                     <Text className="mt-2 text-center text-[12px] font-semibold leading-5 text-slate-400">
-                      No password needed. We will send a one-time code.
+                      Use email and password. No magic links or codes.
                     </Text>
                   </>
                 ) : null}
 
-                {!account.loading && accountMode === 'email' ? (
+                {!account.loading && isPasswordMode ? (
                   <>
+                    <Text className="mt-6 text-[13px] font-extrabold text-slate-700">
+                      {accountMode === 'register'
+                        ? 'Create account'
+                        : 'Sign in'}
+                    </Text>
                     <TextInput
                       accessibilityLabel="Email address"
                       autoCapitalize="none"
@@ -445,65 +453,82 @@ export default function OnboardingScreen() {
                       textContentType="emailAddress"
                       value={email}
                     />
-                    <Text className="mt-3 text-[12px] font-semibold leading-5 text-slate-400">
-                      No password needed. We will send a one-time code.
-                    </Text>
-                    <PrimaryButton
-                      disabled={!canSendCode}
-                      isLoading={isSubmittingAccount}
-                      label={
-                        isSubmittingAccount ? 'Sending code' : 'Send code'
-                      }
-                      onPress={() => {
-                        void sendCode();
-                      }}
-                    />
-                    <SecondaryButton
-                      disabled={isSubmittingAccount}
-                      label="Continue as guest"
-                      onPress={skipAccount}
-                    />
-                  </>
-                ) : null}
-
-                {!account.loading && accountMode === 'otp' ? (
-                  <>
-                    <Text className="mt-5 text-[13px] font-semibold leading-5 text-slate-500">
-                      Enter the one-time code sent to{' '}
-                      {account.pendingEmail ?? email}.
-                    </Text>
                     <TextInput
-                      accessibilityLabel="One-time code"
+                      accessibilityLabel="Password"
                       autoCapitalize="none"
-                      autoComplete="one-time-code"
+                      autoComplete={
+                        accountMode === 'register'
+                          ? 'new-password'
+                          : 'current-password'
+                      }
                       autoCorrect={false}
-                      className={`${INPUT_CLASS} text-center text-[20px] tracking-[4px]`}
+                      className={INPUT_CLASS}
                       editable={!isSubmittingAccount}
-                      inputMode="numeric"
-                      keyboardType="number-pad"
-                      maxLength={6}
-                      onChangeText={setCode}
-                      placeholder="000000"
+                      onChangeText={setPassword}
+                      placeholder="Password"
                       placeholderTextColor="#94A3B8"
-                      textContentType="oneTimeCode"
-                      value={code}
+                      secureTextEntry
+                      textContentType={
+                        accountMode === 'register'
+                          ? 'newPassword'
+                          : 'password'
+                      }
+                      value={password}
                     />
+                    {accountMode === 'register' ? (
+                      <TextInput
+                        accessibilityLabel="Confirm password"
+                        autoCapitalize="none"
+                        autoComplete="new-password"
+                        autoCorrect={false}
+                        className={INPUT_CLASS}
+                        editable={!isSubmittingAccount}
+                        onChangeText={setConfirmPassword}
+                        placeholder="Confirm password"
+                        placeholderTextColor="#94A3B8"
+                        secureTextEntry
+                        textContentType="newPassword"
+                        value={confirmPassword}
+                      />
+                    ) : null}
+                    {accountMode === 'register' &&
+                    confirmPassword.length > 0 &&
+                    !passwordsMatch ? (
+                      <Text
+                        accessibilityRole="alert"
+                        className="mt-3 text-[13px] font-semibold leading-5 text-red-700"
+                      >
+                        Passwords do not match.
+                      </Text>
+                    ) : null}
                     <PrimaryButton
-                      disabled={!canVerifyCode}
+                      disabled={!canSubmitAccount}
                       isLoading={isSubmittingAccount}
                       label={
                         isSubmittingAccount
-                          ? 'Checking code'
-                          : 'Verify code'
+                          ? accountMode === 'register'
+                            ? 'Creating account'
+                            : 'Signing in'
+                          : accountMode === 'register'
+                            ? 'Create account'
+                            : 'Sign in'
                       }
                       onPress={() => {
-                        void verifyCode();
+                        void submitAccount();
                       }}
                     />
                     <SecondaryButton
                       disabled={isSubmittingAccount}
-                      label="Use a different email"
-                      onPress={useDifferentEmail}
+                      label={
+                        accountMode === 'register'
+                          ? 'Already have an account? Sign in'
+                          : 'New here? Create an account'
+                      }
+                      onPress={() =>
+                        switchAccountMode(
+                          accountMode === 'register' ? 'login' : 'register',
+                        )
+                      }
                     />
                     <SecondaryButton
                       disabled={isSubmittingAccount}
@@ -513,12 +538,12 @@ export default function OnboardingScreen() {
                   </>
                 ) : null}
 
-                {account.error ? (
+                {localAccountError || account.error ? (
                   <Text
                     accessibilityRole="alert"
                     className="mt-3 text-[13px] font-semibold leading-5 text-red-700"
                   >
-                    {account.error.message}
+                    {localAccountError ?? account.error?.message}
                   </Text>
                 ) : null}
               </>
@@ -566,7 +591,7 @@ export default function OnboardingScreen() {
                   resetOnboardingForDev();
                   setActiveIndex(0);
                   setShouldLocateOnEntry(false);
-                  account.cancelEmailSignIn();
+                  setLocalAccountError(null);
                 }}
               >
                 <Text className="text-[11px] font-bold text-slate-300">

@@ -62,11 +62,9 @@ export default function AccountProfileScreen() {
       title="Profile"
     >
       <EmailSignInCard
-        cancelEmailSignIn={account.cancelEmailSignIn}
         errorMessage={account.error?.message ?? null}
-        pendingEmail={account.pendingEmail}
-        startEmailSignIn={account.startEmailSignIn}
-        verifyEmailOtp={account.verifyEmailOtp}
+        loginWithEmailPassword={account.loginWithEmailPassword}
+        registerWithEmailPassword={account.registerWithEmailPassword}
       />
     </AccountPlaceholderScreen>
   );

@@ -38,12 +38,12 @@ export const ANONYMOUS_QUICK_ACTIONS: SettingItem[] = [
     id: 'account-benefits',
     title: 'Sign in to sync garage and favorites',
     subtitle:
-      'Email sign-in with a one-time code. Sync itself arrives in a later phase.',
+      'Email and password sign-in. Sync itself arrives in a later phase.',
     icon: Sparkles,
     type: 'navigation',
     navigationTarget: '/account/profile',
     group: 'quick-actions',
-    accessibilityHint: 'Opens email sign-in',
+    accessibilityHint: 'Opens email and password sign-in',
   },
   {
     id: 'restore',

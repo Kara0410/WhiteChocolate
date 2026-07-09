@@ -1,196 +1,201 @@
-import { memo, useCallback, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 
 import type { AccountActionResult } from '@/types/account';
 
 type EmailSignInCardProps = {
   errorMessage: string | null;
-  pendingEmail: string | null;
-  startEmailSignIn: (email: string) => Promise<AccountActionResult>;
-  verifyEmailOtp: (
+  loginWithEmailPassword: (
     email: string,
-    token: string,
+    password: string,
   ) => Promise<AccountActionResult>;
-  cancelEmailSignIn: () => void;
+  registerWithEmailPassword: (
+    email: string,
+    password: string,
+  ) => Promise<AccountActionResult>;
 };
+
+type AuthMode = 'login' | 'register';
 
 const INPUT_CLASS =
   'mt-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-[15px] font-semibold text-slate-900';
 
 export const EmailSignInCard = memo(function EmailSignInCard({
   errorMessage,
-  pendingEmail,
-  startEmailSignIn,
-  verifyEmailOtp,
-  cancelEmailSignIn,
+  loginWithEmailPassword,
+  registerWithEmailPassword,
 }: EmailSignInCardProps) {
+  const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
-  const [code, setCode] = useState('');
-  const [busy, setBusy] = useState<'idle' | 'sending' | 'verifying'>('idle');
-  const [notice, setNotice] = useState<string | null>(null);
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
 
-  const sendCode = useCallback(
-    async (targetEmail: string) => {
-      setBusy('sending');
-      setNotice(null);
-
-      const result = await startEmailSignIn(targetEmail);
-
-      setBusy('idle');
-
-      if (result.ok) {
-        setCode('');
-        setNotice(
-          'Check your email for a 6-digit sign-in code. It can take a minute to arrive.',
-        );
-      }
-    },
-    [startEmailSignIn],
-  );
-
-  const handleSend = useCallback(() => {
-    void sendCode(email);
-  }, [email, sendCode]);
-
-  const handleResend = useCallback(() => {
-    if (pendingEmail) {
-      void sendCode(pendingEmail);
+  const isRegistering = mode === 'register';
+  const passwordsMatch = password === confirmPassword;
+  const canSubmit = useMemo(() => {
+    if (busy || email.trim().length === 0 || password.length === 0) {
+      return false;
     }
-  }, [pendingEmail, sendCode]);
 
-  const handleVerify = useCallback(async () => {
-    if (!pendingEmail) {
+    return !isRegistering || (confirmPassword.length > 0 && passwordsMatch);
+  }, [busy, confirmPassword.length, email, isRegistering, password, passwordsMatch]);
+
+  const submit = useCallback(async () => {
+    if (!canSubmit) {
       return;
     }
 
-    setBusy('verifying');
-    await verifyEmailOtp(pendingEmail, code);
-    setBusy('idle');
-  }, [code, pendingEmail, verifyEmailOtp]);
+    if (isRegistering && !passwordsMatch) {
+      setLocalError('Passwords do not match.');
+      return;
+    }
 
-  const handleUseDifferentEmail = useCallback(() => {
-    cancelEmailSignIn();
-    setCode('');
-    setNotice(null);
-  }, [cancelEmailSignIn]);
+    setBusy(true);
+    setLocalError(null);
 
-  const isBusy = busy !== 'idle';
+    try {
+      const result = isRegistering
+        ? await registerWithEmailPassword(email, password)
+        : await loginWithEmailPassword(email, password);
+
+      if (result.ok) {
+        setPassword('');
+        setConfirmPassword('');
+      }
+    } finally {
+      setBusy(false);
+    }
+  }, [
+    canSubmit,
+    email,
+    isRegistering,
+    loginWithEmailPassword,
+    password,
+    passwordsMatch,
+    registerWithEmailPassword,
+  ]);
+
+  const toggleMode = useCallback(() => {
+    setMode((current) => (current === 'login' ? 'register' : 'login'));
+    setConfirmPassword('');
+    setLocalError(null);
+  }, []);
+
+  const visibleError = localError ?? errorMessage;
 
   return (
     <View>
       <Text className="text-[15px] font-extrabold text-slate-900">
-        {pendingEmail ? 'Enter your sign-in code' : 'Sign in with email'}
+        {isRegistering ? 'Create an account' : 'Sign in with email'}
       </Text>
       <Text className="mt-2 text-[13px] font-semibold leading-5 text-slate-500">
-        {pendingEmail
-          ? `We sent a 6-digit code to ${pendingEmail}.`
-          : 'No password needed. We email you a one-time sign-in code.'}
+        {isRegistering
+          ? 'Use an email and password to save your parking setup later.'
+          : 'Sign in with your email and password. No code or magic link required.'}
       </Text>
 
-      {pendingEmail ? (
-        <>
-          <TextInput
-            accessibilityLabel="Sign-in code"
-            autoComplete="one-time-code"
-            className={INPUT_CLASS}
-            editable={!isBusy}
-            inputMode="numeric"
-            maxLength={6}
-            onChangeText={setCode}
-            placeholder="123456"
-            placeholderTextColor="#94A3B8"
-            textContentType="oneTimeCode"
-            value={code}
-          />
-          <Pressable
-            accessibilityLabel="Verify sign-in code"
-            accessibilityRole="button"
-            className={`mt-4 min-h-12 items-center justify-center rounded-full ${
-              isBusy || code.trim().length < 6
-                ? 'bg-slate-300'
-                : 'bg-blue-600 active:bg-blue-700'
-            }`}
-            disabled={isBusy || code.trim().length < 6}
-            onPress={handleVerify}
-            style={{ borderCurve: 'continuous' }}
-          >
-            <Text className="text-[15px] font-extrabold text-white">
-              {busy === 'verifying' ? 'Verifying…' : 'Verify code'}
-            </Text>
-          </Pressable>
-          <View className="mt-3 flex-row justify-between">
-            <Pressable
-              accessibilityLabel="Resend sign-in code"
-              accessibilityRole="button"
-              className="min-h-11 justify-center"
-              disabled={isBusy}
-              onPress={handleResend}
-            >
-              <Text className="text-[13px] font-extrabold text-blue-600">
-                {busy === 'sending' ? 'Sending…' : 'Resend code'}
-              </Text>
-            </Pressable>
-            <Pressable
-              accessibilityLabel="Use a different email"
-              accessibilityRole="button"
-              className="min-h-11 justify-center"
-              disabled={isBusy}
-              onPress={handleUseDifferentEmail}
-            >
-              <Text className="text-[13px] font-extrabold text-slate-500">
-                Use a different email
-              </Text>
-            </Pressable>
-          </View>
-        </>
-      ) : (
-        <>
-          <TextInput
-            accessibilityLabel="Email address"
-            autoCapitalize="none"
-            autoComplete="email"
-            autoCorrect={false}
-            className={INPUT_CLASS}
-            editable={!isBusy}
-            inputMode="email"
-            keyboardType="email-address"
-            onChangeText={setEmail}
-            placeholder="you@example.com"
-            placeholderTextColor="#94A3B8"
-            textContentType="emailAddress"
-            value={email}
-          />
-          <Pressable
-            accessibilityLabel="Send sign-in code"
-            accessibilityRole="button"
-            className={`mt-4 min-h-12 items-center justify-center rounded-full ${
-              isBusy || email.trim().length === 0
-                ? 'bg-slate-300'
-                : 'bg-blue-600 active:bg-blue-700'
-            }`}
-            disabled={isBusy || email.trim().length === 0}
-            onPress={handleSend}
-            style={{ borderCurve: 'continuous' }}
-          >
-            <Text className="text-[15px] font-extrabold text-white">
-              {busy === 'sending' ? 'Sending…' : 'Send sign-in code'}
-            </Text>
-          </Pressable>
-        </>
-      )}
+      <TextInput
+        accessibilityLabel="Email address"
+        autoCapitalize="none"
+        autoComplete="email"
+        autoCorrect={false}
+        className={INPUT_CLASS}
+        editable={!busy}
+        inputMode="email"
+        keyboardType="email-address"
+        onChangeText={setEmail}
+        placeholder="you@example.com"
+        placeholderTextColor="#94A3B8"
+        textContentType="emailAddress"
+        value={email}
+      />
+      <TextInput
+        accessibilityLabel="Password"
+        autoCapitalize="none"
+        autoComplete={isRegistering ? 'new-password' : 'current-password'}
+        autoCorrect={false}
+        className={INPUT_CLASS}
+        editable={!busy}
+        onChangeText={setPassword}
+        placeholder="Password"
+        placeholderTextColor="#94A3B8"
+        secureTextEntry
+        textContentType={isRegistering ? 'newPassword' : 'password'}
+        value={password}
+      />
 
-      {notice && !errorMessage ? (
-        <Text className="mt-3 text-[13px] font-semibold leading-5 text-emerald-700">
-          {notice}
+      {isRegistering ? (
+        <TextInput
+          accessibilityLabel="Confirm password"
+          autoCapitalize="none"
+          autoComplete="new-password"
+          autoCorrect={false}
+          className={INPUT_CLASS}
+          editable={!busy}
+          onChangeText={setConfirmPassword}
+          placeholder="Confirm password"
+          placeholderTextColor="#94A3B8"
+          secureTextEntry
+          textContentType="newPassword"
+          value={confirmPassword}
+        />
+      ) : null}
+
+      <Pressable
+        accessibilityLabel={isRegistering ? 'Create account' : 'Sign in'}
+        accessibilityRole="button"
+        className={`mt-4 min-h-12 items-center justify-center rounded-full ${
+          canSubmit
+            ? 'bg-blue-600 active:bg-blue-700'
+            : 'bg-slate-300'
+        }`}
+        disabled={!canSubmit}
+        onPress={() => {
+          void submit();
+        }}
+        style={{ borderCurve: 'continuous' }}
+      >
+        <Text className="text-[15px] font-extrabold text-white">
+          {busy
+            ? isRegistering
+              ? 'Creating account...'
+              : 'Signing in...'
+            : isRegistering
+              ? 'Create account'
+              : 'Sign in'}
+        </Text>
+      </Pressable>
+
+      <Pressable
+        accessibilityRole="button"
+        className="mt-3 min-h-11 items-center justify-center"
+        disabled={busy}
+        onPress={toggleMode}
+      >
+        <Text className="text-[13px] font-extrabold text-blue-600">
+          {isRegistering
+            ? 'Already have an account? Sign in'
+            : 'New here? Create an account'}
+        </Text>
+      </Pressable>
+
+      {isRegistering && confirmPassword.length > 0 && !passwordsMatch ? (
+        <Text
+          accessibilityRole="alert"
+          className="mt-2 text-[13px] font-semibold leading-5 text-red-700"
+        >
+          Passwords do not match.
         </Text>
       ) : null}
 
-      {errorMessage ? (
+      {visibleError ? (
         <Text
           accessibilityRole="alert"
           className="mt-3 text-[13px] font-semibold leading-5 text-red-700"
         >
-          {errorMessage}
+          {visibleError}
         </Text>
       ) : null}
 

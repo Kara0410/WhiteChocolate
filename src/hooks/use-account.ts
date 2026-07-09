@@ -15,9 +15,11 @@ import {
 import {
   accountLoadError,
   createAccountError,
+  invalidEmailError,
+  loginFailedError,
   logoutFailedError,
-  signInFailedError,
-  verifyFailedError,
+  registerFailedError,
+  weakPasswordError,
 } from '@/utils/account-errors';
 import { getCurrentAccountSnapshot } from '@/utils/account-state';
 import { mapSupabaseUser } from '@/utils/auth-user';
@@ -26,9 +28,17 @@ function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
+function isValidEmail(email: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function isValidPassword(password: string) {
+  return password.length >= 8;
+}
+
 export function useAccount() {
   const [user, setUser] = useState<AccountUser | null>(null);
-  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
+  const [signingIn, setSigningIn] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<AccountError | null>(null);
@@ -67,7 +77,7 @@ export function useAccount() {
       setUser(mapSupabaseUser(session?.user ?? null));
 
       if (session) {
-        setPendingEmail(null);
+        setSigningIn(false);
         setError(null);
       }
     });
@@ -78,73 +88,94 @@ export function useAccount() {
     };
   }, [refresh]);
 
-  const startEmailSignIn = useCallback(
-    async (email: string): Promise<AccountActionResult> => {
+  const loginWithEmailPassword = useCallback(
+    async (
+      email: string,
+      password: string,
+    ): Promise<AccountActionResult> => {
       setError(null);
 
       const normalizedEmail = normalizeEmail(email);
 
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
-        const invalidError = createAccountError(
-          'SIGNIN_FAILED',
-          'Enter a valid email address.',
-        );
+      if (!isValidEmail(normalizedEmail)) {
+        const invalidError = invalidEmailError();
         setError(invalidError);
         return { ok: false, error: invalidError };
       }
 
-      const { error: otpError } = await supabase.auth.signInWithOtp({
-        email: normalizedEmail,
-        options: { shouldCreateUser: true },
-      });
+      if (!isValidPassword(password)) {
+        const passwordError = weakPasswordError();
+        setError(passwordError);
+        return { ok: false, error: passwordError };
+      }
 
-      if (otpError) {
-        if (__DEV__) {
-          console.warn('[useAccount] signInWithOtp failed', {
-            name: otpError.name,
-            message: otpError.message,
-            status: otpError.status,
-            code: otpError.code,
+      setSigningIn(true);
+
+      try {
+        const { error: signInError } =
+          await supabase.auth.signInWithPassword({
+            email: normalizedEmail,
+            password,
           });
+
+        if (signInError) {
+          const failedError = loginFailedError(signInError);
+          setError(failedError);
+          return { ok: false, error: failedError };
         }
 
-        const sendError = signInFailedError(otpError);
-        setError(sendError);
-        return { ok: false, error: sendError };
+        return { ok: true };
+      } finally {
+        setSigningIn(false);
       }
-
-      setPendingEmail(normalizedEmail);
-      return { ok: true };
     },
     [],
   );
 
-  const verifyEmailOtp = useCallback(
-    async (email: string, token: string): Promise<AccountActionResult> => {
+  const registerWithEmailPassword = useCallback(
+    async (
+      email: string,
+      password: string,
+    ): Promise<AccountActionResult> => {
       setError(null);
 
-      const { error: verifyError } = await supabase.auth.verifyOtp({
-        email: normalizeEmail(email),
-        token: token.trim(),
-        type: 'email',
-      });
+      const normalizedEmail = normalizeEmail(email);
 
-      if (verifyError) {
-        const failedError = verifyFailedError(verifyError);
-        setError(failedError);
-        return { ok: false, error: failedError };
+      if (!isValidEmail(normalizedEmail)) {
+        const invalidError = invalidEmailError();
+        setError(invalidError);
+        return { ok: false, error: invalidError };
       }
 
-      // onAuthStateChange delivers the session and clears pendingEmail.
-      return { ok: true };
+      if (!isValidPassword(password)) {
+        const passwordError = weakPasswordError();
+        setError(passwordError);
+        return { ok: false, error: passwordError };
+      }
+
+      setSigningIn(true);
+
+      try {
+        const { error: signUpError } = await supabase.auth.signUp({
+          email: normalizedEmail,
+          password,
+        });
+
+        if (signUpError) {
+          const failedError = registerFailedError(signUpError);
+          setError(failedError);
+          return { ok: false, error: failedError };
+        }
+
+        // onAuthStateChange delivers the session when email confirmation is
+        // disabled in Supabase Dashboard > Authentication > Providers > Email.
+        return { ok: true };
+      } finally {
+        setSigningIn(false);
+      }
     },
     [],
   );
-
-  const cancelEmailSignIn = useCallback(() => {
-    setPendingEmail(null);
-    setError(null);
-  }, []);
 
   const logout = useCallback(async (): Promise<AccountActionResult> => {
     setError(null);
@@ -156,7 +187,7 @@ export function useAccount() {
     setSigningOut(true);
 
     try {
-      // Product decision (docs/auth-foundation.md §5.6): sign-out only ends
+      // Product decision: sign-out only ends
       // the session. Local garage, favorites, and preferences stay on the
       // device; remote data is untouched.
       const { error: signOutError } = await supabase.auth.signOut();
@@ -203,7 +234,7 @@ export function useAccount() {
       ? 'authenticated'
       : error?.code === 'LOAD_FAILED'
         ? 'error'
-        : pendingEmail
+        : signingIn
           ? 'signingIn'
           : 'anonymous';
 
@@ -211,30 +242,26 @@ export function useAccount() {
     () => ({
       ...accountSnapshot,
       status,
-      pendingEmail,
       loading,
       error,
       refresh,
-      startEmailSignIn,
-      verifyEmailOtp,
-      cancelEmailSignIn,
+      loginWithEmailPassword,
+      registerWithEmailPassword,
       logout,
       deleteAccount,
       upgrade,
     }),
     [
       accountSnapshot,
-      cancelEmailSignIn,
       deleteAccount,
       error,
       loading,
+      loginWithEmailPassword,
       logout,
-      pendingEmail,
+      registerWithEmailPassword,
       refresh,
-      startEmailSignIn,
       status,
       upgrade,
-      verifyEmailOtp,
     ],
   );
 }
