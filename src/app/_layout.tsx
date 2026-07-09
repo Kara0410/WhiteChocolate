@@ -6,19 +6,57 @@ import { cssInterop } from 'nativewind';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
 
+import {
+  OnboardingLoadingScreen,
+  OnboardingProvider,
+  useOnboarding,
+} from '@/context/OnboardingContext';
+
 // SafeAreaView is a third-party component; NativeWind doesn't patch it automatically.
 // cssInterop wires its className prop to the underlying style prop.
 cssInterop(SafeAreaView, { className: 'style' });
 
+function RootStack() {
+  const { isHydrated, shouldShowOnboarding } = useOnboarding();
+
+  if (!isHydrated) {
+    return <OnboardingLoadingScreen />;
+  }
+
+  return (
+    <Stack>
+      <Stack.Protected guard={shouldShowOnboarding}>
+        <Stack.Screen
+          name="onboarding"
+          options={{ headerShown: false }}
+        />
+      </Stack.Protected>
+      <Stack.Protected guard={!shouldShowOnboarding}>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="parking/[id]" options={{ headerShown: true }} />
+        <Stack.Screen
+          name="billing"
+          options={{ headerShown: false, presentation: 'card' }}
+        />
+        <Stack.Screen
+          name="fresh-check"
+          options={{
+            animation: 'fade',
+            headerShown: false,
+            presentation: 'transparentModal',
+          }}
+        />
+      </Stack.Protected>
+    </Stack>
+  );
+}
+
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <Stack>
-        <Stack.Screen name="(tabs)"       options={{ headerShown: false }} />
-        <Stack.Screen name="parking/[id]" options={{ headerShown: true }} />
-        <Stack.Screen name="billing"      options={{ headerShown: false, presentation: 'card' }} />
-        <Stack.Screen name="fresh-check"  options={{ headerShown: false, presentation: 'transparentModal', animation: 'fade' }} />
-      </Stack>
+      <OnboardingProvider>
+        <RootStack />
+      </OnboardingProvider>
     </GestureHandlerRootView>
   );
 }
