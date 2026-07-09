@@ -31,7 +31,9 @@ import {
   MAP_ELEVATIONS,
   MAP_LAYERS,
 } from '@/components/parking-map/map-layers';
+import { useAuthSheet } from '@/context/AuthSheetContext';
 import { useFavoriteParking } from '@/context/FavoriteParkingContext';
+import { useAccount } from '@/hooks/use-account';
 import type { ParkingClusterResponse } from '@/types/parking-map';
 import { openParkingNavigation } from '@/utils/openParkingNavigation';
 
@@ -144,6 +146,8 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
   const title = item.bestSpot.zoneName || 'Parking Area';
   const price = item.avgPrice ?? item.minPrice;
   const dailyPrice = price === null ? null : price * 7.2;
+  const account = useAccount();
+  const { showCreateAccountSheet } = useAuthSheet();
   const { isFavorite, toggleFavorite } = useFavoriteParking();
   const itemIsFavorite = isFavorite(item.id);
 
@@ -161,8 +165,13 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
   }, [item, percentage, title]);
 
   const handleFavorite = useCallback(() => {
+    if (!account.isSignedIn) {
+      showCreateAccountSheet({ origin: 'parking-favorite' });
+      return;
+    }
+
     toggleFavorite(item);
-  }, [item, toggleFavorite]);
+  }, [account.isSignedIn, item, showCreateAccountSheet, toggleFavorite]);
 
   const handleNavigate = useCallback(() => {
     void openParkingNavigation({

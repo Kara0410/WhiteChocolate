@@ -11,6 +11,7 @@ import {
   OnboardingProvider,
   useOnboarding,
 } from '@/context/OnboardingContext';
+import { AuthSheetProvider } from '@/context/AuthSheetContext';
 
 // SafeAreaView is a third-party component; NativeWind doesn't patch it automatically.
 // cssInterop wires its className prop to the underlying style prop.
@@ -55,7 +56,9 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <OnboardingProvider>
-        <RootStack />
+        <AuthSheetProvider>
+          <RootStack />
+        </AuthSheetProvider>
       </OnboardingProvider>
     </GestureHandlerRootView>
   );

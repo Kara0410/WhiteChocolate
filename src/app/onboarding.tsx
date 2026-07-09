@@ -17,10 +17,13 @@ import {
 import {
   CarFront,
   Heart,
+  Info,
   LocateFixed,
+  Lock,
   MapPin,
   MapPinned,
   Navigation,
+  User,
   type LucideProps,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -55,10 +58,10 @@ const STEPS: OnboardingStep[] = [
   },
   {
     id: 'account',
-    title: 'Save your parking setup',
+    title: 'Create a free account',
     subtitle:
-      'Create a free account to keep favorites, vehicles, and preferences synced. Or continue as guest.',
-    icon: Heart,
+      'Create an account to unlock all features and keep your parking setup in sync across devices.',
+    icon: User,
   },
   {
     id: 'ready',
@@ -174,13 +177,34 @@ function SecondaryButton({
   );
 }
 
-function BenefitLine({ children }: { children: string }) {
+function AccountBenefitRow({
+  icon: Icon,
+  showDivider = true,
+  subtitle,
+  title,
+}: {
+  icon: ComponentType<LucideProps>;
+  showDivider?: boolean;
+  subtitle: string;
+  title: string;
+}) {
   return (
-    <View className="flex-row items-center gap-3">
-      <View className="h-2 w-2 rounded-full bg-blue-600" />
-      <Text className="text-[13px] font-extrabold text-slate-700">
-        {children}
-      </Text>
+    <View
+      className={`flex-row items-center py-4 ${
+        showDivider ? 'border-b border-slate-200' : ''
+      }`}
+    >
+      <View className="h-14 w-14 items-center justify-center rounded-2xl bg-blue-50">
+        <Icon color="#2563EB" size={27} strokeWidth={2.4} />
+      </View>
+      <View className="ml-4 flex-1">
+        <Text className="text-[16px] font-extrabold text-slate-950">
+          {title}
+        </Text>
+        <Text className="mt-1 text-[14px] font-semibold leading-5 text-slate-500">
+          {subtitle}
+        </Text>
+      </View>
     </View>
   );
 }
@@ -371,30 +395,60 @@ export default function OnboardingScreen() {
           justifyContent: 'center',
           paddingBottom: Math.max(insets.bottom, 20) + 24,
           paddingHorizontal: 20,
-          paddingTop: Math.max(insets.top, 20) + 24,
+          paddingTop: Math.max(insets.top, 16) + 16,
         }}
         showsVerticalScrollIndicator={false}
       >
         <View className="w-full max-w-[520px] self-center">
           <View
             key={step.id}
-            className="rounded-[32px] border border-white/80 bg-white px-6 py-7"
+            className={`border border-white/80 bg-white ${
+              isAccountStep && accountMode === 'benefit'
+                ? 'rounded-[36px] px-7 py-8'
+                : 'rounded-[32px] px-6 py-7'
+            }`}
             style={{
               borderCurve: 'continuous',
               boxShadow: '0 12px 30px rgba(15,23,42,0.09)',
             }}
           >
-            <View className="self-start rounded-[26px] bg-blue-50 p-4">
-              <StepIcon color="#2563EB" size={32} strokeWidth={2.4} />
+            <View
+              className={
+                isAccountStep && accountMode === 'benefit'
+                  ? 'h-20 w-20 items-center justify-center self-start rounded-[28px] bg-blue-50'
+                  : 'self-start rounded-[26px] bg-blue-50 p-4'
+              }
+            >
+              {isAccountStep && accountMode === 'benefit' ? (
+                <User color="#2563EB" size={39} strokeWidth={2.4} />
+              ) : (
+                <StepIcon color="#2563EB" size={32} strokeWidth={2.4} />
+              )}
             </View>
 
             {step.id === 'welcome' ? <FeatureIcons /> : null}
 
-            <Text className="mt-8 text-[31px] font-black leading-[36px] text-slate-950">
-              {step.title}
+            <Text
+              className={
+                isAccountStep && accountMode === 'benefit'
+                  ? 'mt-8 text-[38px] font-black leading-[42px] tracking-[-1px] text-slate-950'
+                  : 'mt-8 text-[31px] font-black leading-[36px] text-slate-950'
+              }
+            >
+              {isAccountStep && accountMode === 'benefit'
+                ? 'Create a free account'
+                : step.title}
             </Text>
-            <Text className="mt-3 text-[15px] font-semibold leading-6 text-slate-500">
-              {step.subtitle}
+            <Text
+              className={
+                isAccountStep && accountMode === 'benefit'
+                  ? 'mt-4 text-[17px] font-semibold leading-7 text-slate-500'
+                  : 'mt-3 text-[15px] font-semibold leading-6 text-slate-500'
+              }
+            >
+              {isAccountStep && accountMode === 'benefit'
+                ? 'Create an account to unlock all features and keep your parking setup in sync across devices.'
+                : step.subtitle}
             </Text>
 
             {isAccountStep ? (
@@ -410,24 +464,51 @@ export default function OnboardingScreen() {
 
                 {!account.loading && accountMode === 'benefit' ? (
                   <>
-                    <View className="mt-6 gap-3">
-                      <BenefitLine>Sync favorites</BenefitLine>
-                      <BenefitLine>Save vehicles</BenefitLine>
-                      <BenefitLine>
-                        Restore data on a new phone later
-                      </BenefitLine>
+                    <View className="mt-8">
+                      <AccountBenefitRow
+                        icon={Heart}
+                        subtitle="Keep your best parking spots in one place."
+                        title="Save your favorites"
+                      />
+                      <AccountBenefitRow
+                        icon={CarFront}
+                        subtitle="Store your vehicles in your garage for quick access."
+                        title="Manage your vehicles"
+                      />
+                      <AccountBenefitRow
+                        icon={Info}
+                        showDivider={false}
+                        subtitle="Get details like prices, regulations, and availability where available."
+                        title="See more parking info"
+                      />
                     </View>
-                    <PrimaryButton
-                      label="Continue with email"
+                    <Pressable
+                      accessibilityRole="button"
+                      className="mt-8 h-16 items-center justify-center rounded-2xl bg-blue-600 active:bg-blue-700"
                       onPress={() => switchAccountMode('register')}
-                    />
-                    <SecondaryButton
-                      label="Continue as guest"
+                      style={{ borderCurve: 'continuous' }}
+                    >
+                      <Text className="text-[17px] font-extrabold text-white">
+                        Create an account
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      className="mt-3 h-14 items-center justify-center rounded-2xl bg-slate-100 active:bg-slate-200"
                       onPress={skipAccount}
-                    />
-                    <Text className="mt-2 text-center text-[12px] font-semibold leading-5 text-slate-400">
-                      Use email and password. No magic links or codes.
-                    </Text>
+                      style={{ borderCurve: 'continuous' }}
+                    >
+                      <Text className="text-[16px] font-extrabold text-slate-900">
+                        Continue as guest
+                      </Text>
+                    </Pressable>
+                    <View className="mt-5 flex-row items-start">
+                      <Lock color="#94A3B8" size={18} strokeWidth={2.4} />
+                      <Text className="ml-3 flex-1 text-[13px] font-semibold leading-5 text-slate-400">
+                        No password needed. We’ll send you a one-time code to
+                        sign in securely.
+                      </Text>
+                    </View>
                   </>
                 ) : null}
 

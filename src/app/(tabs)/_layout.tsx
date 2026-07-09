@@ -10,11 +10,15 @@ import {
   useMapOverlay,
   type MapOverlayMode,
 } from '@/context/MapOverlayContext';
+import { useAuthSheet } from '@/context/AuthSheetContext';
+import { useAccount } from '@/hooks/use-account';
 import { C } from '@/constants/theme';
 
 function TabNavigation() {
+  const account = useAccount();
   const router = useRouter();
   const pathname = usePathname();
+  const { showCreateAccountSheet } = useAuthSheet();
   const {
     activeOverlay,
     closeOverlay,
@@ -92,10 +96,22 @@ function TabNavigation() {
           }
         }}
         onCarPress={() => {
+          if (!account.isSignedIn) {
+            showCreateAccountSheet({ origin: 'garage-tab' });
+            return;
+          }
+
           closeOverlay();
           router.push('/garage');
         }}
-        onFavoritePress={() => showOverlay('favorites')}
+        onFavoritePress={() => {
+          if (!account.isSignedIn) {
+            showCreateAccountSheet({ origin: 'favorites-tab' });
+            return;
+          }
+
+          showOverlay('favorites');
+        }}
         onParkingPress={() => {
           closeOverlay();
           router.replace({
