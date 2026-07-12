@@ -8,6 +8,7 @@ import {
 import { useRouter } from 'expo-router';
 import {
   ActivityIndicator,
+  BackHandler,
   Pressable,
   ScrollView,
   Text,
@@ -15,6 +16,7 @@ import {
   View,
 } from 'react-native';
 import {
+  ArrowLeft,
   CarFront,
   Heart,
   Info,
@@ -28,18 +30,25 @@ import {
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { APP_DISPLAY_NAME } from '@/constants/app';
 import { useOnboarding } from '@/context/OnboardingContext';
 import { useAccount } from '@/hooks/use-account';
 import { useMapLocation } from '@/hooks/use-map-location';
+import {
+  clampOnboardingIndex,
+  getBackNavigationDecision,
+  getContinueWithoutLocationDecision,
+  getRequestedLocationDecision,
+  type AccountMode,
+  type OnboardingStepId,
+} from '@/utils/onboarding-flow';
 
 type OnboardingStep = {
-  id: 'welcome' | 'location' | 'account' | 'ready';
+  id: OnboardingStepId;
   title: string;
   subtitle: string;
   icon: ComponentType<LucideProps>;
 };
-
-type AccountMode = 'benefit' | 'login' | 'register';
 
 const STEPS: OnboardingStep[] = [
   {
@@ -53,7 +62,7 @@ const STEPS: OnboardingStep[] = [
     id: 'location',
     title: 'See parking near you',
     subtitle:
-      'Allow location while using the app so ParkMunich can center the map and show nearby parking. You can still search manually.',
+      `Allow location while using the app so ${APP_DISPLAY_NAME} can center the map and show nearby parking. You can still search manually.`,
     icon: LocateFixed,
   },
   {
@@ -67,7 +76,7 @@ const STEPS: OnboardingStep[] = [
     id: 'ready',
     title: 'Ready to explore',
     subtitle:
-      'Use ParkMunich as a guest, or create an account later to sync favorites and vehicles.',
+      `Use ${APP_DISPLAY_NAME} as a guest, or create an account later to sync favorites and vehicles.`,
     icon: Navigation,
   },
 ];
@@ -234,12 +243,17 @@ export default function OnboardingScreen() {
     null,
   );
   const [isSubmittingAccount, setIsSubmittingAccount] = useState(false);
+  const [isCompletingOnboarding, setIsCompletingOnboarding] =
+    useState(false);
+  const [completionError, setCompletionError] = useState<string | null>(
+    null,
+  );
 
   const steps = useMemo(
     () => (account.isSignedIn ? SIGNED_IN_STEPS : STEPS),
     [account.isSignedIn],
   );
-  const stepIndex = Math.min(activeIndex, steps.length - 1);
+  const stepIndex = clampOnboardingIndex(activeIndex, steps.length);
   const step = steps[stepIndex];
   const StepIcon = step.icon;
   const isLocationStep = step.id === 'location';
@@ -247,11 +261,27 @@ export default function OnboardingScreen() {
   const isReadyStep = step.id === 'ready';
 
   useEffect(() => {
-    setActiveIndex((current) => Math.min(current, steps.length - 1));
+    setActiveIndex((current) => clampOnboardingIndex(current, steps.length));
+    setAccountMode('benefit');
   }, [steps.length]);
 
-  const enterApp = useCallback(() => {
-    completeOnboarding();
+  const enterApp = useCallback(async () => {
+    if (isCompletingOnboarding) {
+      return;
+    }
+
+    setIsCompletingOnboarding(true);
+    setCompletionError(null);
+
+    const result = await completeOnboarding();
+
+    if (!result.ok) {
+      setCompletionError(
+        'Your setup could not be saved. Please try again before entering the app.',
+      );
+      setIsCompletingOnboarding(false);
+      return;
+    }
 
     if (shouldLocateOnEntry) {
       router.replace({
@@ -262,7 +292,12 @@ export default function OnboardingScreen() {
     }
 
     router.replace('/map');
-  }, [completeOnboarding, router, shouldLocateOnEntry]);
+  }, [
+    completeOnboarding,
+    isCompletingOnboarding,
+    router,
+    shouldLocateOnEntry,
+  ]);
 
   const goNext = useCallback(() => {
     setActiveIndex((current) => Math.min(current + 1, steps.length - 1));
@@ -274,13 +309,21 @@ export default function OnboardingScreen() {
     }
 
     const coordinates = await requestCurrentLocation();
-    setShouldLocateOnEntry(coordinates !== null);
-    goNext();
+    const decision = getRequestedLocationDecision(coordinates);
+    setShouldLocateOnEntry(decision.shouldLocateOnEntry);
+
+    if (decision.shouldAdvance) {
+      goNext();
+    }
   }, [goNext, isLocationLoading, requestCurrentLocation]);
 
   const skipLocation = useCallback(() => {
-    setShouldLocateOnEntry(false);
-    goNext();
+    const decision = getContinueWithoutLocationDecision();
+    setShouldLocateOnEntry(decision.shouldLocateOnEntry);
+
+    if (decision.shouldAdvance) {
+      goNext();
+    }
   }, [goNext]);
 
   const skipAccount = useCallback(() => {
@@ -332,6 +375,45 @@ export default function OnboardingScreen() {
     setLocalAccountError(null);
   }, []);
 
+  const isPasswordMode =
+    accountMode === 'login' || accountMode === 'register';
+  const isBackDisabled =
+    isLocationLoading || isSubmittingAccount || isCompletingOnboarding;
+  const showBackButton = stepIndex > 0 || isPasswordMode;
+
+  const goBack = useCallback(() => {
+    if (isBackDisabled) {
+      return false;
+    }
+
+    const decision = getBackNavigationDecision({
+      accountMode,
+      activeIndex: stepIndex,
+      steps,
+    });
+
+    if (decision.action === 'stay') {
+      return false;
+    }
+
+    setAccountMode(decision.accountMode);
+    setLocalAccountError(null);
+    setCompletionError(null);
+    setActiveIndex(decision.activeIndex);
+    return true;
+  }, [accountMode, isBackDisabled, stepIndex, steps]);
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => goBack(),
+    );
+
+    return () => {
+      subscription.remove();
+    };
+  }, [goBack]);
+
   const primaryAction = useMemo(() => {
     if (isLocationStep) {
       return {
@@ -346,9 +428,9 @@ export default function OnboardingScreen() {
 
     if (isReadyStep) {
       return {
-        disabled: false,
-        isLoading: false,
-        label: 'Enter app',
+        disabled: isCompletingOnboarding,
+        isLoading: isCompletingOnboarding,
+        label: isCompletingOnboarding ? 'Preparing app' : 'Enter app',
         onPress: enterApp,
       };
     }
@@ -362,14 +444,13 @@ export default function OnboardingScreen() {
   }, [
     enterApp,
     goNext,
+    isCompletingOnboarding,
     isLocationLoading,
     isLocationStep,
     isReadyStep,
     requestLocationAndContinue,
   ]);
 
-  const isPasswordMode =
-    accountMode === 'login' || accountMode === 'register';
   const passwordsMatch = password === confirmPassword;
   const canSubmitAccount =
     !isSubmittingAccount &&
@@ -403,6 +484,28 @@ export default function OnboardingScreen() {
               boxShadow: '0 12px 30px rgba(15,23,42,0.09)',
             }}
           >
+            <View className="min-h-11 flex-row items-center">
+              {showBackButton ? (
+                <Pressable
+                  accessibilityLabel="Go to previous onboarding step"
+                  accessibilityRole="button"
+                  className={`h-11 w-11 items-center justify-center rounded-full ${
+                    isBackDisabled
+                      ? 'bg-slate-100'
+                      : 'bg-slate-100 active:bg-slate-200'
+                  }`}
+                  disabled={isBackDisabled}
+                  onPress={goBack}
+                >
+                  <ArrowLeft
+                    color={isBackDisabled ? '#CBD5E1' : '#475569'}
+                    size={22}
+                    strokeWidth={2.6}
+                  />
+                </Pressable>
+              ) : null}
+            </View>
+
             <View
               className={
                 isAccountStep && accountMode === 'benefit'
@@ -438,7 +541,7 @@ export default function OnboardingScreen() {
               }
             >
               {isAccountStep && accountMode === 'benefit'
-                ? 'Create an account to unlock all features and keep your parking setup in sync across devices.'
+                ? 'Create an account with your email and password, or continue as a guest and sign up later.'
                 : step.subtitle}
             </Text>
 
@@ -496,8 +599,8 @@ export default function OnboardingScreen() {
                     <View className="mt-5 flex-row items-start">
                       <Lock color="#94A3B8" size={18} strokeWidth={2.4} />
                       <Text className="ml-3 flex-1 text-[13px] font-semibold leading-5 text-slate-400">
-                        No password needed. We’ll send you a one-time code to
-                        sign in securely.
+                        Sign in with the same email and password when you want
+                        to sync favorites and vehicles.
                       </Text>
                     </View>
                   </>
@@ -642,9 +745,18 @@ export default function OnboardingScreen() {
             {isLocationStep ? (
               <SecondaryButton
                 disabled={isLocationLoading}
-                label="Not now"
+                label="Continue without location"
                 onPress={skipLocation}
               />
+            ) : null}
+
+            {isReadyStep && completionError ? (
+              <Text
+                accessibilityRole="alert"
+                className="mt-4 rounded-2xl bg-red-50 px-4 py-3 text-[13px] font-semibold leading-5 text-red-700"
+              >
+                {completionError}
+              </Text>
             ) : null}
 
             {__DEV__ ? (
@@ -657,6 +769,7 @@ export default function OnboardingScreen() {
                   setActiveIndex(0);
                   setShouldLocateOnEntry(false);
                   setLocalAccountError(null);
+                  setCompletionError(null);
                 }}
               >
                 <Text className="text-[11px] font-bold text-slate-300">

@@ -6,8 +6,36 @@ import { ParkingMap } from '@/components/parking-map/parking-map';
 import { useOnboarding } from '@/context/OnboardingContext';
 import { useMapLocation } from '@/hooks/use-map-location';
 
-export default function MapScreen() {
+function DevelopmentOnboardingReset({ top }: { top: number }) {
   const router = useRouter();
+  const { resetOnboardingForDev } = useOnboarding();
+
+  if (!__DEV__) {
+    return null;
+  }
+
+  return (
+    <Pressable
+      accessibilityLabel="Reset onboarding"
+      accessibilityRole="button"
+      className="absolute right-4 min-h-10 items-center justify-center rounded-full bg-slate-950/85 px-4 active:bg-slate-800"
+      onPress={() => {
+        resetOnboardingForDev();
+        router.replace('/onboarding');
+      }}
+      style={{
+        top,
+        zIndex: 50,
+      }}
+    >
+      <Text className="text-[12px] font-black text-white">
+        Reset onboarding
+      </Text>
+    </Pressable>
+  );
+}
+
+export default function MapScreen() {
   const insets = useSafeAreaInsets();
   const { favoriteFocusKey, favoriteSpotId, focusSearch, locate } =
     useLocalSearchParams<{
@@ -16,7 +44,6 @@ export default function MapScreen() {
     focusSearch?: string;
     locate?: string;
   }>();
-  const { resetOnboardingForDev } = useOnboarding();
   const {
     initialCamera,
     isLocationLoading,
@@ -50,23 +77,7 @@ export default function MapScreen() {
         searchFocusKey={focusSearch}
         userLocation={userLocation}
       />
-      <Pressable
-        accessibilityLabel="Reset onboarding"
-        accessibilityRole="button"
-        className="absolute right-4 min-h-10 items-center justify-center rounded-full bg-slate-950/85 px-4 active:bg-slate-800"
-        onPress={() => {
-          resetOnboardingForDev();
-          router.replace('/onboarding');
-        }}
-        style={{
-          top: Math.max(insets.top, 12) + 12,
-          zIndex: 50,
-        }}
-      >
-        <Text className="text-[12px] font-black text-white">
-          Reset onboarding
-        </Text>
-      </Pressable>
+      <DevelopmentOnboardingReset top={Math.max(insets.top, 12) + 12} />
     </View>
   );
 }

@@ -16,6 +16,10 @@ export type OnboardingState = {
   hasSeenGarageTip: boolean;
 };
 
+export type OnboardingCompletionResult =
+  | { ok: true; state: OnboardingState }
+  | { ok: false; error: unknown };
+
 export const DEFAULT_ONBOARDING_STATE: OnboardingState = {
   hasCompletedOnboarding: false,
   completedVersion: 0,
@@ -103,6 +107,18 @@ export function shouldShowOnboardingForState(
   );
 }
 
+export function createCompletedOnboardingState(
+  current: OnboardingState,
+  completedAt = new Date().toISOString(),
+): OnboardingState {
+  return {
+    ...current,
+    hasCompletedOnboarding: true,
+    completedVersion: ONBOARDING_VERSION,
+    completedAt,
+  };
+}
+
 export async function loadOnboardingState(
   storage: KeyValueStorage = AsyncStorage,
 ): Promise<OnboardingState> {
@@ -124,6 +140,24 @@ export async function saveOnboardingState(
   storage: KeyValueStorage = AsyncStorage,
 ): Promise<void> {
   await storage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(state));
+}
+
+export async function saveCompletedOnboardingState(
+  current: OnboardingState,
+  storage: KeyValueStorage = AsyncStorage,
+  completedAt = new Date().toISOString(),
+): Promise<OnboardingCompletionResult> {
+  const completedState = createCompletedOnboardingState(
+    current,
+    completedAt,
+  );
+
+  try {
+    await saveOnboardingState(completedState, storage);
+    return { ok: true, state: completedState };
+  } catch (error) {
+    return { ok: false, error };
+  }
 }
 
 export async function clearOnboardingState(

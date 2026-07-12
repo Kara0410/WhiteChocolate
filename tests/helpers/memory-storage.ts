@@ -18,3 +18,14 @@ export function createMemoryStorage(): MemoryStorage {
     },
   };
 }
+
+export function createFailingSetItemStorage(error = new Error('set failed')) {
+  const storage = createMemoryStorage();
+
+  return {
+    ...storage,
+    setItem: async () => {
+      throw error;
+    },
+  };
+}

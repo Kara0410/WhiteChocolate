@@ -10,21 +10,26 @@ import {
 } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 
+import { APP_DISPLAY_NAME } from '@/constants/app';
 import {
   clearOnboardingState,
+  createCompletedOnboardingState,
   DEFAULT_ONBOARDING_STATE,
   loadOnboardingState,
-  ONBOARDING_VERSION,
   saveOnboardingState,
   shouldShowOnboardingForState,
   type OnboardingState,
 } from '@/utils/onboarding-state';
 
+type OnboardingActionResult =
+  | { ok: true }
+  | { ok: false; error: unknown };
+
 type OnboardingContextValue = {
   isHydrated: boolean;
   shouldShowOnboarding: boolean;
   onboardingState: OnboardingState;
-  completeOnboarding: () => void;
+  completeOnboarding: () => Promise<OnboardingActionResult>;
   resetOnboardingForDev: () => void;
   markAccountSkipped: () => void;
   markVehicleSkipped: () => void;
@@ -49,7 +54,7 @@ export function OnboardingLoadingScreen() {
       >
         <ActivityIndicator color="#2563EB" size="large" />
         <Text className="mt-4 text-[15px] font-extrabold text-slate-900">
-          Preparing ParkMunich
+          Preparing {APP_DISPLAY_NAME}
         </Text>
         <Text className="mt-2 text-center text-[13px] font-semibold leading-5 text-slate-500">
           Loading your setup.
@@ -65,6 +70,7 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
   );
   const [isHydrated, setIsHydrated] = useState(false);
   const isMountedRef = useRef(true);
+  const onboardingStateRef = useRef(DEFAULT_ONBOARDING_STATE);
   const writeQueueRef = useRef(Promise.resolve());
 
   useEffect(() => {
@@ -73,6 +79,7 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
     loadOnboardingState()
       .then((storedState) => {
         if (isMountedRef.current) {
+          onboardingStateRef.current = storedState;
           setOnboardingState(storedState);
         }
       })
@@ -92,56 +99,87 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
     };
   }, []);
 
+  const enqueueWrite = useCallback(
+    async (
+      write: () => Promise<void>,
+      logMessage: string,
+    ): Promise<OnboardingActionResult> => {
+      const writePromise = writeQueueRef.current.then(write);
+      const resultPromise = writePromise.then(
+        () => ({ ok: true }) as const,
+        (error: unknown) => {
+          if (__DEV__) {
+            console.warn(logMessage, error);
+          }
+
+          return { ok: false, error } as const;
+        },
+      );
+
+      writeQueueRef.current = resultPromise.then(() => undefined);
+      return resultPromise;
+    },
+    [],
+  );
+
   const persist = useCallback((nextState: OnboardingState) => {
-    writeQueueRef.current = writeQueueRef.current
-      .then(() => saveOnboardingState(nextState))
-      .catch((error: unknown) => {
-        if (__DEV__) {
-          console.warn(
-            '[OnboardingProvider] failed to save onboarding state',
-            error,
-          );
-        }
-      });
+    void enqueueWrite(
+      () => saveOnboardingState(nextState),
+      '[OnboardingProvider] failed to save onboarding state',
+    );
+  }, [enqueueWrite]);
+
+  const applyOnboardingState = useCallback((nextState: OnboardingState) => {
+    onboardingStateRef.current = nextState;
+
+    if (isMountedRef.current) {
+      setOnboardingState(nextState);
+    }
   }, []);
 
   const updateState = useCallback(
     (updater: (current: OnboardingState) => OnboardingState) => {
-      setOnboardingState((current) => {
-        const nextState = updater(current);
+      const current = onboardingStateRef.current;
+      const nextState = updater(current);
 
-        if (nextState !== current) {
-          persist(nextState);
-        }
+      if (nextState === current) {
+        return;
+      }
 
-        return nextState;
-      });
+      onboardingStateRef.current = nextState;
+      persist(nextState);
+
+      if (isMountedRef.current) {
+        setOnboardingState(nextState);
+      }
     },
     [persist],
   );
 
-  const completeOnboarding = useCallback(() => {
-    updateState((current) => ({
-      ...current,
-      hasCompletedOnboarding: true,
-      completedVersion: ONBOARDING_VERSION,
-      completedAt: new Date().toISOString(),
-    }));
-  }, [updateState]);
+  const completeOnboarding = useCallback(async () => {
+    const completedState = createCompletedOnboardingState(
+      onboardingStateRef.current,
+    );
+    const result = await enqueueWrite(
+      () => saveOnboardingState(completedState),
+      '[OnboardingProvider] failed to complete onboarding',
+    );
+
+    if (!result.ok) {
+      return result;
+    }
+
+    applyOnboardingState(completedState);
+    return { ok: true } as const;
+  }, [applyOnboardingState, enqueueWrite]);
 
   const resetOnboardingForDev = useCallback(() => {
-    setOnboardingState(DEFAULT_ONBOARDING_STATE);
-    writeQueueRef.current = writeQueueRef.current
-      .then(() => clearOnboardingState())
-      .catch((error: unknown) => {
-        if (__DEV__) {
-          console.warn(
-            '[OnboardingProvider] failed to clear onboarding state',
-            error,
-          );
-        }
-      });
-  }, []);
+    applyOnboardingState(DEFAULT_ONBOARDING_STATE);
+    void enqueueWrite(
+      () => clearOnboardingState(),
+      '[OnboardingProvider] failed to clear onboarding state',
+    );
+  }, [applyOnboardingState, enqueueWrite]);
 
   const markAccountSkipped = useCallback(() => {
     updateState((current) =>
