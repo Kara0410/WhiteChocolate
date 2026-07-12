@@ -32,26 +32,13 @@ import {
   assignParkingRecordsToZones,
   createParkingZoneMatcher,
 } from '@/utils/parking-zones';
+import {
+  cacheParkingData,
+  getCachedParkingData,
+  getParkingCacheIdentity,
+} from '@/utils/parking-client-cache';
 
 const CAMERA_DEBOUNCE_MS = 350;
-const MAX_CLIENT_CACHE_ENTRIES = 80;
-type CachedParkingData = {
-  clusters: ParkingClusterResponse[];
-  spots: ParkingClusterResponse[];
-};
-const parkingCache = new Map<string, CachedParkingData>();
-
-function cacheParkingData(key: string, data: CachedParkingData) {
-  parkingCache.delete(key);
-  parkingCache.set(key, data);
-
-  if (parkingCache.size > MAX_CLIENT_CACHE_ENTRIES) {
-    const oldestKey = parkingCache.keys().next().value;
-    if (oldestKey) {
-      parkingCache.delete(oldestKey);
-    }
-  }
-}
 
 type CameraMoveEvent = {
   coordinates: {
@@ -135,7 +122,10 @@ export function useParkingClusters(
     preparedRequest?: ParkingClusterRequest,
   ) => {
     const request = preparedRequest ?? createRequest(camera);
-    const requestIdentity = `${request.tileKey}:zones:${parkingZoneVersion}`;
+    const requestIdentity = getParkingCacheIdentity(
+      request.tileKey,
+      parkingZoneVersion,
+    );
     requestedCameraRef.current = camera;
     setCurrentRegion(camera);
     currentZoomRef.current = request.zoom;
@@ -146,7 +136,7 @@ export function useParkingClusters(
 
     requestKeyRef.current = requestIdentity;
 
-    const cached = parkingCache.get(requestIdentity);
+    const cached = getCachedParkingData(requestIdentity);
     if (cached) {
       setVisibleClusters(cached.clusters);
       setVisibleSpots(cached.spots);

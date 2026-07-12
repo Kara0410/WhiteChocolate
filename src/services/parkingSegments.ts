@@ -12,6 +12,85 @@ const PARKING_SEGMENT_COLUMNS =
 const MAX_SEGMENTS_PER_REQUEST = 2_000;
 const SEGMENT_PAGE_SIZE = 1_000;
 const QUERY_TIMEOUT_MS = 10_000;
+const MUNICH_TEST_BBOX = {
+  minLng: 11.35,
+  minLat: 48.0,
+  maxLng: 11.75,
+  maxLat: 48.25,
+};
+
+function isDevelopmentBuild() {
+  return typeof __DEV__ !== 'undefined' && __DEV__;
+}
+
+function intersectsMunichTestBbox(bounds: ParkingBoundingBox) {
+  return (
+    bounds.minLng <= MUNICH_TEST_BBOX.maxLng &&
+    bounds.maxLng >= MUNICH_TEST_BBOX.minLng &&
+    bounds.minLat <= MUNICH_TEST_BBOX.maxLat &&
+    bounds.maxLat >= MUNICH_TEST_BBOX.minLat
+  );
+}
+
+function logParkingSegmentQueryResult({
+  bounds,
+  error,
+  rowCount,
+  truncated,
+}: {
+  bounds?: ParkingBoundingBox;
+  error?: unknown;
+  rowCount: number;
+  truncated?: boolean;
+}) {
+  if (!isDevelopmentBuild()) {
+    return;
+  }
+
+  if (error) {
+    const supabaseError = error as {
+      code?: unknown;
+      message?: unknown;
+      status?: unknown;
+    };
+    console.warn('[parking-map] parking_segments query error', {
+      bbox: bounds ?? null,
+      code:
+        typeof supabaseError.code === 'string'
+          ? supabaseError.code
+          : undefined,
+      message:
+        typeof supabaseError.message === 'string'
+          ? supabaseError.message
+          : 'Unknown Supabase query error.',
+      status:
+        typeof supabaseError.status === 'number'
+          ? supabaseError.status
+          : undefined,
+    });
+    return;
+  }
+
+  const outcome =
+    rowCount > 0
+      ? 'success-with-rows'
+      : bounds && intersectsMunichTestBbox(bounds)
+        ? 'possible-rls-filtered-zero-row-result'
+        : 'valid-zero-row-geographic-result';
+
+  const payload = {
+    bbox: bounds,
+    outcome,
+    rowCount,
+    truncated: truncated === true,
+  };
+
+  if (outcome === 'possible-rls-filtered-zero-row-result') {
+    console.warn('[parking-map] parking_segments query result', payload);
+  } else {
+    console.debug('[parking-map] parking_segments query result', payload);
+  }
+}
 
 async function withQueryTimeout<T>(
   operation: (signal: AbortSignal) => Promise<T>,
@@ -68,6 +147,11 @@ export async function fetchParkingSegments(bounds: ParkingBoundingBox) {
     );
 
     if (error) {
+      logParkingSegmentQueryResult({
+        bounds,
+        error,
+        rowCount: rows.length,
+      });
       throw new Error(`Unable to fetch parking segments: ${error.message}`);
     }
 
@@ -82,10 +166,17 @@ export async function fetchParkingSegments(bounds: ParkingBoundingBox) {
     .slice(0, MAX_SEGMENTS_PER_REQUEST)
     .map(parkingSegmentFromRow)
     .filter((segment): segment is ParkingSegment => segment !== null);
+  const truncated = rows.length > MAX_SEGMENTS_PER_REQUEST;
+
+  logParkingSegmentQueryResult({
+    bounds,
+    rowCount: segments.length,
+    truncated,
+  });
 
   return {
     segments,
-    truncated: rows.length > MAX_SEGMENTS_PER_REQUEST,
+    truncated,
   };
 }
 
@@ -108,6 +199,10 @@ export async function fetchParkingSegmentById(id: string) {
   );
 
   if (error) {
+    logParkingSegmentQueryResult({
+      error,
+      rowCount: 0,
+    });
     throw new Error(`Unable to fetch parking segment: ${error.message}`);
   }
 

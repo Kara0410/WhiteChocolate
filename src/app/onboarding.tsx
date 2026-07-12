@@ -242,6 +242,9 @@ export default function OnboardingScreen() {
   const [localAccountError, setLocalAccountError] = useState<string | null>(
     null,
   );
+  const [registrationNotice, setRegistrationNotice] = useState<string | null>(
+    null,
+  );
   const [isSubmittingAccount, setIsSubmittingAccount] = useState(false);
   const [isCompletingOnboarding, setIsCompletingOnboarding] =
     useState(false);
@@ -344,18 +347,46 @@ export default function OnboardingScreen() {
 
     setIsSubmittingAccount(true);
     setLocalAccountError(null);
+    setRegistrationNotice(null);
 
     try {
-      const result =
-        accountMode === 'register'
-          ? await account.registerWithEmailPassword(email, password)
-          : await account.loginWithEmailPassword(email, password);
+      if (accountMode === 'register') {
+        const result = await account.registerWithEmailPassword(
+          email,
+          password,
+        );
 
-      if (result.ok) {
+        if (!result.ok) {
+          setLocalAccountError(result.error.message);
+          return;
+        }
+
+        if (result.status === 'confirmation-required') {
+          setPassword('');
+          setConfirmPassword('');
+          setRegistrationNotice(
+            `Account created for ${result.email}. Confirm your email before signing in, or continue as a guest for now.`,
+          );
+          setAccountMode('benefit');
+          return;
+        }
+
         setPassword('');
         setConfirmPassword('');
         goNext();
+        return;
       }
+
+      const result = await account.loginWithEmailPassword(email, password);
+
+      if (!result.ok) {
+        setLocalAccountError(result.error.message);
+        return;
+      }
+
+      setPassword('');
+      setConfirmPassword('');
+      goNext();
     } finally {
       setIsSubmittingAccount(false);
     }
@@ -373,6 +404,7 @@ export default function OnboardingScreen() {
     setAccountMode(nextMode);
     setConfirmPassword('');
     setLocalAccountError(null);
+    setRegistrationNotice(null);
   }, []);
 
   const isPasswordMode =
@@ -398,6 +430,7 @@ export default function OnboardingScreen() {
 
     setAccountMode(decision.accountMode);
     setLocalAccountError(null);
+    setRegistrationNotice(null);
     setCompletionError(null);
     setActiveIndex(decision.activeIndex);
     return true;
@@ -721,6 +754,14 @@ export default function OnboardingScreen() {
                     {localAccountError ?? account.error?.message}
                   </Text>
                 ) : null}
+                {registrationNotice ? (
+                  <Text
+                    accessibilityRole="alert"
+                    className="mt-3 rounded-2xl bg-blue-50 px-4 py-3 text-[13px] font-semibold leading-5 text-blue-800"
+                  >
+                    {registrationNotice}
+                  </Text>
+                ) : null}
               </>
             ) : null}
 
@@ -769,6 +810,7 @@ export default function OnboardingScreen() {
                   setActiveIndex(0);
                   setShouldLocateOnEntry(false);
                   setLocalAccountError(null);
+                  setRegistrationNotice(null);
                   setCompletionError(null);
                 }}
               >

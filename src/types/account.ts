@@ -30,16 +30,44 @@ export type AccountErrorCode =
   | 'REGISTER_FAILED'
   | 'INVALID_EMAIL'
   | 'WEAK_PASSWORD'
+  | 'ACCOUNT_EXISTS'
+  | 'SIGNUP_DISABLED'
+  | 'EMAIL_PROVIDER_DISABLED'
+  | 'EMAIL_NOT_AUTHORIZED'
+  | 'RATE_LIMITED'
+  | 'DATABASE_FAILURE'
+  | 'NETWORK_ERROR'
+  | 'REQUEST_TIMEOUT'
+  | 'UNKNOWN_AUTH_ERROR'
   | 'LOGOUT_FAILED'
   | 'DELETE_NOT_IMPLEMENTED'
   | 'UPGRADE_NOT_IMPLEMENTED';
 
+export type AccountErrorCategory =
+  | 'validation'
+  | 'auth'
+  | 'configuration'
+  | 'database'
+  | 'network'
+  | 'rateLimit'
+  | 'unknown';
+
 export type AccountError = {
   code: AccountErrorCode;
   message: string;
+  category?: AccountErrorCategory;
+  developerMessage?: string;
+  retryable?: boolean;
+  sourceCode?: string | null;
+  status?: number | null;
   cause?: unknown;
 };
 
 export type AccountActionResult =
   | { ok: true }
+  | { ok: false; error: AccountError };
+
+export type RegisterActionResult =
+  | { ok: true; status: 'authenticated'; user: AccountUser }
+  | { ok: true; status: 'confirmation-required'; email: string }
   | { ok: false; error: AccountError };

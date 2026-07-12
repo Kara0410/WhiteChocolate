@@ -14,6 +14,7 @@ import BottomSheet, {
   useBottomSheetSpringConfigs,
 } from '@gorhom/bottom-sheet';
 import { BlurView } from 'expo-blur';
+import { router } from 'expo-router';
 import {
   Ban,
   Camera,
@@ -28,7 +29,14 @@ import {
   UserRoundCheck,
   Zap,
 } from 'lucide-react-native';
-import { Share, StyleSheet, Text, View } from 'react-native';
+import {
+  Platform,
+  Pressable,
+  Share,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 import {
   MAP_ELEVATIONS,
@@ -40,6 +48,13 @@ import { useAccount } from '@/hooks/use-account';
 import type { ParkingClusterResponse } from '@/types/parking-map';
 import { getAccountAccessTier } from '@/utils/account-tier';
 import { openParkingNavigation } from '@/utils/openParkingNavigation';
+import {
+  FREE_DETAIL_PREVIEW_CARDS,
+  PREMIUM_DETAIL_PREVIEW_SECTIONS,
+  getParkingDetailAccess,
+  getParkingDetailGateCopy,
+  getPremiumGateRoute,
+} from '@/utils/parking-detail-gating';
 
 import { ParkingDetailHeader } from './ParkingDetailHeader';
 import { ParkingDetailSection } from './ParkingDetailSection';
@@ -135,128 +150,120 @@ function buildParkingShareMessage(
   return lines.join('\n');
 }
 
-function LockedDetailContent({
-  children,
-  locked,
-  message,
+function SkeletonBar({
+  height,
+  width,
+  tone = 'medium',
 }: {
-  children: ReactNode;
-  locked: boolean;
-  message: string;
+  height: number;
+  width: number;
+  tone?: 'light' | 'medium';
 }) {
   return (
-    <View style={locked ? styles.lockedContent : undefined}>
-      <View
-        accessibilityElementsHidden={locked}
-        importantForAccessibility={
-          locked ? 'no-hide-descendants' : 'auto'
-        }
-        pointerEvents={locked ? 'none' : 'auto'}
-      >
-        {children}
-      </View>
-      {locked ? (
-        <BlurView
-          intensity={68}
-          pointerEvents="auto"
-          style={styles.lockedOverlay}
-          tint="light"
-        >
-          <View style={styles.lockedScrim} />
-          <View
-            className="mx-6 items-center justify-center rounded-3xl border border-white/80 bg-white/90 px-5 py-4"
-            style={{ borderCurve: 'continuous' }}
-          >
-            <View className="mb-2 h-10 w-10 items-center justify-center rounded-full bg-slate-950">
-              <Lock color="#FFFFFF" size={18} strokeWidth={2.4} />
-            </View>
-            <Text className="text-center text-[14px] font-extrabold leading-5 text-slate-900">
-              {message}
-            </Text>
-          </View>
-        </BlurView>
-      ) : null}
+    <View
+      className={`mt-2 rounded-full ${
+        tone === 'light' ? 'bg-slate-100' : 'bg-slate-200'
+      }`}
+      style={{ height, width, maxWidth: '100%' }}
+    />
+  );
+}
+
+function DetailCard({
+  children,
+}: {
+  children: ReactNode;
+}) {
+  return (
+    <View
+      className="flex-1 rounded-[28px] border border-white/70 bg-white px-4 py-5 shadow-sm"
+      style={{ borderCurve: 'continuous' }}
+    >
+      {children}
     </View>
   );
 }
 
-const ParkingDetailContent = memo(function ParkingDetailContent({
-  item,
-  onClose,
+function LockedDetailGate({
+  children,
+  title,
+  description,
+  actionLabel,
+  onAction,
+  accessibilityLabel,
+  accessibilityHint,
 }: {
-  item: ParkingClusterResponse;
-  onClose: () => void;
+  children: ReactNode;
+  title: string;
+  description: string;
+  actionLabel: string;
+  onAction: () => void;
+  accessibilityLabel: string;
+  accessibilityHint: string;
 }) {
-  const percentage = clampPercentage(item.availabilityPercent);
-  const theme = useMemo(
-    () => getAvailabilityTheme(percentage),
-    [percentage],
+  return (
+    <View style={styles.lockedContent}>
+      <View
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        pointerEvents="none"
+      >
+        {children}
+      </View>
+      <BlurView
+        blurReductionFactor={2}
+        experimentalBlurMethod={
+          Platform.OS === 'android' ? 'dimezisBlurView' : undefined
+        }
+        intensity={92}
+        pointerEvents="auto"
+        style={styles.lockedOverlay}
+        tint="light"
+      >
+        <View style={styles.lockedScrim} />
+        <View
+          className="mx-5 items-center justify-center rounded-3xl border border-white/90 bg-white px-5 py-4 shadow-sm"
+          style={{ borderCurve: 'continuous' }}
+        >
+          <View className="mb-2 h-10 w-10 items-center justify-center rounded-full bg-slate-950">
+            <Lock color="#FFFFFF" size={18} strokeWidth={2.4} />
+          </View>
+          <Text className="text-center text-[15px] font-extrabold leading-5 text-slate-950">
+            {title}
+          </Text>
+          <Text className="mt-2 text-center text-[12px] font-semibold leading-[17px] text-slate-600">
+            {description}
+          </Text>
+          <Pressable
+            accessibilityHint={accessibilityHint}
+            accessibilityLabel={`${accessibilityLabel} ${actionLabel}`}
+            accessibilityRole="button"
+            className="mt-4 min-h-11 items-center justify-center rounded-2xl bg-slate-950 px-5 active:bg-slate-800"
+            onPress={onAction}
+          >
+            <Text className="text-[13px] font-extrabold text-white">
+              {actionLabel}
+            </Text>
+          </Pressable>
+        </View>
+      </BlurView>
+    </View>
   );
-  const title = item.bestSpot.zoneName || 'Parking Area';
-  const price = item.avgPrice ?? item.minPrice;
-  const dailyPrice = price === null ? null : price * 7.2;
-  const account = useAccount();
-  const accessTier = getAccountAccessTier(account);
-  const isGuest = accessTier === 'guest';
-  const isPremium = accessTier === 'premium';
-  const { showCreateAccountSheet } = useAuthSheet();
-  const { isFavorite, toggleFavorite } = useFavoriteParking();
-  const itemIsFavorite = isFavorite(item.id);
+}
 
-  const handleShare = useCallback(async () => {
-    try {
-      await Share.share({
-        message: buildParkingShareMessage(item, title, percentage),
-        title,
-      });
-    } catch (error) {
-      if (__DEV__) {
-        console.warn('Unable to share parking location', error);
-      }
-    }
-  }, [item, percentage, title]);
-
-  const handleFavorite = useCallback(() => {
-    if (!account.isSignedIn) {
-      showCreateAccountSheet({ origin: 'parking-favorite' });
-      return;
-    }
-
-    toggleFavorite(item);
-  }, [account.isSignedIn, item, showCreateAccountSheet, toggleFavorite]);
-
-  const handleNavigate = useCallback(() => {
-    void openParkingNavigation({
-      latitude: item.latitude,
-      longitude: item.longitude,
-      label: title,
-    });
-  }, [item.latitude, item.longitude, title]);
-
+function FreeParkingDetails({
+  dailyPrice,
+  distanceLabel,
+  price,
+}: {
+  dailyPrice: number | null;
+  distanceLabel: string;
+  price: number | null;
+}) {
   return (
     <>
-      <ParkingDetailHeader
-        distanceLabel={formatDistance(item.distanceToDestination)}
-        isFavorite={itemIsFavorite}
-        onClose={onClose}
-        onFavorite={isGuest ? undefined : handleFavorite}
-        onNavigate={handleNavigate}
-        onShare={isGuest ? undefined : handleShare}
-        percentage={percentage}
-        showMetrics={!isGuest}
-        theme={theme}
-        title={title}
-      />
-
-      <LockedDetailContent
-        locked={isGuest}
-        message="Get a free account for more information."
-      >
-        <View className="mb-4 flex-row gap-3">
-          <View
-            className="flex-1 rounded-[28px] border border-white/70 bg-white px-4 py-5 shadow-sm"
-            style={{ borderCurve: 'continuous' }}
-          >
+      <View className="mb-4 flex-row gap-3">
+        <DetailCard>
           <View className="h-11 w-11 items-center justify-center rounded-full bg-emerald-100">
             <Text className="text-xl font-bold text-emerald-700">$</Text>
           </View>
@@ -271,12 +278,9 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
               ? 'No payment required'
               : `Max daily $${dailyPrice.toFixed(2)}`}
           </Text>
-          </View>
+        </DetailCard>
 
-          <View
-            className="flex-1 rounded-[28px] border border-white/70 bg-white px-4 py-5 shadow-sm"
-            style={{ borderCurve: 'continuous' }}
-          >
+        <DetailCard>
           <View className="h-11 w-11 items-center justify-center rounded-full bg-blue-100">
             <Clock3 color="#1D4ED8" size={19} />
           </View>
@@ -289,14 +293,11 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
           <Text className="mt-1 text-[11px] font-medium text-slate-500">
             Check local signs
           </Text>
-          </View>
-        </View>
+        </DetailCard>
+      </View>
 
-        <View className="mb-4 flex-row gap-3">
-          <View
-            className="flex-1 rounded-[28px] border border-white/70 bg-white px-4 py-5 shadow-sm"
-            style={{ borderCurve: 'continuous' }}
-          >
+      <View className="mb-4 flex-row gap-3">
+        <DetailCard>
           <View className="h-11 w-11 items-center justify-center rounded-full bg-blue-100">
             <CarFront color="#1D4ED8" size={19} />
           </View>
@@ -307,17 +308,14 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
             className="mt-1 text-[17px] font-extrabold text-slate-950"
             numberOfLines={1}
           >
-            {formatDistance(item.distanceToDestination)}
+            {distanceLabel}
           </Text>
           <Text className="mt-1 text-[11px] font-medium text-slate-500">
             To your destination
           </Text>
-          </View>
+        </DetailCard>
 
-          <View
-            className="flex-1 rounded-[28px] border border-white/70 bg-white px-4 py-5 shadow-sm"
-            style={{ borderCurve: 'continuous' }}
-          >
+        <DetailCard>
           <View className="h-11 w-11 items-center justify-center rounded-full bg-emerald-100">
             <Clock3 color={POSITIVE_COLOR} size={19} />
           </View>
@@ -330,15 +328,109 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
           <Text className="mt-1 text-[11px] font-medium text-slate-500">
             Open now
           </Text>
-          </View>
-        </View>
-      </LockedDetailContent>
+        </DetailCard>
+      </View>
+    </>
+  );
+}
 
-      {!isGuest ? (
-        <LockedDetailContent
-          locked={!isPremium}
-          message="Get a premium account for more details."
-        >
+function LockedFreeDetailsPreview() {
+  const previewIcons = [
+    <Text className="text-xl font-bold text-emerald-700" key="pricing">
+      $
+    </Text>,
+    <Clock3 color="#1D4ED8" key="max-stay" size={19} />,
+    <CarFront color="#1D4ED8" key="distance" size={19} />,
+    <Clock3 color={POSITIVE_COLOR} key="hours" size={19} />,
+  ];
+
+  return (
+    <>
+      {[0, 2].map((startIndex) => (
+        <View className="mb-4 flex-row gap-3" key={startIndex}>
+          {FREE_DETAIL_PREVIEW_CARDS.slice(
+            startIndex,
+            startIndex + 2,
+          ).map((card, offset) => (
+            <DetailCard key={card.label}>
+              <View
+                className={`h-11 w-11 items-center justify-center rounded-full ${
+                  card.label === 'Pricing' || card.label === 'Open Hours'
+                    ? 'bg-emerald-100'
+                    : 'bg-blue-100'
+                }`}
+              >
+                {previewIcons[startIndex + offset]}
+              </View>
+              <Text className="mt-4 text-[13px] font-semibold text-slate-500">
+                {card.label}
+              </Text>
+              <SkeletonBar height={20} width={card.valueWidth} />
+              <SkeletonBar
+                height={12}
+                tone="light"
+                width={card.descriptionWidth}
+              />
+            </DetailCard>
+          ))}
+        </View>
+      ))}
+    </>
+  );
+}
+
+function LockedPremiumDetailsPreview() {
+  return (
+    <>
+      <ParkingDetailSection title={PREMIUM_DETAIL_PREVIEW_SECTIONS[0]}>
+        <View className="h-36 flex-row items-end justify-between">
+          {[72, 56, 84, 64, 78, 48, 40].map((height, index) => (
+            <View className="h-full flex-1 items-center justify-end" key={index}>
+              <View className="h-[104px] w-full items-center justify-end">
+                <View
+                  className="w-5 rounded-t-lg bg-slate-200"
+                  style={{ height: `${height}%` }}
+                />
+              </View>
+              <SkeletonBar height={10} tone="light" width={20} />
+            </View>
+          ))}
+        </View>
+      </ParkingDetailSection>
+
+      <ParkingDetailSection title={PREMIUM_DETAIL_PREVIEW_SECTIONS[1]}>
+        <View className="py-1">
+          {[0, 1, 2].map((row) => (
+            <View
+              className="flex-row items-center justify-between py-3"
+              key={row}
+            >
+              <View className="flex-1 flex-row items-center">
+                <View className="mr-3 h-10 w-10 rounded-full bg-slate-100" />
+                <View className="flex-1 pr-3">
+                  <SkeletonBar
+                    height={14}
+                    width={row === 1 ? 120 : 96}
+                  />
+                  <SkeletonBar
+                    height={10}
+                    tone="light"
+                    width={row === 2 ? 150 : 128}
+                  />
+                </View>
+              </View>
+              <SkeletonBar height={14} width={64} />
+            </View>
+          ))}
+        </View>
+      </ParkingDetailSection>
+    </>
+  );
+}
+
+function PremiumParkingDetails({ item }: { item: ParkingClusterResponse }) {
+  return (
+    <>
       <ParkingDetailSection title="Historical Usage">
         <View className="h-40 flex-row items-end justify-between">
           {HISTORICAL_USAGE.map(({ day, value, weekend }) => (
@@ -484,10 +576,7 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
       </ParkingDetailSection>
 
       <ParkingDetailSection title="Details">
-        <ParkingInfoRow
-          label="Zone ID"
-          value={item.bestSpot.id}
-        />
+        <ParkingInfoRow label="Zone ID" value={item.bestSpot.id} />
         <ParkingInfoRow label="Zone Type" value="Public parking" />
         <ParkingInfoRow label="Surface" value="Paved" />
         <ParkingInfoRow
@@ -496,9 +585,124 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
         />
         <ParkingInfoRow label="Last Updated" value="Just now" />
       </ParkingDetailSection>
-        </LockedDetailContent>
-      ) : null}
+    </>
+  );
+}
 
+const ParkingDetailContent = memo(function ParkingDetailContent({
+  item,
+  onClose,
+}: {
+  item: ParkingClusterResponse;
+  onClose: () => void;
+}) {
+  const percentage = clampPercentage(item.availabilityPercent);
+  const theme = useMemo(
+    () => getAvailabilityTheme(percentage),
+    [percentage],
+  );
+  const title = item.bestSpot.zoneName || 'Parking Area';
+  const account = useAccount();
+  const accessTier = getAccountAccessTier(account);
+  const { hasFreeDetailsAccess, hasPremiumDetailsAccess } =
+    getParkingDetailAccess(accessTier);
+  const isGuest = accessTier === 'guest';
+  const distanceLabel = formatDistance(item.distanceToDestination);
+  const price = hasFreeDetailsAccess ? item.avgPrice ?? item.minPrice : null;
+  const dailyPrice =
+    hasFreeDetailsAccess && price !== null ? price * 7.2 : null;
+  const freeGateCopy = getParkingDetailGateCopy('free-details');
+  const premiumGateCopy = getParkingDetailGateCopy('premium-details');
+  const { showCreateAccountSheet } = useAuthSheet();
+  const { isFavorite, toggleFavorite } = useFavoriteParking();
+  const itemIsFavorite = isFavorite(item.id);
+
+  const handleShare = useCallback(async () => {
+    try {
+      await Share.share({
+        message: buildParkingShareMessage(item, title, percentage),
+        title,
+      });
+    } catch (error) {
+      if (__DEV__) {
+        console.warn('Unable to share parking location', error);
+      }
+    }
+  }, [item, percentage, title]);
+
+  const handleFavorite = useCallback(() => {
+    if (!account.isSignedIn) {
+      showCreateAccountSheet({ origin: 'parking-favorite' });
+      return;
+    }
+
+    toggleFavorite(item);
+  }, [account.isSignedIn, item, showCreateAccountSheet, toggleFavorite]);
+
+  const handleNavigate = useCallback(() => {
+    void openParkingNavigation({
+      latitude: item.latitude,
+      longitude: item.longitude,
+      label: title,
+    });
+  }, [item.latitude, item.longitude, title]);
+
+  const handleCreateFreeAccount = useCallback(() => {
+    showCreateAccountSheet({ origin: 'parking-free-details-gate' });
+  }, [showCreateAccountSheet]);
+
+  const handleExplorePremium = useCallback(() => {
+    router.push(getPremiumGateRoute());
+  }, []);
+
+  return (
+    <>
+      <ParkingDetailHeader
+        distanceLabel={distanceLabel}
+        isFavorite={itemIsFavorite}
+        onClose={onClose}
+        onFavorite={isGuest ? undefined : handleFavorite}
+        onNavigate={handleNavigate}
+        onShare={isGuest ? undefined : handleShare}
+        percentage={percentage}
+        showMetrics={!isGuest}
+        theme={theme}
+        title={title}
+      />
+
+      {hasFreeDetailsAccess ? (
+        <FreeParkingDetails
+          dailyPrice={dailyPrice}
+          distanceLabel={distanceLabel}
+          price={price}
+        />
+      ) : (
+        <LockedDetailGate
+          accessibilityHint={freeGateCopy.accessibilityHint}
+          accessibilityLabel={freeGateCopy.accessibilityLabel}
+          actionLabel={freeGateCopy.actionLabel}
+          description={freeGateCopy.description}
+          onAction={handleCreateFreeAccount}
+          title={freeGateCopy.title}
+        >
+          <LockedFreeDetailsPreview />
+        </LockedDetailGate>
+      )}
+
+      {hasPremiumDetailsAccess ? (
+        <PremiumParkingDetails item={item} />
+      ) : hasFreeDetailsAccess ? (
+        <LockedDetailGate
+          accessibilityHint={premiumGateCopy.accessibilityHint}
+          accessibilityLabel={premiumGateCopy.accessibilityLabel}
+          actionLabel={premiumGateCopy.actionLabel}
+          description={premiumGateCopy.description}
+          onAction={handleExplorePremium}
+          title={premiumGateCopy.title}
+        >
+          <LockedPremiumDetailsPreview />
+        </LockedDetailGate>
+      ) : null}
     </>
   );
 });
@@ -666,7 +870,7 @@ const styles = StyleSheet.create({
   },
   lockedScrim: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(15,23,42,0.18)',
+    backgroundColor: 'rgba(248,250,252,0.70)',
   },
   sheet: {
     borderTopLeftRadius: 32,

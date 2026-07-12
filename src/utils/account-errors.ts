@@ -1,36 +1,348 @@
-import { isAuthApiError } from '@supabase/supabase-js';
+import {
+  isAuthApiError,
+  isAuthError,
+  isAuthRetryableFetchError,
+  isAuthWeakPasswordError,
+} from '@supabase/supabase-js';
 
 import type {
   AccountError,
+  AccountErrorCategory,
   AccountErrorCode,
 } from '@/types/account';
 import type { PreferencesError } from '@/types/preferences';
+
+type AuthFailureOperation = 'login' | 'signup' | 'session' | 'logout';
+
+type NormalizedAuthFailure = {
+  category: AccountErrorCategory;
+  code: AccountErrorCode;
+  developerMessage: string;
+  message: string;
+  retryable: boolean;
+  sourceCode: string | null;
+  status: number | null;
+};
 
 export function createAccountError(
   code: AccountErrorCode,
   message: string,
   cause?: unknown,
+  options?: {
+    category?: AccountErrorCategory;
+    developerMessage?: string;
+    retryable?: boolean;
+    sourceCode?: string | null;
+    status?: number | null;
+  },
 ): AccountError {
-  return { code, message, cause };
+  return {
+    code,
+    message,
+    cause,
+    category: options?.category,
+    developerMessage: options?.developerMessage,
+    retryable: options?.retryable,
+    sourceCode: options?.sourceCode,
+    status: options?.status,
+  };
 }
 
-export function accountLoadError(cause: unknown): AccountError {
-  return createAccountError(
-    'LOAD_FAILED',
-    'Account information could not be loaded. Try again.',
-    cause,
+function unknownRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === 'object' && value !== null
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function stringField(value: unknown) {
+  return typeof value === 'string' ? value : null;
+}
+
+function numberField(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? value
+    : null;
+}
+
+function getErrorName(cause: unknown) {
+  const record = unknownRecord(cause);
+  return stringField(record?.name) ?? 'Error';
+}
+
+function getSourceCode(cause: unknown) {
+  const record = unknownRecord(cause);
+  return stringField(record?.code)?.toLowerCase() ?? null;
+}
+
+function getStatus(cause: unknown) {
+  const record = unknownRecord(cause);
+  return numberField(record?.status);
+}
+
+function getSafeDeveloperMessage(cause: unknown) {
+  if (cause instanceof Error) {
+    return cause.message;
+  }
+
+  const record = unknownRecord(cause);
+  return (
+    stringField(record?.message) ??
+    stringField(record?.error_description) ??
+    'Unknown account service error'
   );
 }
 
 function authErrorMatches(cause: unknown, terms: string[]) {
-  if (!isAuthApiError(cause)) {
-    return false;
-  }
-
-  const code = cause.code?.toLowerCase() ?? '';
-  const message = cause.message.toLowerCase();
+  const code = getSourceCode(cause) ?? '';
+  const message = getSafeDeveloperMessage(cause).toLowerCase();
 
   return terms.some((term) => code.includes(term) || message.includes(term));
+}
+
+function weakPasswordMessage(cause: unknown) {
+  if (!isAuthWeakPasswordError(cause)) {
+    return 'Your password does not meet the account security requirements.';
+  }
+
+  const reasons = cause.reasons;
+  if (!Array.isArray(reasons) || reasons.length === 0) {
+    return 'Your password does not meet the account security requirements.';
+  }
+
+  return `Your password does not meet the account security requirements: ${reasons
+    .slice(0, 2)
+    .join(', ')}.`;
+}
+
+export function normalizeAuthFailure(
+  cause: unknown,
+  operation: AuthFailureOperation,
+): NormalizedAuthFailure {
+  const sourceCode = getSourceCode(cause);
+  const status = getStatus(cause);
+  const developerMessage = getSafeDeveloperMessage(cause);
+  const lowerMessage = developerMessage.toLowerCase();
+
+  if (
+    isAuthRetryableFetchError(cause) ||
+    authErrorMatches(cause, ['network', 'fetch failed', 'failed to fetch'])
+  ) {
+    return {
+      category: 'network',
+      code: 'NETWORK_ERROR',
+      developerMessage,
+      message:
+        'Could not reach the account service. Check your connection and try again.',
+      retryable: true,
+      sourceCode,
+      status,
+    };
+  }
+
+  if (sourceCode === 'request_timeout' || lowerMessage.includes('timeout')) {
+    return {
+      category: 'network',
+      code: 'REQUEST_TIMEOUT',
+      developerMessage,
+      message:
+        'Could not reach the account service. Check your connection and try again.',
+      retryable: true,
+      sourceCode,
+      status,
+    };
+  }
+
+  switch (sourceCode) {
+    case 'email_exists':
+    case 'user_already_exists':
+      return {
+        category: 'auth',
+        code: 'ACCOUNT_EXISTS',
+        developerMessage,
+        message: 'An account with this email already exists. Sign in instead.',
+        retryable: false,
+        sourceCode,
+        status,
+      };
+    case 'weak_password':
+      return {
+        category: 'validation',
+        code: 'WEAK_PASSWORD',
+        developerMessage,
+        message: weakPasswordMessage(cause),
+        retryable: false,
+        sourceCode,
+        status,
+      };
+    case 'email_address_invalid':
+      return {
+        category: 'validation',
+        code: 'INVALID_EMAIL',
+        developerMessage,
+        message: 'Enter a valid email address.',
+        retryable: false,
+        sourceCode,
+        status,
+      };
+    case 'email_address_not_authorized':
+      return {
+        category: 'configuration',
+        code: 'EMAIL_NOT_AUTHORIZED',
+        developerMessage,
+        message: 'This email cannot currently receive account messages.',
+        retryable: false,
+        sourceCode,
+        status,
+      };
+    case 'signup_disabled':
+      return {
+        category: 'configuration',
+        code: 'SIGNUP_DISABLED',
+        developerMessage,
+        message: 'Account creation is temporarily unavailable.',
+        retryable: false,
+        sourceCode,
+        status,
+      };
+    case 'email_provider_disabled':
+      return {
+        category: 'configuration',
+        code: 'EMAIL_PROVIDER_DISABLED',
+        developerMessage,
+        message: 'Account creation is temporarily unavailable.',
+        retryable: false,
+        sourceCode,
+        status,
+      };
+    case 'over_email_send_rate_limit':
+    case 'over_request_rate_limit':
+      return {
+        category: 'rateLimit',
+        code: 'RATE_LIMITED',
+        developerMessage,
+        message: 'Too many attempts. Wait a few minutes and try again.',
+        retryable: true,
+        sourceCode,
+        status,
+      };
+    case 'captcha_failed':
+      return {
+        category: 'auth',
+        code: 'REGISTER_FAILED',
+        developerMessage,
+        message: 'Account creation is temporarily unavailable.',
+        retryable: true,
+        sourceCode,
+        status,
+      };
+    case 'unexpected_failure':
+      return {
+        category: operation === 'signup' ? 'database' : 'auth',
+        code: operation === 'signup' ? 'DATABASE_FAILURE' : 'UNKNOWN_AUTH_ERROR',
+        developerMessage,
+        message:
+          operation === 'signup'
+            ? 'Account creation is temporarily unavailable. Please try again later.'
+            : 'Sign in did not complete. Check your email and password, then try again.',
+        retryable: true,
+        sourceCode,
+        status,
+      };
+  }
+
+  if (
+    operation === 'login' &&
+    authErrorMatches(cause, ['invalid_credentials', 'invalid login'])
+  ) {
+    return {
+      category: 'auth',
+      code: 'LOGIN_FAILED',
+      developerMessage,
+      message: 'The email or password is incorrect.',
+      retryable: false,
+      sourceCode,
+      status,
+    };
+  }
+
+  if (
+    operation === 'signup' &&
+    authErrorMatches(cause, ['already registered', 'already exists'])
+  ) {
+    return {
+      category: 'auth',
+      code: 'ACCOUNT_EXISTS',
+      developerMessage,
+      message: 'An account with this email already exists. Sign in instead.',
+      retryable: false,
+      sourceCode,
+      status,
+    };
+  }
+
+  const isSupabaseAuthFailure =
+    isAuthApiError(cause) || isAuthError(cause) || sourceCode !== null;
+
+  return {
+    category: isSupabaseAuthFailure ? 'auth' : 'unknown',
+    code:
+      operation === 'login'
+        ? 'LOGIN_FAILED'
+        : operation === 'signup'
+          ? 'UNKNOWN_AUTH_ERROR'
+          : operation === 'logout'
+            ? 'LOGOUT_FAILED'
+            : 'LOAD_FAILED',
+    developerMessage,
+    message:
+      operation === 'signup'
+        ? 'Account creation is temporarily unavailable. Please try again later.'
+        : operation === 'login'
+          ? 'Sign in did not complete. Check your email and password, then try again.'
+          : operation === 'logout'
+            ? 'Sign out did not complete. Try again.'
+            : 'Account information could not be loaded. Try again.',
+    retryable: true,
+    sourceCode,
+    status,
+  };
+}
+
+export function accountAuthError(
+  operation: AuthFailureOperation,
+  cause?: unknown,
+): AccountError {
+  const normalized = normalizeAuthFailure(cause, operation);
+  return createAccountError(normalized.code, normalized.message, cause, {
+    category: normalized.category,
+    developerMessage: normalized.developerMessage,
+    retryable: normalized.retryable,
+    sourceCode: normalized.sourceCode,
+    status: normalized.status,
+  });
+}
+
+export function logAccountAuthFailure(
+  operation: AuthFailureOperation,
+  cause: unknown,
+) {
+  if (typeof __DEV__ === 'undefined' || !__DEV__) {
+    return;
+  }
+
+  const normalized = normalizeAuthFailure(cause, operation);
+  console.warn(`[AccountAuth] ${operation} failed`, {
+    operation,
+    name: getErrorName(cause),
+    code: normalized.sourceCode,
+    status: normalized.status,
+    message: normalized.developerMessage,
+    at: new Date().toISOString(),
+  });
+}
+
+export function accountLoadError(cause: unknown): AccountError {
+  return accountAuthError('session', cause);
 }
 
 export function invalidEmailError(): AccountError {
@@ -44,54 +356,21 @@ export function weakPasswordError(): AccountError {
   return createAccountError(
     'WEAK_PASSWORD',
     'Use a password with at least 8 characters.',
+    undefined,
+    { category: 'validation', retryable: false },
   );
 }
 
 export function loginFailedError(cause: unknown): AccountError {
-  if (authErrorMatches(cause, ['invalid_credentials', 'invalid login'])) {
-    return createAccountError(
-      'LOGIN_FAILED',
-      'The email or password is incorrect.',
-      cause,
-    );
-  }
-
-  return createAccountError(
-    'LOGIN_FAILED',
-    'Sign in did not complete. Check your email and password, then try again.',
-    cause,
-  );
+  return accountAuthError('login', cause);
 }
 
 export function registerFailedError(cause: unknown): AccountError {
-  if (
-    authErrorMatches(cause, [
-      'already registered',
-      'already exists',
-      'email_exists',
-      'user_already_exists',
-    ])
-  ) {
-    return createAccountError(
-      'REGISTER_FAILED',
-      'An account with this email already exists. Sign in instead.',
-      cause,
-    );
-  }
-
-  return createAccountError(
-    'REGISTER_FAILED',
-    'Account creation did not complete. Check your details and try again.',
-    cause,
-  );
+  return accountAuthError('signup', cause);
 }
 
 export function logoutFailedError(cause: unknown): AccountError {
-  return createAccountError(
-    'LOGOUT_FAILED',
-    'Sign out did not complete. Try again.',
-    cause,
-  );
+  return accountAuthError('logout', cause);
 }
 
 export function preferencesLoadError(cause: unknown): PreferencesError {

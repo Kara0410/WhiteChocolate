@@ -1,7 +1,10 @@
 import { memo, useCallback, useMemo, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 
-import type { AccountActionResult } from '@/types/account';
+import type {
+  AccountActionResult,
+  RegisterActionResult,
+} from '@/types/account';
 
 type EmailSignInCardProps = {
   errorMessage: string | null;
@@ -12,7 +15,7 @@ type EmailSignInCardProps = {
   registerWithEmailPassword: (
     email: string,
     password: string,
-  ) => Promise<AccountActionResult>;
+  ) => Promise<RegisterActionResult>;
 };
 
 type AuthMode = 'login' | 'register';
@@ -31,6 +34,7 @@ export const EmailSignInCard = memo(function EmailSignInCard({
   const [confirmPassword, setConfirmPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const isRegistering = mode === 'register';
   const passwordsMatch = password === confirmPassword;
@@ -54,16 +58,41 @@ export const EmailSignInCard = memo(function EmailSignInCard({
 
     setBusy(true);
     setLocalError(null);
+    setNotice(null);
 
     try {
-      const result = isRegistering
-        ? await registerWithEmailPassword(email, password)
-        : await loginWithEmailPassword(email, password);
+      if (isRegistering) {
+        const result = await registerWithEmailPassword(email, password);
 
-      if (result.ok) {
+        if (!result.ok) {
+          setLocalError(result.error.message);
+          return;
+        }
+
+        if (result.status === 'confirmation-required') {
+          setPassword('');
+          setConfirmPassword('');
+          setNotice(
+            `Account created for ${result.email}. Confirm your email before signing in.`,
+          );
+          setMode('login');
+          return;
+        }
+
         setPassword('');
         setConfirmPassword('');
+        return;
       }
+
+      const result = await loginWithEmailPassword(email, password);
+
+      if (!result.ok) {
+        setLocalError(result.error.message);
+        return;
+      }
+
+      setPassword('');
+      setConfirmPassword('');
     } finally {
       setBusy(false);
     }
@@ -81,6 +110,7 @@ export const EmailSignInCard = memo(function EmailSignInCard({
     setMode((current) => (current === 'login' ? 'register' : 'login'));
     setConfirmPassword('');
     setLocalError(null);
+    setNotice(null);
   }, []);
 
   const visibleError = localError ?? errorMessage;
@@ -196,6 +226,15 @@ export const EmailSignInCard = memo(function EmailSignInCard({
           className="mt-3 text-[13px] font-semibold leading-5 text-red-700"
         >
           {visibleError}
+        </Text>
+      ) : null}
+
+      {notice ? (
+        <Text
+          accessibilityRole="alert"
+          className="mt-3 rounded-2xl bg-blue-50 px-4 py-3 text-[13px] font-semibold leading-5 text-blue-800"
+        >
+          {notice}
         </Text>
       ) : null}
 

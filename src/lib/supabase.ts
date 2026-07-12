@@ -1,7 +1,7 @@
 import 'react-native-url-polyfill/auto';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, processLock } from '@supabase/supabase-js';
 import { AppState, Platform } from 'react-native';
 
 import type { Database } from '@/types/database';
@@ -23,6 +23,17 @@ const supabaseUrl = configuredUrl.replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '
 
 const isWeb = Platform.OS === 'web';
 
+if (typeof __DEV__ !== 'undefined' && __DEV__) {
+  try {
+    const parsedUrl = new URL(supabaseUrl);
+    if (!parsedUrl.hostname.endsWith('.supabase.co')) {
+      console.warn('[Supabase] URL does not look like a Supabase project URL.');
+    }
+  } catch {
+    console.warn('[Supabase] EXPO_PUBLIC_SUPABASE_URL is not a valid URL.');
+  }
+}
+
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
     // On native the session must be stored explicitly; AsyncStorage is used
@@ -35,6 +46,7 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     // Email/password auth does not use website callbacks, magic links, or
     // deep-link session detection in this product phase.
     detectSessionInUrl: false,
+    lock: processLock,
   },
 });
 
