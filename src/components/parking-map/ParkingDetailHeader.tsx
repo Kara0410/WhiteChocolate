@@ -10,6 +10,7 @@ export type ParkingDetailHeaderProps = {
   percentage: number;
   distanceLabel: string;
   theme: AvailabilityTheme;
+  showMetrics?: boolean;
   onClose: () => void;
   onNavigate?: () => void;
   onShare?: () => void;
@@ -27,6 +28,7 @@ export const ParkingDetailHeader = memo(function ParkingDetailHeader({
   percentage,
   distanceLabel,
   theme,
+  showMetrics = true,
   onClose,
   onNavigate,
   onShare,
@@ -46,33 +48,37 @@ export const ParkingDetailHeader = memo(function ParkingDetailHeader({
           {title}
         </Text>
         <View className="flex-row gap-2">
-          <Pressable
-            accessibilityLabel="Share parking location"
-            accessibilityRole="button"
-            className="h-9 w-9 items-center justify-center rounded-full bg-blue-50 active:bg-blue-100"
-            hitSlop={6}
-            onPress={onShare}
-          >
-            <Share2 color="#2563EB" size={17} strokeWidth={2.3} />
-          </Pressable>
-          <Pressable
-            accessibilityLabel={
-              isFavorite
-                ? 'Remove parking location from favorites'
-                : 'Add parking location to favorites'
-            }
-            accessibilityRole="button"
-            className="h-9 w-9 items-center justify-center rounded-full bg-blue-50 active:bg-blue-100"
-            hitSlop={6}
-            onPress={onFavorite}
-          >
-            <Heart
-              color="#2563EB"
-              fill={isFavorite ? '#2563EB' : 'transparent'}
-              size={17}
-              strokeWidth={2.3}
-            />
-          </Pressable>
+          {onShare ? (
+            <Pressable
+              accessibilityLabel="Share parking location"
+              accessibilityRole="button"
+              className="h-9 w-9 items-center justify-center rounded-full bg-blue-50 active:bg-blue-100"
+              hitSlop={6}
+              onPress={onShare}
+            >
+              <Share2 color="#2563EB" size={17} strokeWidth={2.3} />
+            </Pressable>
+          ) : null}
+          {onFavorite ? (
+            <Pressable
+              accessibilityLabel={
+                isFavorite
+                  ? 'Remove parking location from favorites'
+                  : 'Add parking location to favorites'
+              }
+              accessibilityRole="button"
+              className="h-9 w-9 items-center justify-center rounded-full bg-blue-50 active:bg-blue-100"
+              hitSlop={6}
+              onPress={onFavorite}
+            >
+              <Heart
+                color="#2563EB"
+                fill={isFavorite ? '#2563EB' : 'transparent'}
+                size={17}
+                strokeWidth={2.3}
+              />
+            </Pressable>
+          ) : null}
           <Pressable
             accessibilityLabel="Close parking details"
             accessibilityRole="button"
@@ -85,57 +91,59 @@ export const ParkingDetailHeader = memo(function ParkingDetailHeader({
         </View>
       </View>
 
-      <View className="mt-3 flex-row items-center justify-between">
-        <View className="flex-row items-center">
-          <View className="items-center justify-center">
-            <Svg
-              height={RING_SIZE}
-              style={{ transform: [{ rotate: '-90deg' }] }}
-              width={RING_SIZE}
-            >
-              <Circle
-                cx={RING_SIZE / 2}
-                cy={RING_SIZE / 2}
-                fill="rgba(255,255,255,0.9)"
-                r={RING_RADIUS}
-                stroke={theme.ringTrack}
-                strokeWidth={RING_STROKE}
-              />
-              <Circle
-                cx={RING_SIZE / 2}
-                cy={RING_SIZE / 2}
-                fill="none"
-                r={RING_RADIUS}
-                stroke={theme.ring}
-                strokeDasharray={`${RING_CIRCUMFERENCE} ${RING_CIRCUMFERENCE}`}
-                strokeDashoffset={ringOffset}
-                strokeLinecap="round"
-                strokeWidth={RING_STROKE}
-              />
-            </Svg>
+      {showMetrics ? (
+        <View className="mt-3 flex-row items-center justify-between">
+          <View className="flex-row items-center">
+            <View className="items-center justify-center">
+              <Svg
+                height={RING_SIZE}
+                style={{ transform: [{ rotate: '-90deg' }] }}
+                width={RING_SIZE}
+              >
+                <Circle
+                  cx={RING_SIZE / 2}
+                  cy={RING_SIZE / 2}
+                  fill="rgba(255,255,255,0.9)"
+                  r={RING_RADIUS}
+                  stroke={theme.ringTrack}
+                  strokeWidth={RING_STROKE}
+                />
+                <Circle
+                  cx={RING_SIZE / 2}
+                  cy={RING_SIZE / 2}
+                  fill="none"
+                  r={RING_RADIUS}
+                  stroke={theme.ring}
+                  strokeDasharray={`${RING_CIRCUMFERENCE} ${RING_CIRCUMFERENCE}`}
+                  strokeDashoffset={ringOffset}
+                  strokeLinecap="round"
+                  strokeWidth={RING_STROKE}
+                />
+              </Svg>
+              <Text
+                className="absolute text-[17px] font-extrabold"
+                style={{
+                  color: theme.text,
+                  fontVariant: ['tabular-nums'],
+                  letterSpacing: -0.5,
+                }}
+              >
+                {percentage}%
+              </Text>
+            </View>
             <Text
-              className="absolute text-[17px] font-extrabold"
-              style={{
-                color: theme.text,
-                fontVariant: ['tabular-nums'],
-                letterSpacing: -0.5,
-              }}
+              className="ml-3 text-[14px] font-semibold"
+              style={{ color: theme.text }}
             >
-              {percentage}%
+              Available
             </Text>
           </View>
-          <Text
-            className="ml-3 text-[14px] font-semibold"
-            style={{ color: theme.text }}
-          >
-            Available
+
+          <Text className="ml-4 flex-1 text-right text-[13px] font-semibold text-blue-600">
+            {distanceLabel}
           </Text>
         </View>
-
-        <Text className="ml-4 flex-1 text-right text-[13px] font-semibold text-blue-600">
-          {distanceLabel}
-        </Text>
-      </View>
+      ) : null}
 
       <Pressable
         accessibilityLabel="Navigate to parking spot"

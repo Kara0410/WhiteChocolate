@@ -7,11 +7,13 @@ import {
   useRef,
   useEffect,
   type ComponentRef,
+  type ReactNode,
 } from 'react';
 import BottomSheet, {
   BottomSheetScrollView,
   useBottomSheetSpringConfigs,
 } from '@gorhom/bottom-sheet';
+import { BlurView } from 'expo-blur';
 import {
   Ban,
   Camera,
@@ -20,6 +22,7 @@ import {
   CreditCard,
   DoorClosed,
   Lightbulb,
+  Lock,
   Ruler,
   ShieldCheck,
   UserRoundCheck,
@@ -35,6 +38,7 @@ import { useAuthSheet } from '@/context/AuthSheetContext';
 import { useFavoriteParking } from '@/context/FavoriteParkingContext';
 import { useAccount } from '@/hooks/use-account';
 import type { ParkingClusterResponse } from '@/types/parking-map';
+import { getAccountAccessTier } from '@/utils/account-tier';
 import { openParkingNavigation } from '@/utils/openParkingNavigation';
 
 import { ParkingDetailHeader } from './ParkingDetailHeader';
@@ -131,6 +135,51 @@ function buildParkingShareMessage(
   return lines.join('\n');
 }
 
+function LockedDetailContent({
+  children,
+  locked,
+  message,
+}: {
+  children: ReactNode;
+  locked: boolean;
+  message: string;
+}) {
+  return (
+    <View style={locked ? styles.lockedContent : undefined}>
+      <View
+        accessibilityElementsHidden={locked}
+        importantForAccessibility={
+          locked ? 'no-hide-descendants' : 'auto'
+        }
+        pointerEvents={locked ? 'none' : 'auto'}
+      >
+        {children}
+      </View>
+      {locked ? (
+        <BlurView
+          intensity={68}
+          pointerEvents="auto"
+          style={styles.lockedOverlay}
+          tint="light"
+        >
+          <View style={styles.lockedScrim} />
+          <View
+            className="mx-6 items-center justify-center rounded-3xl border border-white/80 bg-white/90 px-5 py-4"
+            style={{ borderCurve: 'continuous' }}
+          >
+            <View className="mb-2 h-10 w-10 items-center justify-center rounded-full bg-slate-950">
+              <Lock color="#FFFFFF" size={18} strokeWidth={2.4} />
+            </View>
+            <Text className="text-center text-[14px] font-extrabold leading-5 text-slate-900">
+              {message}
+            </Text>
+          </View>
+        </BlurView>
+      ) : null}
+    </View>
+  );
+}
+
 const ParkingDetailContent = memo(function ParkingDetailContent({
   item,
   onClose,
@@ -147,6 +196,9 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
   const price = item.avgPrice ?? item.minPrice;
   const dailyPrice = price === null ? null : price * 7.2;
   const account = useAccount();
+  const accessTier = getAccountAccessTier(account);
+  const isGuest = accessTier === 'guest';
+  const isPremium = accessTier === 'premium';
   const { showCreateAccountSheet } = useAuthSheet();
   const { isFavorite, toggleFavorite } = useFavoriteParking();
   const itemIsFavorite = isFavorite(item.id);
@@ -187,19 +239,24 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
         distanceLabel={formatDistance(item.distanceToDestination)}
         isFavorite={itemIsFavorite}
         onClose={onClose}
-        onFavorite={handleFavorite}
+        onFavorite={isGuest ? undefined : handleFavorite}
         onNavigate={handleNavigate}
-        onShare={handleShare}
+        onShare={isGuest ? undefined : handleShare}
         percentage={percentage}
+        showMetrics={!isGuest}
         theme={theme}
         title={title}
       />
 
-      <View className="mb-4 flex-row gap-3">
-        <View
-          className="flex-1 rounded-[28px] border border-white/70 bg-white px-4 py-5 shadow-sm"
-          style={{ borderCurve: 'continuous' }}
-        >
+      <LockedDetailContent
+        locked={isGuest}
+        message="Get a free account for more information."
+      >
+        <View className="mb-4 flex-row gap-3">
+          <View
+            className="flex-1 rounded-[28px] border border-white/70 bg-white px-4 py-5 shadow-sm"
+            style={{ borderCurve: 'continuous' }}
+          >
           <View className="h-11 w-11 items-center justify-center rounded-full bg-emerald-100">
             <Text className="text-xl font-bold text-emerald-700">$</Text>
           </View>
@@ -214,12 +271,12 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
               ? 'No payment required'
               : `Max daily $${dailyPrice.toFixed(2)}`}
           </Text>
-        </View>
+          </View>
 
-        <View
-          className="flex-1 rounded-[28px] border border-white/70 bg-white px-4 py-5 shadow-sm"
-          style={{ borderCurve: 'continuous' }}
-        >
+          <View
+            className="flex-1 rounded-[28px] border border-white/70 bg-white px-4 py-5 shadow-sm"
+            style={{ borderCurve: 'continuous' }}
+          >
           <View className="h-11 w-11 items-center justify-center rounded-full bg-blue-100">
             <Clock3 color="#1D4ED8" size={19} />
           </View>
@@ -232,14 +289,14 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
           <Text className="mt-1 text-[11px] font-medium text-slate-500">
             Check local signs
           </Text>
+          </View>
         </View>
-      </View>
 
-      <View className="mb-4 flex-row gap-3">
-        <View
-          className="flex-1 rounded-[28px] border border-white/70 bg-white px-4 py-5 shadow-sm"
-          style={{ borderCurve: 'continuous' }}
-        >
+        <View className="mb-4 flex-row gap-3">
+          <View
+            className="flex-1 rounded-[28px] border border-white/70 bg-white px-4 py-5 shadow-sm"
+            style={{ borderCurve: 'continuous' }}
+          >
           <View className="h-11 w-11 items-center justify-center rounded-full bg-blue-100">
             <CarFront color="#1D4ED8" size={19} />
           </View>
@@ -255,12 +312,12 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
           <Text className="mt-1 text-[11px] font-medium text-slate-500">
             To your destination
           </Text>
-        </View>
+          </View>
 
-        <View
-          className="flex-1 rounded-[28px] border border-white/70 bg-white px-4 py-5 shadow-sm"
-          style={{ borderCurve: 'continuous' }}
-        >
+          <View
+            className="flex-1 rounded-[28px] border border-white/70 bg-white px-4 py-5 shadow-sm"
+            style={{ borderCurve: 'continuous' }}
+          >
           <View className="h-11 w-11 items-center justify-center rounded-full bg-emerald-100">
             <Clock3 color={POSITIVE_COLOR} size={19} />
           </View>
@@ -273,9 +330,15 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
           <Text className="mt-1 text-[11px] font-medium text-slate-500">
             Open now
           </Text>
+          </View>
         </View>
-      </View>
+      </LockedDetailContent>
 
+      {!isGuest ? (
+        <LockedDetailContent
+          locked={!isPremium}
+          message="Get a premium account for more details."
+        >
       <ParkingDetailSection title="Historical Usage">
         <View className="h-40 flex-row items-end justify-between">
           {HISTORICAL_USAGE.map(({ day, value, weekend }) => (
@@ -433,6 +496,8 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
         />
         <ParkingInfoRow label="Last Updated" value="Just now" />
       </ParkingDetailSection>
+        </LockedDetailContent>
+      ) : null}
 
     </>
   );
@@ -586,6 +651,22 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     height: 5,
     width: 42,
+  },
+  lockedContent: {
+    borderRadius: 28,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  lockedOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    zIndex: 5,
+  },
+  lockedScrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15,23,42,0.18)',
   },
   sheet: {
     borderTopLeftRadius: 32,
