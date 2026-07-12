@@ -1,5 +1,4 @@
 import type {
-  AvailabilityColorStatus,
   ParkingBoundingBox,
   ParkingCameraState,
   ParkingClusterRequest,
@@ -7,6 +6,7 @@ import type {
   ParkingMapSize,
   WalkingCategory,
 } from '@/types/parking-map';
+export { getAvailabilityColorStatus } from '@/utils/parking-availability';
 
 const MAX_MERCATOR_LATITUDE = 85.05112878;
 const EARTH_RADIUS_METERS = 6_371_000;
@@ -39,16 +39,6 @@ export function clampZoom(zoom: number) {
 
 export function zoomFromLongitudeDelta(longitudeDelta: number) {
   return clampZoom(Math.log2(360 / Math.max(longitudeDelta, 0.000001)));
-}
-
-export function getAvailabilityColorStatus(percent: number): AvailabilityColorStatus {
-  if (percent >= 65) {
-    return 'green';
-  }
-  if (percent >= 30) {
-    return 'orange';
-  }
-  return 'red';
 }
 
 export function longitudeToTileX(longitude: number, zoom: number) {

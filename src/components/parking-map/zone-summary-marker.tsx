@@ -3,6 +3,9 @@ import { Pressable, StyleSheet, Text } from 'react-native';
 import Animated, {
   FadeOut,
   ReduceMotion,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
   ZoomIn,
 } from 'react-native-reanimated';
 
@@ -22,12 +25,18 @@ type ZoneSummaryMarkerProps = {
   onPress: (summary: ParkingZoneSummary) => void;
 };
 
-const ENTERING_TRANSITION = ZoomIn.duration(180)
+const ENTERING_TRANSITION = ZoomIn.duration(200)
   .withInitialValues({ opacity: 0, transform: [{ scale: 0.92 }] })
   .reduceMotion(ReduceMotion.System);
-const EXITING_TRANSITION = FadeOut.duration(140).reduceMotion(
+const EXITING_TRANSITION = FadeOut.duration(150).reduceMotion(
   ReduceMotion.System,
 );
+const PRESS_SPRING_CONFIG = {
+  damping: 18,
+  stiffness: 320,
+  mass: 0.6,
+  reduceMotion: ReduceMotion.System,
+} as const;
 
 export const ZoneSummaryMarker = memo(function ZoneSummaryMarker({
   summary,
@@ -41,6 +50,16 @@ export const ZoneSummaryMarker = memo(function ZoneSummaryMarker({
     capped: true,
     cap: ZONE_SUMMARY_SPOT_CAP,
   });
+  const pressScale = useSharedValue(1);
+  const animatedPressStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pressScale.value }],
+  }));
+  const handlePressIn = useCallback(() => {
+    pressScale.value = withSpring(0.96, PRESS_SPRING_CONFIG);
+  }, [pressScale]);
+  const handlePressOut = useCallback(() => {
+    pressScale.value = withSpring(1, PRESS_SPRING_CONFIG);
+  }, [pressScale]);
 
   return (
     <Animated.View
@@ -48,18 +67,25 @@ export const ZoneSummaryMarker = memo(function ZoneSummaryMarker({
       exiting={EXITING_TRANSITION}
       style={styles.canvas}
     >
-      <Pressable
-        accessibilityHint="Zooms the map into this parking zone"
-        accessibilityLabel={`${summary.zoneName ?? 'Parking zone'}, ${label}`}
-        accessibilityRole="button"
-        hitSlop={6}
-        onPress={handlePress}
-        style={({ pressed }) => [styles.pill, pressed && styles.pillPressed]}
-      >
-        <Text numberOfLines={1} style={styles.label}>
-          {label}
-        </Text>
-      </Pressable>
+      <Animated.View style={animatedPressStyle}>
+        <Pressable
+          accessibilityHint="Zooms the map into this parking zone"
+          accessibilityLabel={`${summary.zoneName ?? 'Parking zone'}, ${label}`}
+          accessibilityRole="button"
+          hitSlop={6}
+          onPress={handlePress}
+          onPressIn={handlePressIn}
+          onPressOut={handlePressOut}
+          style={({ pressed }) => [
+            styles.pill,
+            pressed && styles.pillPressed,
+          ]}
+        >
+          <Text numberOfLines={1} style={styles.label}>
+            {label}
+          </Text>
+        </Pressable>
+      </Animated.View>
     </Animated.View>
   );
 });
@@ -72,27 +98,29 @@ const styles = StyleSheet.create({
     width: ZONE_SUMMARY_MARKER_SIZE.width,
   },
   label: {
-    color: '#FFFFFF',
+    color: '#0F172A',
     fontSize: 13,
     fontVariant: ['tabular-nums'],
-    fontWeight: '700',
-    letterSpacing: -0.2,
+    fontWeight: '800',
+    letterSpacing: -0.3,
     lineHeight: 16,
   },
   pill: {
     alignItems: 'center',
-    backgroundColor: '#1D4ED8',
-    borderColor: 'rgba(255, 255, 255, 0.85)',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#DBEAFE',
     borderRadius: 999,
-    borderWidth: 1.5,
-    boxShadow: '0 3px 10px rgba(29, 78, 216, 0.35)',
-    height: 32,
+    borderWidth: 1,
+    boxShadow: '0 8px 18px rgba(15, 23, 42, 0.2)',
+    elevation: 5,
+    height: 36,
     justifyContent: 'center',
     minWidth: 92,
     paddingHorizontal: 14,
   },
   pillPressed: {
-    backgroundColor: '#1E40AF',
-    transform: [{ scale: 0.95 }],
+    borderColor: '#2563EB',
+    boxShadow: '0 9px 20px rgba(37, 99, 235, 0.24)',
+    elevation: 7,
   },
 });

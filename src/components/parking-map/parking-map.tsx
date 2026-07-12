@@ -14,36 +14,25 @@ import Animated, {
   FadeIn,
   FadeOut,
   ReduceMotion,
-  ZoomIn,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import {
-  filterParkingMarkersForScreenCircle,
-  getDisplayedParkingMarkerItems,
-  projectMapCoordinate,
-  projectSelectedParkingMarkers,
-  selectSpatiallySeparatedMarkers,
-} from '@/components/parking-map/marker-density';
 import {
   MAP_ELEVATIONS,
   MAP_LAYERS,
 } from '@/components/parking-map/map-layers';
 import { MAP_DETAIL_THRESHOLDS } from '@/components/parking-map/map-detail-level';
 import {
-  ZONE_SUMMARY_MARKER_SIZE,
-  ZoneSummaryMarker,
-} from '@/components/parking-map/zone-summary-marker';
-import {
   ParkingBottomSheet,
   type ParkingBottomSheetHandle,
 } from '@/components/parking-map/ParkingBottomSheet';
 import { FavoriteParkingBottomSheet } from '@/components/parking-map/FavoriteParkingBottomSheet';
 import { ParkingListBottomSheet } from '@/components/parking-map/ParkingListBottomSheet';
-import { ParkingMarkerCard } from '@/components/parking-map/parking-marker-card';
+import { ParkingMarkerOverlay } from '@/components/parking-map/parking-marker-overlay';
 import { SearchDestinationMarker } from '@/components/parking-map/search-destination-marker';
 import { SearchNearestSpotsBottomSheet } from '@/components/parking-map/SearchNearestSpotsBottomSheet';
 import { UserLocationMarker } from '@/components/parking-map/user-location-marker';
+import { useParkingMarkerPipeline } from '@/components/parking-map/use-parking-marker-pipeline';
 import { useFavoriteParking } from '@/context/FavoriteParkingContext';
 import { useMapOverlay } from '@/context/MapOverlayContext';
 import { useMapDetailLevel } from '@/hooks/use-map-detail-level';
@@ -66,7 +55,6 @@ import {
   isCoordinateInsideBounds,
 } from '@/utils/parking-map-geo';
 import {
-  buildZoneSummaries,
   getZoneFocusZoom,
   type ParkingZoneSummary,
 } from '@/utils/parking-zones';
@@ -141,7 +129,6 @@ const INITIAL_CAMERA_SETTLE_MS = 750;
 const MAP_DRAG_SETTLE_MS = 180;
 const MARKER_MOVEMENT_SETTLE_MS = 150;
 const EMPTY_SEARCH_SPOTS: ParkingSpotWithDistance[] = [];
-const EMPTY_ZONE_SUMMARIES: ParkingZoneSummary[] = [];
 /** Only the top recommendations get map markers in active search mode. */
 const SEARCH_HIGHLIGHTED_MARKER_LIMIT = 3;
 /**
@@ -165,13 +152,6 @@ const DETAIL_LAYER_ENTERING = FadeIn.duration(180).reduceMotion(
 const DETAIL_LAYER_EXITING = FadeOut.duration(140).reduceMotion(
   ReduceMotion.System,
 );
-const SEARCH_MARKER_ENTERING = ZoomIn.duration(180)
-  .withInitialValues({ opacity: 0, transform: [{ scale: 0.92 }] })
-  .reduceMotion(ReduceMotion.System);
-const SEARCH_MARKER_EXITING = FadeOut.duration(140).reduceMotion(
-  ReduceMotion.System,
-);
-
 type ParkingMapProps = {
   initialCamera: ParkingCameraState;
   currentLocationFocusKey?: string;
@@ -505,16 +485,29 @@ export function ParkingMap({
   ]);
 
   const detailLevel = useMapDetailLevel(displayCamera);
-  const circleFilterResult = useMemo(
-    () =>
-      filterParkingMarkersForScreenCircle(visibleClusters, {
-        camera: currentRegion,
-        width: mapSize.width,
-        height: mapSize.height,
-      }),
-    [currentRegion, mapSize.height, mapSize.width, visibleClusters],
-  );
-  const circularFilteredClusters = circleFilterResult.markers;
+  const {
+    projectedMarkers,
+    projectedSearchDestination,
+    projectedUserLocation,
+    projectedZoneSummaries,
+  } = useParkingMarkerPipeline({
+    activeOverlay,
+    currentRegion,
+    detailLevel,
+    displayCamera,
+    highlightedSearchSpots,
+    isAutomaticParkingFetchEnabled,
+    isMapMoving,
+    loadedRequestBounds,
+    mapMode,
+    mapSize,
+    parkingZonePolygons,
+    selectedParkingItem,
+    selectedSearchPlace,
+    userLocation,
+    visibleClusters,
+    visibleSpots,
+  });
   const nativeZonePolygons = useMemo(
     () =>
       mapMode === 'munichOverview' || detailLevel === 'overview'
@@ -528,269 +521,6 @@ export function ParkingMap({
         : [],
     [detailLevel, mapMode, parkingZonePolygons],
   );
-
-  useEffect(() => {
-    if (!__DEV__ || !isAutomaticParkingFetchEnabled) {
-      return;
-    }
-
-    const debugDetails = {
-      afterCircularFilter: circularFilteredClusters.length,
-      bbox: loadedRequestBounds,
-      cameraCenter: {
-        latitude: currentRegion.latitude,
-        longitude: currentRegion.longitude,
-      },
-      mapSize,
-      radiusMeters: circleFilterResult.radiusMeters,
-      radiusPixels: circleFilterResult.radiusPixels,
-      sampleMarkerCoordinates: visibleClusters.slice(0, 3).map((marker) => ({
-        latitude: marker.latitude,
-        longitude: marker.longitude,
-      })),
-      serverMarkers: visibleClusters.length,
-    };
-
-    console.debug('[parking-map] Parking circle filter', debugDetails);
-
-    if (circleFilterResult.removedAllMarkers) {
-      console.warn(
-        'Parking circle filter rejected all server-returned markers; using bbox results.',
-        debugDetails,
-      );
-    } else if (circleFilterResult.usedServerFallback) {
-      console.warn(
-        'Parking circle filter used the server-filtered marker fallback.',
-        debugDetails,
-      );
-    }
-  }, [
-    circleFilterResult.radiusMeters,
-    circleFilterResult.radiusPixels,
-    circleFilterResult.removedAllMarkers,
-    circleFilterResult.usedServerFallback,
-    circularFilteredClusters.length,
-    currentRegion,
-    isAutomaticParkingFetchEnabled,
-    loadedRequestBounds,
-    mapSize,
-    visibleClusters,
-    visibleClusters.length,
-  ]);
-
-  const densityFilteredMarkers = useMemo(
-    () =>
-      mapSize.width > 0 && mapSize.height > 0
-        ? selectSpatiallySeparatedMarkers(circularFilteredClusters, {
-            camera: currentRegion,
-            width: mapSize.width,
-            height: mapSize.height,
-          })
-        : [],
-    [
-      currentRegion,
-      circularFilteredClusters,
-      mapSize.height,
-      mapSize.width,
-    ],
-  );
-  const displayedMarkerItems = useMemo(
-    () => {
-      if (mapMode === 'munichOverview') {
-        return [];
-      }
-
-      return getDisplayedParkingMarkerItems(
-        detailLevel === 'spotDetail' ? densityFilteredMarkers : [],
-        selectedParkingItem,
-        selectedSearchPlace !== null ? highlightedSearchSpots : null,
-        activeOverlay !== 'none',
-      );
-    },
-    [
-      activeOverlay,
-      densityFilteredMarkers,
-      detailLevel,
-      highlightedSearchSpots,
-      mapMode,
-      selectedParkingItem,
-      selectedSearchPlace,
-    ],
-  );
-  const projectedMarkers = useMemo(
-    () =>
-      mapSize.width > 0 && mapSize.height > 0
-        ? projectSelectedParkingMarkers(displayedMarkerItems, {
-            camera: displayCamera,
-            width: mapSize.width,
-            height: mapSize.height,
-          })
-        : [],
-    [
-      displayCamera,
-      displayedMarkerItems,
-      mapSize.height,
-      mapSize.width,
-    ],
-  );
-
-  const zoneSummaries = useMemo(
-    () =>
-      detailLevel === 'zoneSummary' && mapMode !== 'munichOverview'
-        ? buildZoneSummaries(visibleSpots, parkingZonePolygons)
-        : EMPTY_ZONE_SUMMARIES,
-    [detailLevel, mapMode, parkingZonePolygons, visibleSpots],
-  );
-  const projectedZoneSummaries = useMemo(() => {
-    if (
-      zoneSummaries.length === 0 ||
-      mapSize.width <= 0 ||
-      mapSize.height <= 0 ||
-      activeOverlay !== 'none' ||
-      selectedSearchPlace !== null ||
-      selectedParkingItem !== null
-    ) {
-      return [];
-    }
-
-    const margin = ZONE_SUMMARY_MARKER_SIZE.width;
-    return zoneSummaries.flatMap((summary) => {
-      const position = projectMapCoordinate(summary, {
-        camera: displayCamera,
-        height: mapSize.height,
-        width: mapSize.width,
-      });
-
-      if (
-        !Number.isFinite(position.x) ||
-        !Number.isFinite(position.y) ||
-        position.x < -margin ||
-        position.x > mapSize.width + margin ||
-        position.y < -margin ||
-        position.y > mapSize.height + margin
-      ) {
-        return [];
-      }
-
-      return [{ summary, x: position.x, y: position.y }];
-    });
-  }, [
-    activeOverlay,
-    displayCamera,
-    mapSize.height,
-    mapSize.width,
-    selectedParkingItem,
-    selectedSearchPlace,
-    zoneSummaries,
-  ]);
-
-  useEffect(() => {
-    if (
-      !__DEV__ ||
-      isMapMoving ||
-      detailLevel !== 'spotDetail' ||
-      activeOverlay !== 'none' ||
-      selectedSearchPlace !== null ||
-      mapSize.width <= 0 ||
-      mapSize.height <= 0 ||
-      visibleClusters.length === 0 ||
-      circleFilterResult.removedAllMarkers ||
-      projectedMarkers.length > 0
-    ) {
-      return;
-    }
-
-    console.warn('Parking marker pipeline produced no projected markers.', {
-      currentRegion,
-      circularFilteredMarkers: circularFilteredClusters.length,
-      densityFilteredMarkers: densityFilteredMarkers.length,
-      displayCamera,
-      mapSize: {
-        height: mapSize.height,
-        width: mapSize.width,
-      },
-      projectedMarkers: projectedMarkers.length,
-      radiusPixels: circleFilterResult.radiusPixels,
-      visibleClusters: visibleClusters.length,
-    });
-  }, [
-    activeOverlay,
-    circleFilterResult.radiusPixels,
-    circleFilterResult.removedAllMarkers,
-    circularFilteredClusters.length,
-    currentRegion,
-    densityFilteredMarkers.length,
-    detailLevel,
-    displayCamera,
-    isMapMoving,
-    mapSize.height,
-    mapSize.width,
-    projectedMarkers.length,
-    selectedSearchPlace,
-    visibleClusters.length,
-  ]);
-
-  const projectedSearchDestination = useMemo(() => {
-    if (
-      selectedSearchPlace === null ||
-      !hasValidParkingCoordinates(selectedSearchPlace) ||
-      mapSize.width <= 0 ||
-      mapSize.height <= 0
-    ) {
-      return null;
-    }
-
-    const position = projectMapCoordinate(selectedSearchPlace, {
-      camera: displayCamera,
-      height: mapSize.height,
-      width: mapSize.width,
-    });
-
-    if (
-      position.x < -40 ||
-      position.x > mapSize.width + 40 ||
-      position.y < -44 ||
-      position.y > mapSize.height + 44
-    ) {
-      return null;
-    }
-
-    return position;
-  }, [
-    displayCamera,
-    mapSize.height,
-    mapSize.width,
-    selectedSearchPlace,
-  ]);
-
-  const projectedUserLocation = useMemo(() => {
-    if (
-      mapMode === 'munichOverview' ||
-      userLocation == null ||
-      !hasValidParkingCoordinates(userLocation) ||
-      mapSize.width <= 0 ||
-      mapSize.height <= 0
-    ) {
-      return null;
-    }
-
-    const position = projectMapCoordinate(userLocation, {
-      camera: displayCamera,
-      height: mapSize.height,
-      width: mapSize.width,
-    });
-
-    if (
-      position.x < -28 ||
-      position.x > mapSize.width + 28 ||
-      position.y < -28 ||
-      position.y > mapSize.height + 28
-    ) {
-      return null;
-    }
-
-    return position;
-  }, [displayCamera, mapMode, mapSize.height, mapSize.width, userLocation]);
 
   const canFocusCamera = useCallback(
     () =>
@@ -1671,115 +1401,16 @@ export function ParkingMap({
         </View>
       )}
 
-      <View
-        pointerEvents="box-none"
-        style={{
-          elevation: MAP_ELEVATIONS.markers,
-          position: 'absolute',
-          inset: 0,
-          zIndex: MAP_LAYERS.markers,
-        }}
-      >
-        <Animated.View
-          key={`marker-layer-${detailLevel}`}
-          entering={DETAIL_LAYER_ENTERING}
-          exiting={DETAIL_LAYER_EXITING}
-          pointerEvents="box-none"
-          style={{ flex: 1 }}
-        >
-          {projectedMarkers.map(({ item, x, y, width, height, tier }) => (
-            <View
-              key={item.id}
-              pointerEvents="box-none"
-              style={{
-                position: 'absolute',
-                left: 0,
-                top: 0,
-                transform: [
-                  { translateX: x - width / 2 },
-                  { translateY: y - height / 2 },
-                ],
-                width,
-                height,
-                zIndex: selectedParkingItem?.id === item.id ? 2 : 1,
-              }}
-            >
-              {isSearchRecommendationMode ? (
-                <Animated.View
-                  entering={SEARCH_MARKER_ENTERING}
-                  exiting={SEARCH_MARKER_EXITING}
-                  pointerEvents="box-none"
-                  style={{ flex: 1 }}
-                >
-                  <ParkingMarkerCard
-                    item={item}
-                    onPress={handleMarkerPress}
-                    performanceMode={isMapMoving ? 'moving' : 'normal'}
-                    selected={false}
-                    tier={tier}
-                  />
-                </Animated.View>
-              ) : (
-                <ParkingMarkerCard
-                  item={item}
-                  onPress={handleMarkerPress}
-                  performanceMode={isMapMoving ? 'moving' : 'normal'}
-                  selected={selectedParkingItem?.id === item.id}
-                  tier={tier}
-                />
-              )}
-            </View>
-          ))}
-        </Animated.View>
-      </View>
-
-      <View
-        pointerEvents="box-none"
-        style={{
-          elevation: MAP_ELEVATIONS.markers,
-          position: 'absolute',
-          inset: 0,
-          zIndex: MAP_LAYERS.markers,
-        }}
-      >
-        {projectedZoneSummaries.length > 0 ? (
-          <Animated.View
-            entering={DETAIL_LAYER_ENTERING}
-            exiting={DETAIL_LAYER_EXITING}
-            pointerEvents="box-none"
-            style={{ flex: 1 }}
-          >
-            {projectedZoneSummaries.map(({ summary, x, y }) => (
-              <View
-                key={summary.zoneId}
-                pointerEvents="box-none"
-                style={{
-                  position: 'absolute',
-                  left: 0,
-                  top: 0,
-                  transform: [
-                    {
-                      translateX:
-                        x - ZONE_SUMMARY_MARKER_SIZE.width / 2,
-                    },
-                    {
-                      translateY:
-                        y - ZONE_SUMMARY_MARKER_SIZE.height / 2,
-                    },
-                  ],
-                  width: ZONE_SUMMARY_MARKER_SIZE.width,
-                  height: ZONE_SUMMARY_MARKER_SIZE.height,
-                }}
-              >
-                <ZoneSummaryMarker
-                  onPress={handleZoneSummaryPress}
-                  summary={summary}
-                />
-              </View>
-            ))}
-          </Animated.View>
-        ) : null}
-      </View>
+      <ParkingMarkerOverlay
+        detailLevel={detailLevel}
+        isMapMoving={isMapMoving}
+        isSearchRecommendationMode={isSearchRecommendationMode}
+        onMarkerPress={handleMarkerPress}
+        onZoneSummaryPress={handleZoneSummaryPress}
+        projectedMarkers={projectedMarkers}
+        projectedZoneSummaries={projectedZoneSummaries}
+        selectedParkingItemId={selectedParkingItem?.id}
+      />
 
       {projectedSearchDestination ? (
         <View

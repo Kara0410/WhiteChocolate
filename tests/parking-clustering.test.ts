@@ -214,6 +214,35 @@ test('builds weighted cluster metadata and filters by viewport', () => {
   assert.ok(cluster.expansionZoom !== undefined);
 });
 
+test('uses unified availability thresholds for response color status', () => {
+  const mediumSpot = createParkingClusterEngine([
+    record({ id: 'medium', capacity: 100, available: 65 }),
+  ]).getClusters(
+    {
+      minLng: 11.57,
+      minLat: 48.12,
+      maxLng: 11.59,
+      maxLat: 48.15,
+    },
+    17,
+  )[0];
+
+  const highSpot = createParkingClusterEngine([
+    record({ id: 'high', capacity: 100, available: 66 }),
+  ]).getClusters(
+    {
+      minLng: 11.57,
+      minLat: 48.12,
+      maxLng: 11.59,
+      maxLat: 48.15,
+    },
+    17,
+  )[0];
+
+  assert.equal(mediumSpot.colorStatus, 'orange');
+  assert.equal(highSpot.colorStatus, 'green');
+});
+
 test('returns individual records at street-level zoom', () => {
   const engine = createParkingClusterEngine([
     record({ id: 'a' }),

@@ -21,6 +21,7 @@ import {
   createBufferedViewportBounds,
   createParkingRenderCircleBounds,
   createParkingSearchFocusCamera,
+  getAvailabilityColorStatus,
   hasValidParkingCoordinates,
   isCoordinateInsideBounds,
 } from '../src/utils/parking-map-geo';
@@ -330,10 +331,27 @@ test('search mode renders only its stable nearest parking markers', () => {
 test('maps percentage thresholds to availability status', () => {
   assert.equal(getAvailabilityStatus(100), 'high');
   assert.equal(getAvailabilityStatus(66), 'high');
+  assert.equal(getAvailabilityStatus(65.5), 'high');
   assert.equal(getAvailabilityStatus(65), 'medium');
   assert.equal(getAvailabilityStatus(33), 'medium');
+  assert.equal(getAvailabilityStatus(32.5), 'medium');
   assert.equal(getAvailabilityStatus(32), 'low');
   assert.equal(getAvailabilityStatus(0), 'low');
+  assert.equal(getAvailabilityStatus(Number.NaN), 'low');
+  assert.equal(getAvailabilityStatus(101), 'high');
+  assert.equal(getAvailabilityStatus(-1), 'low');
+});
+
+test('maps response color status with the same availability thresholds', () => {
+  assert.equal(getAvailabilityColorStatus(100), 'green');
+  assert.equal(getAvailabilityColorStatus(66), 'green');
+  assert.equal(getAvailabilityColorStatus(65.5), 'green');
+  assert.equal(getAvailabilityColorStatus(65), 'orange');
+  assert.equal(getAvailabilityColorStatus(33), 'orange');
+  assert.equal(getAvailabilityColorStatus(32.5), 'orange');
+  assert.equal(getAvailabilityColorStatus(32), 'red');
+  assert.equal(getAvailabilityColorStatus(0), 'red');
+  assert.equal(getAvailabilityColorStatus(Number.NaN), 'red');
 });
 
 test('uses readable spot-count pills with room for selection effects', () => {

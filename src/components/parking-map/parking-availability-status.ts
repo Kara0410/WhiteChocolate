@@ -1,4 +1,9 @@
-export type AvailabilityStatus = 'high' | 'medium' | 'low';
+import {
+  getParkingAvailabilityLevel,
+  type ParkingAvailabilityLevel,
+} from '@/utils/parking-availability';
+
+export type AvailabilityStatus = ParkingAvailabilityLevel;
 
 export type AvailabilityTheme = {
   fill: string;
@@ -54,13 +59,7 @@ export const AVAILABILITY_THEME: Record<
 export function getAvailabilityStatus(
   percentage: number,
 ): AvailabilityStatus {
-  if (percentage >= 66) {
-    return 'high';
-  }
-  if (percentage >= 33) {
-    return 'medium';
-  }
-  return 'low';
+  return getParkingAvailabilityLevel(percentage);
 }
 
 export function getAvailabilityTheme(percentage: number): AvailabilityTheme {

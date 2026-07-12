@@ -11,6 +11,7 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
+  withTiming,
 } from 'react-native-reanimated';
 
 import {
@@ -70,9 +71,13 @@ const SPOT_SIZE = {
 } as const;
 
 const SPRING_CONFIG = {
-  damping: 17,
-  stiffness: 280,
+  damping: 18,
+  stiffness: 260,
   mass: 0.65,
+  reduceMotion: ReduceMotion.System,
+} as const;
+const SELECTION_TIMING_CONFIG = {
+  duration: 160,
   reduceMotion: ReduceMotion.System,
 } as const;
 
@@ -140,6 +145,7 @@ function ParkingAvailabilityBubble({
       ? 0.95
       : 1;
   const scale = useSharedValue(restingScale);
+  const selectionProgress = useSharedValue(selected && !moving ? 1 : 0);
   const clusterCount = normalizeClusterCount(count ?? zoneCount);
   const label = isCluster
     ? `${formatSpotCount(clusterCount)} parking cluster`
@@ -156,8 +162,23 @@ function ParkingAvailabilityBubble({
     animateScale(restingScale);
   }, [animateScale, restingScale]);
 
+  useEffect(() => {
+    selectionProgress.value = withTiming(
+      selected && !moving ? 1 : 0,
+      SELECTION_TIMING_CONFIG,
+    );
+  }, [moving, selected, selectionProgress]);
+
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
+  }));
+  const auraAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: selectionProgress.value,
+    transform: [{ scale: 0.82 + selectionProgress.value * 0.18 }],
+  }));
+  const tailAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: selectionProgress.value,
+    transform: [{ scale: 0.75 + selectionProgress.value * 0.25 }],
   }));
 
   const handlePressIn = useCallback(() => {
@@ -191,8 +212,8 @@ function ParkingAvailabilityBubble({
         animatedStyle,
       ]}
     >
-      {!isCluster && selected && !moving ? (
-        <View
+      {!isCluster ? (
+        <Animated.View
           pointerEvents="none"
           style={[
             styles.selectedAura,
@@ -201,6 +222,7 @@ function ParkingAvailabilityBubble({
               height: (spotDimensions?.height ?? 0) + 8,
               width: (spotDimensions?.width ?? 0) + 8,
             },
+            auraAnimatedStyle,
           ]}
         />
       ) : null}
@@ -208,6 +230,7 @@ function ParkingAvailabilityBubble({
       <Pressable
         accessibilityLabel={label}
         accessibilityRole="button"
+        accessibilityState={{ selected }}
         className={className}
         hitSlop={4}
         onPress={onPress}
@@ -239,12 +262,24 @@ function ParkingAvailabilityBubble({
               ),
               elevation: isCluster ? (selected ? 8 : 6) : selected ? 5 : 3,
               height: dimensions.height,
-              paddingHorizontal: clusterDimensions?.horizontalPadding,
+              paddingLeft: clusterDimensions
+                ? clusterDimensions.horizontalPadding + 12
+                : undefined,
+              paddingRight: clusterDimensions?.horizontalPadding,
               minWidth: clusterDimensions?.minWidth,
               width: spotDimensions?.width,
             },
           ]}
         >
+          {isCluster ? (
+            <View
+              pointerEvents="none"
+              style={[
+                styles.clusterAccent,
+                { backgroundColor: theme.fill },
+              ]}
+            />
+          ) : null}
           <Text
             className="text-center font-black"
             numberOfLines={1}
@@ -263,8 +298,11 @@ function ParkingAvailabilityBubble({
           </Text>
         </View>
 
-        {!isCluster && selected ? (
-          <View pointerEvents="none" style={styles.tailContainer}>
+        {!isCluster ? (
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.tailContainer, tailAnimatedStyle]}
+          >
             <View
               style={[
                 styles.tail,
@@ -279,7 +317,7 @@ function ParkingAvailabilityBubble({
                 { borderTopColor: fillColor },
               ]}
             />
-          </View>
+          </Animated.View>
         ) : null}
       </Pressable>
     </Animated.View>
@@ -295,6 +333,14 @@ const styles = StyleSheet.create({
   markerText: {
     fontVariant: ['tabular-nums'],
     letterSpacing: -0.45,
+  },
+  clusterAccent: {
+    borderRadius: 999,
+    height: 7,
+    left: 12,
+    opacity: 0.95,
+    position: 'absolute',
+    width: 7,
   },
   pill: {
     alignItems: 'center',
