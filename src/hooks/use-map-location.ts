@@ -10,6 +10,8 @@ import { hasValidParkingCoordinates } from '@/utils/parking-map-geo';
 const LOCATION_TIMEOUT_MS = 15_000;
 const LAST_KNOWN_LOCATION_MAX_AGE_MS = 2 * 60_000;
 const LAST_KNOWN_LOCATION_MAX_ACCURACY_METERS = 500;
+const RECENT_LOCATION_REUSE_MS = 10_000;
+const USER_LOCATION_ZOOM = 17;
 
 export const MUNICH_CENTER: ParkingCoordinates = {
   latitude: 48.1351,
@@ -83,17 +85,25 @@ async function getRecentLastKnownCoordinates() {
   }
 }
 
-async function getDeviceLocation(): Promise<LocationResult> {
+async function getDeviceLocation(
+  requestPermission: boolean,
+): Promise<LocationResult> {
   try {
     let permission = await Location.getForegroundPermissionsAsync();
-    if (!permission.granted && permission.canAskAgain) {
+    if (
+      requestPermission &&
+      !permission.granted &&
+      permission.canAskAgain
+    ) {
       permission = await Location.requestForegroundPermissionsAsync();
     }
 
     if (!permission.granted) {
       return {
         message:
-          'Location permission is denied. Enable it in Settings to show your position. Showing the Munich overview.',
+          permission.status === Location.PermissionStatus.UNDETERMINED
+            ? 'Location access has not been enabled. Showing the Munich overview.'
+            : 'Location permission is denied. Enable it in Settings to show your position. Showing the Munich overview.',
       };
     }
 
@@ -136,11 +146,22 @@ async function getDeviceLocation(): Promise<LocationResult> {
   }
 }
 
-export function useMapLocation() {
+type UseMapLocationOptions = {
+  resolveInitialCamera?: boolean;
+};
+
+export function useMapLocation({
+  resolveInitialCamera = false,
+}: UseMapLocationOptions = {}) {
   const isMountedRef = useRef(true);
   const requestIdRef = useRef(0);
-  const [initialCamera] = useState<ParkingCameraState>(
-    MUNICH_OVERVIEW_CAMERA,
+  const lastResolvedLocationRef = useRef<{
+    coordinates: ParkingCoordinates;
+    resolvedAt: number;
+  } | null>(null);
+  const [initialCamera, setInitialCamera] =
+    useState<ParkingCameraState | null>(
+      resolveInitialCamera ? null : MUNICH_OVERVIEW_CAMERA,
   );
   const [userLocation, setUserLocation] =
     useState<ParkingCoordinates | null>(null);
@@ -149,6 +170,10 @@ export function useMapLocation() {
 
   const applyResult = useCallback((result: LocationResult) => {
     if ('coordinates' in result) {
+      lastResolvedLocationRef.current = {
+        coordinates: result.coordinates,
+        resolvedAt: Date.now(),
+      };
       setUserLocation(result.coordinates);
       setLocationMessage(null);
       return result.coordinates;
@@ -168,12 +193,12 @@ export function useMapLocation() {
     };
   }, []);
 
-  const requestCurrentLocation = useCallback(async () => {
+  const resolveDeviceLocation = useCallback(async (requestPermission: boolean) => {
     const requestId = ++requestIdRef.current;
     if (isMountedRef.current) {
       setIsLocationLoading(true);
     }
-    const result = await getDeviceLocation();
+    const result = await getDeviceLocation(requestPermission);
 
     if (!isMountedRef.current || requestId !== requestIdRef.current) {
       return null;
@@ -183,6 +208,44 @@ export function useMapLocation() {
     setIsLocationLoading(false);
     return coordinates;
   }, [applyResult]);
+
+  const requestCurrentLocation = useCallback(async () => {
+    const recentLocation = lastResolvedLocationRef.current;
+    if (
+      recentLocation !== null &&
+      Date.now() - recentLocation.resolvedAt <= RECENT_LOCATION_REUSE_MS
+    ) {
+      return recentLocation.coordinates;
+    }
+
+    return resolveDeviceLocation(true);
+  }, [resolveDeviceLocation]);
+
+  useEffect(() => {
+    if (!resolveInitialCamera) {
+      return;
+    }
+
+    let active = true;
+    void resolveDeviceLocation(false).then((coordinates) => {
+      if (!active) {
+        return;
+      }
+
+      setInitialCamera(
+        coordinates === null
+          ? MUNICH_OVERVIEW_CAMERA
+          : {
+              ...coordinates,
+              zoom: USER_LOCATION_ZOOM,
+            },
+      );
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [resolveDeviceLocation, resolveInitialCamera]);
 
   return {
     initialCamera,

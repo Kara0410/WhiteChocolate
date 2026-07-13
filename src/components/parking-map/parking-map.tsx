@@ -239,11 +239,14 @@ export function ParkingMap({
   userLocation,
 }: ParkingMapProps) {
   const insets = useSafeAreaInsets();
+  const startsAtUserLocation = userLocation !== null;
   const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
   const [isAutomaticParkingFetchEnabled, setAutomaticParkingFetchEnabled] =
-    useState(false);
+    useState(startsAtUserLocation);
   const [mapMode, setMapMode] =
-    useState<ParkingMapMode>('munichOverview');
+    useState<ParkingMapMode>(
+      startsAtUserLocation ? 'userLocation' : 'munichOverview',
+    );
   const { polygons: parkingZonePolygons } = useParkingZones();
   const {
     clearParkingData,

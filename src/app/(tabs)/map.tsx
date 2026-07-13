@@ -50,7 +50,7 @@ export default function MapScreen() {
     locationMessage,
     requestCurrentLocation,
     userLocation,
-  } = useMapLocation();
+  } = useMapLocation({ resolveInitialCamera: true });
   if (initialCamera === null) {
     return (
       <View className="flex-1 items-center justify-center bg-slate-100">
