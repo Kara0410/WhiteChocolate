@@ -1,15 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import type { ParkingSegmentRow } from '../src/types/database';
 import {
   getParkingSegmentPageRange,
   parkingSegmentFromRow,
-  parkingSegmentToMapRecord,
 } from '../src/utils/parking-segments';
-import { parkingRecordToResponse } from '../src/services/parking-clustering';
-import type { ParkingSegmentRow } from '../src/types/database';
 
-test('paginates through the Supabase row cap and requests one overflow row', () => {
+test('paginates through the Supabase row cap and requests overflow', () => {
   assert.deepEqual(getParkingSegmentPageRange(0, 2_001, 1_000), {
     from: 0,
     to: 999,
@@ -33,12 +31,14 @@ function row(overrides: Partial<ParkingSegmentRow> = {}): ParkingSegmentRow {
     geoportal_class: 'Bewohnerparken',
     id: 'segment-id',
     lat: 48.13,
+    location: null,
     lon: 11.58,
+    parking_zone_id: null,
     parkregel_beschreibung: 'Bewohnerparken 9-23 Uhr',
     parkregel_gruppe: 'Bewohnerparken',
     parkregel_id: 8,
     parkregel_name: 'Bew 9-23',
-    prm_name: 'Südliche Au',
+    prm_name: 'Southern Au',
     shape: 'LINESTRING (691000 5333000, 691100 5333100)',
     strasse: 'Teststr.',
     updated_at: '2026-06-30T00:00:00.000Z',
@@ -46,21 +46,21 @@ function row(overrides: Partial<ParkingSegmentRow> = {}): ParkingSegmentRow {
   };
 }
 
-test('maps Supabase columns to strict app fields', () => {
+test('maps Supabase columns to explicit domain fields', () => {
   const segment = parkingSegmentFromRow(row());
-
-  assert.deepEqual(segment, {
-    id: 'segment-id',
-    street: 'Teststr.',
-    capacity: 12,
-    description: 'Bewohnerparken 9-23 Uhr',
-    groupName: 'Bewohnerparken',
-    parkregelName: 'Bew 9-23',
-    prmName: 'Südliche Au',
-    geoportalClass: 'Bewohnerparken',
-    lat: 48.13,
-    lon: 11.58,
+  assert.ok(segment);
+  assert.equal(segment.id, 'segment-id');
+  assert.equal(segment.streetName, 'Teststr.');
+  assert.equal(segment.sourceAreaName, 'Southern Au');
+  assert.equal(segment.capacity, 12);
+  assert.deepEqual(segment.coordinates, {
+    latitude: 48.13,
+    longitude: 11.58,
   });
+  assert.equal(segment.pricing.status, 'unknown');
+  assert.equal(segment.availability.status, 'estimated');
+  assert.equal(segment.regulation.name, 'Bew 9-23');
+  assert.equal(segment.updatedAt, '2026-06-30T00:00:00.000Z');
 });
 
 test('rejects missing or invalid coordinates', () => {
@@ -71,41 +71,20 @@ test('rejects missing or invalid coordinates', () => {
   assert.equal(parkingSegmentFromRow(row({ lon: Number.NaN })), null);
 });
 
-test('keeps null and zero capacity distinct and handles missing streets', () => {
-  const nullCapacity = parkingSegmentFromRow(
+test('keeps null and zero capacity distinct', () => {
+  const unknown = parkingSegmentFromRow(
     row({ angebot: null, prm_name: null, strasse: null }),
   );
-  const zeroCapacity = parkingSegmentFromRow(row({ angebot: 0 }));
-
-  assert.equal(nullCapacity?.capacity, null);
-  assert.equal(
-    nullCapacity && parkingSegmentToMapRecord(nullCapacity).zoneName,
-    'Unnamed parking segment',
-  );
-  assert.equal(zeroCapacity?.capacity, 0);
-  assert.equal(
-    zeroCapacity && parkingSegmentToMapRecord(zeroCapacity).availabilityPercent,
-    0,
-  );
+  const zero = parkingSegmentFromRow(row({ angebot: 0 }));
+  assert.equal(unknown?.capacity, null);
+  assert.equal(unknown?.availability.status, 'unknown');
+  assert.equal(zero?.capacity, 0);
+  assert.equal(zero?.availability.status, 'estimated');
 });
 
-test('preserves UUID identity for multiple segments on the same street', () => {
+test('preserves stable identity for segments on the same street', () => {
   const first = parkingSegmentFromRow(row({ id: 'first' }));
   const second = parkingSegmentFromRow(row({ id: 'second' }));
-
-  assert.equal(first?.street, second?.street);
+  assert.equal(first?.streetName, second?.streetName);
   assert.notEqual(first?.id, second?.id);
-});
-
-test('preserves segment identity and title through the marker model', () => {
-  const segment = parkingSegmentFromRow(row());
-  assert.ok(segment);
-
-  const marker = parkingRecordToResponse(parkingSegmentToMapRecord(segment));
-
-  assert.equal(marker.id, 'segment-id');
-  assert.equal(marker.bestSpot.id, 'segment-id');
-  assert.equal(marker.bestSpot.zoneName, 'Südliche Au');
-  assert.equal(marker.latitude, 48.13);
-  assert.equal(marker.longitude, 11.58);
 });

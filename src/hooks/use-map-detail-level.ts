@@ -1,8 +1,8 @@
 import { useRef } from 'react';
 
 import {
-  deriveMapDetailLevel,
-  type MapDetailLevel,
+  deriveParkingSemanticZoomStage,
+  type ParkingSemanticZoomStage,
 } from '@/components/parking-map/map-detail-level';
 import type { ParkingCameraState } from '@/types/parking-map';
 
@@ -11,11 +11,16 @@ import type { ParkingCameraState } from '@/types/parking-map';
  * a ref (camera changes already re-render the map screen), so boundary
  * crossings use enter/exit thresholds instead of a single flickery cutoff.
  */
-export function useMapDetailLevel(
+export function useParkingSemanticZoomStage(
   camera: Pick<ParkingCameraState, 'zoom' | 'longitudeDelta'>,
-): MapDetailLevel {
-  const previousLevelRef = useRef<MapDetailLevel | undefined>(undefined);
-  const level = deriveMapDetailLevel(camera, previousLevelRef.current);
+): ParkingSemanticZoomStage {
+  const previousLevelRef = useRef<ParkingSemanticZoomStage | undefined>(
+    undefined,
+  );
+  const level = deriveParkingSemanticZoomStage(
+    camera,
+    previousLevelRef.current,
+  );
   previousLevelRef.current = level;
   return level;
 }

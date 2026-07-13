@@ -50,7 +50,7 @@ export default function AccountDeleteScreen() {
             Local data deleted
           </Text>
           <Text className="mt-2 text-[13px] font-semibold leading-5 text-slate-500">
-            Favorite parking spots were removed from this device, and
+            Favorite parking areas were removed from this device, and
             preferences were reset to their defaults.
           </Text>
           {account.isSignedIn ? (
@@ -68,7 +68,7 @@ export default function AccountDeleteScreen() {
             This deletes data stored on this device:
           </Text>
           <BulletLine
-            text={`Favorite parking spots (${favoriteCount.toLocaleString()} saved)`}
+            text={`Favorite parking areas (${favoriteCount.toLocaleString()} saved)`}
           />
           <BulletLine text="Preferences, reset to their defaults" />
 

@@ -85,7 +85,9 @@ export type Database = {
           geoportal_class: string | null
           id: string
           lat: number | null
+          location: unknown
           lon: number | null
+          parking_zone_id: number | null
           parkregel_beschreibung: string | null
           parkregel_gruppe: string | null
           parkregel_id: number | null
@@ -102,7 +104,9 @@ export type Database = {
           geoportal_class?: string | null
           id?: string
           lat?: number | null
+          location?: never
           lon?: number | null
+          parking_zone_id?: number | null
           parkregel_beschreibung?: string | null
           parkregel_gruppe?: string | null
           parkregel_id?: number | null
@@ -119,7 +123,9 @@ export type Database = {
           geoportal_class?: string | null
           id?: string
           lat?: number | null
+          location?: never
           lon?: number | null
+          parking_zone_id?: number | null
           parkregel_beschreibung?: string | null
           parkregel_gruppe?: string | null
           parkregel_id?: number | null
@@ -129,7 +135,15 @@ export type Database = {
           strasse?: string | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "parking_segments_parking_zone_id_fkey"
+            columns: ["parking_zone_id"]
+            isOneToOne: false
+            referencedRelation: "parking_zones"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       parking_zone_raw: {
         Row: {
@@ -325,6 +339,48 @@ export type Database = {
       }
     }
     Views: {
+      parking_segment_summaries: {
+        Row: {
+          availability_status: string | null
+          capacity: number | null
+          estimated_availability_percent: number | null
+          estimated_available_capacity: number | null
+          geoportal_class: string | null
+          hourly_rate: number | null
+          id: string | null
+          lat: number | null
+          lon: number | null
+          parking_zone_id: number | null
+          pricing_status: string | null
+          regulation_description: string | null
+          regulation_group_name: string | null
+          regulation_name: string | null
+          source_area_name: string | null
+          street_name: string | null
+          updated_at: string | null
+        }
+        Relationships: []
+      }
+      parking_zone_summaries: {
+        Row: {
+          availability_percent: number | null
+          availability_status: string | null
+          available_capacity: number | null
+          has_free_parking: boolean | null
+          has_unknown_pricing: boolean | null
+          maximum_hourly_rate: number | null
+          minimum_hourly_rate: number | null
+          representative_latitude: number | null
+          representative_longitude: number | null
+          segment_count: number | null
+          source_status: string | null
+          total_capacity: number | null
+          updated_at: string | null
+          zone_id: string | null
+          zone_name: string | null
+        }
+        Relationships: []
+      }
       geography_columns: {
         Row: {
           coord_dimension: number | null
@@ -369,6 +425,36 @@ export type Database = {
       }
     }
     Functions: {
+      fetch_parking_cells: {
+        Args: {
+          p_max_lat: number
+          p_max_lng: number
+          p_min_lat: number
+          p_min_lng: number
+          p_resolution: string
+        }
+        Returns: {
+          availability_percent: number | null
+          availability_status: string
+          available_capacity: number | null
+          center_latitude: number
+          center_longitude: number
+          has_free_parking: boolean
+          has_unknown_pricing: boolean
+          id: string
+          max_lat: number
+          max_lng: number
+          maximum_hourly_rate: number | null
+          min_lat: number
+          min_lng: number
+          minimum_hourly_rate: number | null
+          parent_zone_ids: string[]
+          resolution: string
+          segment_count: number
+          total_capacity: number | null
+          updated_at: string | null
+        }[]
+      }
       _postgis_deprecate: {
         Args: { newname: string; oldname: string; version: string }
         Returns: undefined
@@ -1412,6 +1498,12 @@ export type ParkingSegmentRow =
 
 export type ParkingZoneRow =
   Database['public']['Tables']['parking_zones']['Row'];
+
+export type ParkingSegmentSummaryRow =
+  Database['public']['Views']['parking_segment_summaries']['Row'];
+
+export type ParkingZoneSummaryRow =
+  Database['public']['Views']['parking_zone_summaries']['Row'];
 
 export type UserFavoriteRow =
   Database['public']['Tables']['user_favorites']['Row'];

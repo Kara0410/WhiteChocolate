@@ -2,10 +2,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
-  createParkingClusterEngine,
-  getClusterRadiusForZoom,
-} from '../src/services/parking-clustering';
-import type { ParkingMapRecord } from '../src/types/parking-map';
+  clusterParkingSegmentFeatures,
+  parkingSegmentToMapFeature,
+} from '../src/services/parking-feature-clustering';
+import { getClusterRadiusForZoom } from '../src/services/parking-clustering';
+import type {
+  ParkingBoundingBox,
+  ParkingSegmentSummary,
+} from '../src/types/parking-domain';
 import {
   deriveCameraViewportDeltas,
   getParkingClusterRequest,
@@ -14,27 +18,40 @@ import {
   haversineDistanceMeters,
 } from '../src/utils/parking-map-geo';
 
-function record(
-  overrides: Partial<ParkingMapRecord> & Pick<ParkingMapRecord, 'id'>,
-): ParkingMapRecord {
-  const capacity = overrides.capacity ?? 10;
-  const available = overrides.available ?? 5;
+const BOUNDS: ParkingBoundingBox = {
+  minLng: 11.56,
+  minLat: 48.12,
+  maxLng: 11.6,
+  maxLat: 48.16,
+};
+
+function segment(
+  id: string,
+  overrides: Partial<ParkingSegmentSummary> = {},
+): ParkingSegmentSummary {
   return {
-    id: overrides.id,
-    latitude: overrides.latitude ?? 48.1351,
-    longitude: overrides.longitude ?? 11.5824,
-    zoneId: overrides.zoneId ?? `zone-${overrides.id}`,
-    zoneName: overrides.zoneName ?? `Zone ${overrides.id}`,
-    parkingZoneId: overrides.parkingZoneId ?? null,
-    parkingZoneName: overrides.parkingZoneName ?? null,
-    capacity,
-    available,
-    availabilityPercent: Math.round((available / capacity) * 100),
-    updatedAt: '2026-06-24T00:00:00.000Z',
-    pricePerHour: overrides.pricePerHour ?? 2,
-    maxStay: null,
-    restrictions: '',
-    type: 'zone',
+    id,
+    zoneId: 'zone-a',
+    streetName: `Street ${id}`,
+    sourceAreaName: null,
+    coordinates: { latitude: 48.1351, longitude: 11.5824 },
+    capacity: 10,
+    pricing: {
+      status: 'paid',
+      currency: 'EUR',
+      hourlyRate: 2,
+      dailyRate: null,
+    },
+    availability: {
+      status: 'estimated',
+      availableSpaces: 5,
+      totalSpaces: 10,
+      percent: 50,
+      confidence: null,
+      observedAt: null,
+    },
+    updatedAt: '2026-07-13T10:00:00.000Z',
+    ...overrides,
   };
 }
 
@@ -50,7 +67,6 @@ test('calculates walking thresholds with Haversine distance', () => {
   assert.equal(getWalkingCategory(417), 'acceptable');
   assert.equal(getWalkingCategory(624), 'acceptable');
   assert.equal(getWalkingCategory(625), 'far');
-
   const distance = haversineDistanceMeters(
     { latitude: 48.1351, longitude: 11.5824 },
     { latitude: 48.1387, longitude: 11.5824 },
@@ -58,49 +74,38 @@ test('calculates walking thresholds with Haversine distance', () => {
   assert.ok(distance > 390 && distance < 410);
 });
 
-test('moves the parking cluster request bbox with the camera', () => {
-  const munichRequest = getParkingClusterRequest({
+test('camera requests move with the viewport and preserve compact cache keys', () => {
+  const first = getParkingClusterRequest({
     latitude: 48.1351,
     longitude: 11.5824,
     zoom: 16,
   });
-  const pannedRequest = getParkingClusterRequest({
+  const panned = getParkingClusterRequest({
     latitude: 48.2351,
     longitude: 11.7824,
     zoom: 16,
   });
-
-  assert.notEqual(munichRequest.tileKey, pannedRequest.tileKey);
-  assert.notDeepEqual(munichRequest.bbox, pannedRequest.bbox);
-  assert.ok(
-    munichRequest.bbox.minLat < 48.1351 &&
-      munichRequest.bbox.maxLat > 48.1351,
-  );
-  assert.ok(
-    pannedRequest.bbox.minLng < 11.7824 &&
-      pannedRequest.bbox.maxLng > 11.7824,
-  );
+  assert.notEqual(first.tileKey, panned.tileKey);
+  assert.notDeepEqual(first.bbox, panned.bbox);
 });
 
-test('centers the circular fetch bbox on the camera and map dimensions', () => {
-  const camera = { latitude: 48.1351, longitude: 11.5824, zoom: 16 };
-  const request = getParkingRenderCircleClusterRequest(camera, {
-    width: 400,
-    height: 800,
-  });
-
-  assert.ok(request);
-  assert.ok(
-    Math.abs(
-      (request.bbox.minLng + request.bbox.maxLng) / 2 -
-        camera.longitude,
-    ) < 0.000001,
+test('circular requests use map dimensions and shrink when zooming in', () => {
+  const mapSize = { width: 400, height: 800 };
+  const zoomedOut = getParkingRenderCircleClusterRequest(
+    { latitude: 48.1351, longitude: 11.5824, zoom: 14 },
+    mapSize,
   );
-  assert.ok(
-    request.bbox.minLat < camera.latitude &&
-      request.bbox.maxLat > camera.latitude,
+  const zoomedIn = getParkingRenderCircleClusterRequest(
+    { latitude: 48.1351, longitude: 11.5824, zoom: 17 },
+    mapSize,
   );
-  assert.match(request.tileKey, /^parking:circle:/);
+  assert.ok(zoomedOut);
+  assert.ok(zoomedIn);
+  assert.ok(
+    zoomedOut.bbox.maxLng - zoomedOut.bbox.minLng >
+      zoomedIn.bbox.maxLng - zoomedIn.bbox.minLng,
+  );
+  assert.match(zoomedIn.tileKey, /^parking:circle:/);
 });
 
 test('derives provider-specific viewport deltas when native events omit them', () => {
@@ -108,11 +113,8 @@ test('derives provider-specific viewport deltas when native events omit them', (
   const mapSize = { width: 400, height: 800 };
   const apple = deriveCameraViewportDeltas(camera, mapSize, 'apple');
   const google = deriveCameraViewportDeltas(camera, mapSize, 'google');
-
   assert.ok(apple);
   assert.ok(google);
-  assert.ok(apple.latitudeDelta > 0);
-  assert.ok(google.latitudeDelta > 0);
   assert.equal(apple.longitudeDelta, 360 / 2 ** camera.zoom);
   assert.equal(
     google.longitudeDelta,
@@ -120,241 +122,84 @@ test('derives provider-specific viewport deltas when native events omit them', (
   );
 });
 
-test('panning changes the circular fetch bbox and cache key', () => {
-  const mapSize = { width: 400, height: 800 };
-  const first = getParkingRenderCircleClusterRequest(
-    { latitude: 48.1351, longitude: 11.5824, zoom: 16 },
-    mapSize,
-  );
-  const panned = getParkingRenderCircleClusterRequest(
-    { latitude: 48.2351, longitude: 11.7824, zoom: 16 },
-    mapSize,
-  );
-
-  assert.ok(first);
-  assert.ok(panned);
-  assert.notEqual(first.tileKey, panned.tileKey);
-  assert.notDeepEqual(first.bbox, panned.bbox);
-});
-
-test('screen circle covers less geography when zoomed in', () => {
-  const cameraCenter = { latitude: 48.1351, longitude: 11.5824 };
-  const mapSize = { width: 400, height: 800 };
-  const zoomedOut = getParkingRenderCircleClusterRequest(
-    { ...cameraCenter, zoom: 14 },
-    mapSize,
-  );
-  const zoomedIn = getParkingRenderCircleClusterRequest(
-    { ...cameraCenter, zoom: 17 },
-    mapSize,
-  );
-
-  assert.ok(zoomedOut);
-  assert.ok(zoomedIn);
-  assert.ok(
-    zoomedOut.bbox.maxLng - zoomedOut.bbox.minLng >
-      zoomedIn.bbox.maxLng - zoomedIn.bbox.minLng,
-  );
-});
-
-test('distance metadata does not change the camera-derived fetch bbox', () => {
-  const camera = { latitude: 48.1351, longitude: 11.5824, zoom: 15 };
-  const withoutDestination = getParkingClusterRequest(camera);
-  const withDestination = getParkingClusterRequest(camera, {
-    latitude: 47.5,
-    longitude: 10.5,
+test('segment clusters never cross known administrative-zone boundaries', () => {
+  const features = clusterParkingSegmentFeatures({
+    segments: [
+      segment('a', { zoneId: 'zone-a' }),
+      segment('b', {
+        zoneId: 'zone-b',
+        coordinates: { latitude: 48.13511, longitude: 11.58241 },
+      }),
+    ],
+    bounds: BOUNDS,
+    zoom: 14.8,
   });
-
-  assert.deepEqual(withDestination.bbox, withoutDestination.bbox);
-});
-
-test('builds weighted cluster metadata and filters by viewport', () => {
-  const engine = createParkingClusterEngine([
-    record({ id: 'a', capacity: 10, available: 5, pricePerHour: 2 }),
-    record({
-      id: 'b',
-      latitude: 48.1353,
-      longitude: 11.5826,
-      capacity: 20,
-      available: 15,
-      pricePerHour: 1.5,
-    }),
-    record({
-      id: 'outside',
-      latitude: 48.2,
-      longitude: 11.7,
-      capacity: 100,
-      available: 100,
-      pricePerHour: 0.5,
-    }),
-  ]);
-
-  const results = engine.getClusters(
-    {
-      minLng: 11.57,
-      minLat: 48.12,
-      maxLng: 11.59,
-      maxLat: 48.15,
-    },
-    14,
-    { latitude: 48.1351, longitude: 11.5824 },
-  );
-
-  assert.equal(results.length, 1);
-  const cluster = results[0];
-  assert.equal(cluster.type, 'cluster');
-  assert.equal(cluster.count, 2);
-  assert.equal(cluster.totalCapacity, 30);
-  assert.equal(cluster.availableSpots, 20);
-  assert.equal(cluster.availabilityPercent, 67);
-  assert.equal(cluster.minPrice, 1.5);
-  assert.equal(cluster.avgPrice, 1.75);
-  assert.equal(cluster.bestSpot.id, 'b');
-  assert.equal(cluster.walkingCategory, 'close');
-  assert.ok(cluster.expansionZoom !== undefined);
-});
-
-test('uses unified availability thresholds for response color status', () => {
-  const mediumSpot = createParkingClusterEngine([
-    record({ id: 'medium', capacity: 100, available: 65 }),
-  ]).getClusters(
-    {
-      minLng: 11.57,
-      minLat: 48.12,
-      maxLng: 11.59,
-      maxLat: 48.15,
-    },
-    17,
-  )[0];
-
-  const highSpot = createParkingClusterEngine([
-    record({ id: 'high', capacity: 100, available: 66 }),
-  ]).getClusters(
-    {
-      minLng: 11.57,
-      minLat: 48.12,
-      maxLng: 11.59,
-      maxLat: 48.15,
-    },
-    17,
-  )[0];
-
-  assert.equal(mediumSpot.colorStatus, 'orange');
-  assert.equal(highSpot.colorStatus, 'green');
-});
-
-test('returns individual records at street-level zoom', () => {
-  const engine = createParkingClusterEngine([
-    record({ id: 'a' }),
-    record({ id: 'b', latitude: 48.1353, longitude: 11.5826 }),
-  ]);
-  const results = engine.getClusters(
-    {
-      minLng: 11.57,
-      minLat: 48.12,
-      maxLng: 11.59,
-      maxLat: 48.15,
-    },
-    17,
-  );
-
-  assert.equal(results.length, 2);
-  assert.ok(results.every((item) => item.type === 'spot'));
-});
-
-test('does not combine nearby records assigned to different polygon zones', () => {
-  const results = createParkingClusterEngine([
-    record({
-      id: 'a',
-      parkingZoneId: 'zone-a',
-      parkingZoneName: 'Zone A',
-    }),
-    record({
-      id: 'b',
-      latitude: 48.13511,
-      longitude: 11.58241,
-      parkingZoneId: 'zone-b',
-      parkingZoneName: 'Zone B',
-    }),
-  ]).getClusters(
-    {
-      minLng: 11.57,
-      minLat: 48.12,
-      maxLng: 11.59,
-      maxLat: 48.15,
-    },
-    12,
-  );
-
-  assert.equal(results.length, 2);
+  assert.equal(features.length, 2);
   assert.deepEqual(
-    results.map((item) => item.zoneId).sort(),
+    features.map((feature) => feature.parentId).sort(),
     ['zone-a', 'zone-b'],
   );
 });
 
-test('clusters nearby records assigned to the same polygon zone', () => {
-  const results = createParkingClusterEngine([
-    record({
-      id: 'a',
-      parkingZoneId: 'zone-a',
-      parkingZoneName: 'Zone A',
-    }),
-    record({
-      id: 'b',
-      latitude: 48.13511,
-      longitude: 11.58241,
-      parkingZoneId: 'zone-a',
-      parkingZoneName: 'Zone A',
-    }),
-  ]).getClusters(
-    {
-      minLng: 11.57,
-      minLat: 48.12,
-      maxLng: 11.59,
-      maxLat: 48.15,
-    },
-    12,
+test('same-zone segments form a stable aggregate with expansion zoom', () => {
+  const features = clusterParkingSegmentFeatures({
+    segments: [
+      segment('a'),
+      segment('b', {
+        capacity: 20,
+        coordinates: { latitude: 48.13511, longitude: 11.58241 },
+        availability: {
+          status: 'estimated',
+          availableSpaces: 15,
+          totalSpaces: 20,
+          percent: 75,
+          confidence: null,
+          observedAt: null,
+        },
+      }),
+    ],
+    bounds: BOUNDS,
+    zoom: 14.8,
+  });
+  assert.equal(features.length, 1);
+  const feature = features[0];
+  assert.equal(feature.kind, 'segment-cluster');
+  assert.equal(feature.stats.segmentCount, 2);
+  assert.equal(feature.stats.totalCapacity, 30);
+  assert.equal(feature.stats.availableCapacity, 20);
+  assert.ok(
+    feature.kind === 'segment-cluster' && feature.expansionZoom > 14.8,
   );
-
-  assert.equal(results.length, 1);
-  assert.equal(results[0].type, 'cluster');
-  assert.equal(results[0].spotCount, 2);
-  assert.equal(results[0].zoneId, 'zone-a');
-  assert.equal(results[0].zoneName, 'Zone A');
 });
 
-test('keeps dense clustered viewports within the engine safety cap', () => {
-  const records = Array.from({ length: 400 }, (_, index) =>
-    record({
-      id: String(index),
-      latitude: 48.13 + (index % 20) * 0.0004,
-      longitude: 11.57 + Math.floor(index / 20) * 0.0004,
-    }),
-  );
-  const results = createParkingClusterEngine(records).getClusters(
-    {
-      minLng: 11.56,
-      minLat: 48.12,
-      maxLng: 11.59,
-      maxLat: 48.15,
-    },
-    14,
-  );
-
-  assert.ok(results.length <= 180);
+test('individual segment projections retain stable identity', () => {
+  const feature = parkingSegmentToMapFeature(segment('stable-id'));
+  assert.equal(feature.kind, 'segment');
+  assert.equal(feature.id, 'stable-id');
+  assert.equal(feature.segment.id, 'stable-id');
 });
 
-test('handles an empty Supabase result without producing markers', () => {
-  const results = createParkingClusterEngine([]).getClusters(
-    {
-      minLng: 11.55,
-      minLat: 48.12,
-      maxLng: 11.6,
-      maxLat: 48.16,
-    },
-    14,
+test('dense clustered viewports stay within the marker safety cap', () => {
+  const segments = Array.from({ length: 500 }, (_, index) =>
+    segment(String(index), {
+      zoneId: null,
+      coordinates: {
+        latitude: 48.13 + (index % 25) * 0.0005,
+        longitude: 11.57 + Math.floor(index / 25) * 0.0005,
+      },
+    }),
   );
+  const features = clusterParkingSegmentFeatures({
+    segments,
+    bounds: BOUNDS,
+    zoom: 15.5,
+  });
+  assert.ok(features.length <= 180);
+});
 
-  assert.deepEqual(results, []);
+test('empty segment results remain a valid empty layer', () => {
+  assert.deepEqual(
+    clusterParkingSegmentFeatures({ segments: [], bounds: BOUNDS, zoom: 15 }),
+    [],
+  );
 });

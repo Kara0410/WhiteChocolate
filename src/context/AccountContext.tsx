@@ -74,7 +74,7 @@ export function AccountProvider({ children }: PropsWithChildren) {
 
     if (accountIdentityRef.current !== nextIdentity) {
       accountIdentityRef.current = nextIdentity;
-      invalidateParkingCache('auth-state-change');
+      invalidateParkingCache();
     }
 
     setUser(nextUser);

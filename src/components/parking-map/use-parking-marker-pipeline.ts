@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
 
-import type { MapDetailLevel } from '@/components/parking-map/map-detail-level';
+import type { ParkingSemanticZoomStage } from '@/components/parking-map/map-detail-level';
+import { CELL_SUMMARY_MARKER_SIZE } from '@/components/parking-map/cell-summary-marker';
 import {
   filterParkingMarkersForScreenCircle,
   getDisplayedParkingMarkerItems,
@@ -11,25 +12,27 @@ import {
 import { ZONE_SUMMARY_MARKER_SIZE } from '@/components/parking-map/zone-summary-marker';
 import type { PlaceSearchResult } from '@/hooks/use-google-place-search';
 import type {
+  ParkingCellSummary,
+  ParkingMapFeature,
+  ParkingZoneSummary,
+} from '@/types/parking-domain';
+import type {
   ParkingBoundingBox,
   ParkingCameraState,
   ParkingClusterResponse,
   ParkingCoordinates,
   ParkingMapSize,
 } from '@/types/parking-map';
-import type { ParkingZonePolygon } from '@/types/parking-zone';
+import { parkingMapFeatureToLegacyResponse } from '@/utils/parking-feature-adapters';
 import { hasValidParkingCoordinates } from '@/utils/parking-map-geo';
-import {
-  buildZoneSummaries,
-  type ParkingZoneSummary,
-} from '@/utils/parking-zones';
 
 const EMPTY_ZONE_SUMMARIES: ParkingZoneSummary[] = [];
+const EMPTY_CELL_SUMMARIES: ParkingCellSummary[] = [];
 
 type UseParkingMarkerPipelineOptions = {
   activeOverlay: string;
   currentRegion: ParkingCameraState;
-  detailLevel: MapDetailLevel;
+  semanticStage: ParkingSemanticZoomStage;
   displayCamera: ParkingCameraState;
   highlightedSearchSpots: ParkingClusterResponse[];
   isAutomaticParkingFetchEnabled: boolean;
@@ -37,18 +40,16 @@ type UseParkingMarkerPipelineOptions = {
   loadedRequestBounds: ParkingBoundingBox | null;
   mapMode: string;
   mapSize: ParkingMapSize;
-  parkingZonePolygons: ParkingZonePolygon[];
+  layerFeatures: ParkingMapFeature[];
   selectedParkingItem: ParkingClusterResponse | null;
   selectedSearchPlace: PlaceSearchResult | null;
   userLocation?: ParkingCoordinates | null;
-  visibleClusters: ParkingClusterResponse[];
-  visibleSpots: ParkingClusterResponse[];
 };
 
 export function useParkingMarkerPipeline({
   activeOverlay,
   currentRegion,
-  detailLevel,
+  semanticStage,
   displayCamera,
   highlightedSearchSpots,
   isAutomaticParkingFetchEnabled,
@@ -56,21 +57,27 @@ export function useParkingMarkerPipeline({
   loadedRequestBounds,
   mapMode,
   mapSize,
-  parkingZonePolygons,
+  layerFeatures,
   selectedParkingItem,
   selectedSearchPlace,
   userLocation,
-  visibleClusters,
-  visibleSpots,
 }: UseParkingMarkerPipelineOptions) {
+  const markerItems = useMemo(
+    () =>
+      layerFeatures.flatMap((feature) => {
+        const item = parkingMapFeatureToLegacyResponse(feature);
+        return item === null ? [] : [item];
+      }),
+    [layerFeatures],
+  );
   const circleFilterResult = useMemo(
     () =>
-      filterParkingMarkersForScreenCircle(visibleClusters, {
+      filterParkingMarkersForScreenCircle(markerItems, {
         camera: currentRegion,
         width: mapSize.width,
         height: mapSize.height,
       }),
-    [currentRegion, mapSize.height, mapSize.width, visibleClusters],
+    [currentRegion, mapSize.height, mapSize.width, markerItems],
   );
   const circularFilteredClusters = circleFilterResult.markers;
 
@@ -89,11 +96,11 @@ export function useParkingMarkerPipeline({
       mapSize,
       radiusMeters: circleFilterResult.radiusMeters,
       radiusPixels: circleFilterResult.radiusPixels,
-      sampleMarkerCoordinates: visibleClusters.slice(0, 3).map((marker) => ({
+      sampleMarkerCoordinates: markerItems.slice(0, 3).map((marker) => ({
         latitude: marker.latitude,
         longitude: marker.longitude,
       })),
-      serverMarkers: visibleClusters.length,
+      serverMarkers: markerItems.length,
     };
 
     console.debug('[parking-map] Parking circle filter', debugDetails);
@@ -119,8 +126,8 @@ export function useParkingMarkerPipeline({
     isAutomaticParkingFetchEnabled,
     loadedRequestBounds,
     mapSize,
-    visibleClusters,
-    visibleClusters.length,
+    markerItems,
+    markerItems.length,
   ]);
 
   const densityFilteredMarkers = useMemo(
@@ -146,7 +153,9 @@ export function useParkingMarkerPipeline({
     }
 
     return getDisplayedParkingMarkerItems(
-      detailLevel === 'spotDetail' ? densityFilteredMarkers : [],
+      semanticStage === 'segment' || semanticStage === 'segmentCluster'
+        ? densityFilteredMarkers
+        : [],
       selectedParkingItem,
       selectedSearchPlace !== null ? highlightedSearchSpots : null,
       activeOverlay !== 'none',
@@ -154,7 +163,7 @@ export function useParkingMarkerPipeline({
   }, [
     activeOverlay,
     densityFilteredMarkers,
-    detailLevel,
+    semanticStage,
     highlightedSearchSpots,
     mapMode,
     selectedParkingItem,
@@ -180,10 +189,32 @@ export function useParkingMarkerPipeline({
 
   const zoneSummaries = useMemo(
     () =>
-      detailLevel === 'zoneSummary' && mapMode !== 'munichOverview'
-        ? buildZoneSummaries(visibleSpots, parkingZonePolygons)
+      semanticStage === 'zone' && mapMode !== 'munichOverview'
+        ? layerFeatures.flatMap((feature) =>
+            feature.kind === 'zone'
+              ? [
+                  {
+                    kind: 'zone-summary' as const,
+                    zoneId: feature.zoneId,
+                    zoneName: feature.zoneName,
+                    representativePoint: feature.coordinates,
+                    stats: feature.stats,
+                  },
+                ]
+              : [],
+          )
         : EMPTY_ZONE_SUMMARIES,
-    [detailLevel, mapMode, parkingZonePolygons, visibleSpots],
+    [layerFeatures, mapMode, semanticStage],
+  );
+
+  const cellSummaries = useMemo(
+    () =>
+      semanticStage === 'cell' && mapMode !== 'munichOverview'
+        ? layerFeatures.flatMap((feature) =>
+            feature.kind === 'cell' ? [feature.cell] : [],
+          )
+        : EMPTY_CELL_SUMMARIES,
+    [layerFeatures, mapMode, semanticStage],
   );
 
   const projectedZoneSummaries = useMemo(() => {
@@ -200,7 +231,7 @@ export function useParkingMarkerPipeline({
 
     const margin = ZONE_SUMMARY_MARKER_SIZE.width;
     return zoneSummaries.flatMap((summary) => {
-      const position = projectMapCoordinate(summary, {
+      const position = projectMapCoordinate(summary.representativePoint, {
         camera: displayCamera,
         height: mapSize.height,
         width: mapSize.width,
@@ -229,16 +260,52 @@ export function useParkingMarkerPipeline({
     zoneSummaries,
   ]);
 
+  const projectedCellSummaries = useMemo(() => {
+    if (
+      cellSummaries.length === 0 ||
+      mapSize.width <= 0 ||
+      mapSize.height <= 0 ||
+      activeOverlay !== 'none' ||
+      selectedParkingItem !== null
+    ) {
+      return [];
+    }
+    const margin = CELL_SUMMARY_MARKER_SIZE.width;
+    return cellSummaries.flatMap((summary) => {
+      const position = projectMapCoordinate(summary.center, {
+        camera: displayCamera,
+        height: mapSize.height,
+        width: mapSize.width,
+      });
+      return !Number.isFinite(position.x) ||
+        !Number.isFinite(position.y) ||
+        position.x < -margin ||
+        position.x > mapSize.width + margin ||
+        position.y < -margin ||
+        position.y > mapSize.height + margin
+        ? []
+        : [{ summary, x: position.x, y: position.y }];
+    });
+  }, [
+    activeOverlay,
+    cellSummaries,
+    displayCamera,
+    mapSize.height,
+    mapSize.width,
+    selectedParkingItem,
+  ]);
+
   useEffect(() => {
     if (
       !__DEV__ ||
       isMapMoving ||
-      detailLevel !== 'spotDetail' ||
+      (semanticStage !== 'segment' &&
+        semanticStage !== 'segmentCluster') ||
       activeOverlay !== 'none' ||
       selectedSearchPlace !== null ||
       mapSize.width <= 0 ||
       mapSize.height <= 0 ||
-      visibleClusters.length === 0 ||
+      markerItems.length === 0 ||
       circleFilterResult.removedAllMarkers ||
       projectedMarkers.length > 0
     ) {
@@ -256,7 +323,7 @@ export function useParkingMarkerPipeline({
       },
       projectedMarkers: projectedMarkers.length,
       radiusPixels: circleFilterResult.radiusPixels,
-      visibleClusters: visibleClusters.length,
+      visibleClusters: markerItems.length,
     });
   }, [
     activeOverlay,
@@ -265,14 +332,14 @@ export function useParkingMarkerPipeline({
     circularFilteredClusters.length,
     currentRegion,
     densityFilteredMarkers.length,
-    detailLevel,
+    semanticStage,
     displayCamera,
     isMapMoving,
     mapSize.height,
     mapSize.width,
     projectedMarkers.length,
     selectedSearchPlace,
-    visibleClusters.length,
+    markerItems.length,
   ]);
 
   const projectedSearchDestination = useMemo(() => {
@@ -343,9 +410,11 @@ export function useParkingMarkerPipeline({
     densityFilteredMarkers,
     displayedMarkerItems,
     projectedMarkers,
+    projectedCellSummaries,
     projectedSearchDestination,
     projectedUserLocation,
     projectedZoneSummaries,
+    cellSummaries,
     zoneSummaries,
   };
 }

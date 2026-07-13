@@ -6,9 +6,20 @@ import type {
   ParkingClusterResponse,
   WalkingCategory,
 } from '@/types/parking-map';
+import type { FavoriteParkingReference } from '@/types/parking-domain';
 import type { KeyValueStorage } from '@/types/storage';
 
 export const FAVORITES_STORAGE_KEY = '@white-choclate/favorites/v1';
+
+export type StoredFavoriteParkingItem = {
+  reference: FavoriteParkingReference;
+  cachedItem: ParkingClusterResponse | null;
+};
+
+export type StoredFavoriteParkingState = {
+  version: 2;
+  favorites: StoredFavoriteParkingItem[];
+};
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -96,6 +107,24 @@ export function normalizeStoredFavorite(
     bestSpot,
   };
 
+  if (
+    value.availabilityStatus === 'live' ||
+    value.availabilityStatus === 'predicted' ||
+    value.availabilityStatus === 'estimated' ||
+    value.availabilityStatus === 'unknown' ||
+    value.availabilityStatus === 'mixed'
+  ) {
+    favorite.availabilityStatus = value.availabilityStatus;
+  }
+
+  if (
+    value.pricingStatus === 'free' ||
+    value.pricingStatus === 'paid' ||
+    value.pricingStatus === 'unknown'
+  ) {
+    favorite.pricingStatus = value.pricingStatus;
+  }
+
   if (isFiniteNumber(value.zoneCount)) {
     favorite.zoneCount = value.zoneCount;
   }
@@ -151,37 +180,114 @@ export function normalizeStoredFavorites(
   return favorites;
 }
 
+function normalizeReference(value: unknown): FavoriteParkingReference | null {
+  if (!isRecord(value) || !isNonEmptyString(value.entityId)) {
+    return null;
+  }
+  if (value.entityType !== 'segment' && value.entityType !== 'facility') {
+    return null;
+  }
+  return {
+    entityId: value.entityId,
+    entityType: value.entityType,
+    createdAt: isNonEmptyString(value.createdAt)
+      ? value.createdAt
+      : new Date(0).toISOString(),
+  };
+}
+
+export function normalizeStoredFavoriteState(
+  value: unknown,
+): StoredFavoriteParkingState {
+  const entries =
+    isRecord(value) && value.version === 2 && Array.isArray(value.favorites)
+      ? value.favorites
+      : Array.isArray(value)
+        ? value
+        : [];
+  const favorites: StoredFavoriteParkingItem[] = [];
+  const seenIds = new Set<string>();
+
+  for (const entry of entries) {
+    const explicitReference = isRecord(entry)
+      ? normalizeReference(entry.reference)
+      : null;
+    const legacyItem = explicitReference
+      ? normalizeStoredFavorite(
+          isRecord(entry) ? entry.cachedItem : null,
+        )
+      : normalizeStoredFavorite(entry);
+    const reference =
+      explicitReference ??
+      (legacyItem
+        ? {
+            entityId: legacyItem.id,
+            entityType: 'segment' as const,
+            createdAt: new Date(0).toISOString(),
+          }
+        : null);
+    if (reference === null || seenIds.has(reference.entityId)) {
+      continue;
+    }
+    seenIds.add(reference.entityId);
+    favorites.push({ reference, cachedItem: legacyItem });
+  }
+
+  return { version: 2, favorites };
+}
+
+export async function loadStoredFavoriteState(
+  storage: KeyValueStorage = AsyncStorage,
+): Promise<StoredFavoriteParkingState> {
+  const storedValue = await storage.getItem(FAVORITES_STORAGE_KEY);
+  if (storedValue === null) {
+    return { version: 2, favorites: [] };
+  }
+  try {
+    return normalizeStoredFavoriteState(JSON.parse(storedValue));
+  } catch {
+    return { version: 2, favorites: [] };
+  }
+}
+
 export async function loadStoredFavorites(
   storage: KeyValueStorage = AsyncStorage,
 ): Promise<ParkingClusterResponse[]> {
-  const storedValue = await storage.getItem(FAVORITES_STORAGE_KEY);
+  const state = await loadStoredFavoriteState(storage);
+  return state.favorites.flatMap(({ cachedItem }) =>
+    cachedItem === null ? [] : [cachedItem],
+  );
+}
 
-  if (storedValue === null) {
-    return [];
+export async function saveFavoriteState(
+  state: StoredFavoriteParkingState,
+  storage: KeyValueStorage = AsyncStorage,
+): Promise<void> {
+  if (state.favorites.length === 0) {
+    await storage.removeItem(FAVORITES_STORAGE_KEY);
+    return;
   }
-
-  let parsedValue: unknown;
-  try {
-    parsedValue = JSON.parse(storedValue);
-  } catch {
-    return [];
-  }
-
-  return normalizeStoredFavorites(parsedValue);
+  await storage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(state));
 }
 
 export async function saveFavorites(
   favorites: ParkingClusterResponse[],
   storage: KeyValueStorage = AsyncStorage,
 ): Promise<void> {
-  // An empty list is stored as an absent key so "Delete local data"
-  // leaves nothing behind in AsyncStorage.
-  if (favorites.length === 0) {
-    await storage.removeItem(FAVORITES_STORAGE_KEY);
-    return;
-  }
-
-  await storage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(favorites));
+  await saveFavoriteState(
+    {
+      version: 2,
+      favorites: favorites.map((favorite) => ({
+        reference: {
+          entityId: favorite.id,
+          entityType: 'segment',
+          createdAt: new Date(0).toISOString(),
+        },
+        cachedItem: favorite,
+      })),
+    },
+    storage,
+  );
 }
 
 export async function clearStoredFavorites(

@@ -147,7 +147,7 @@ export function CreateAccountSheet({
         <View className="mt-6">
           <BenefitRow
             icon={Heart}
-            subtitle="Keep your best parking spots in one place."
+            subtitle="Keep your best parking areas in one place."
             title="Save your favorites"
           />
           <BenefitRow

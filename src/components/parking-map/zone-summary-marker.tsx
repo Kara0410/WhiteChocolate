@@ -9,16 +9,14 @@ import Animated, {
   ZoomIn,
 } from 'react-native-reanimated';
 
-import { formatSpotCount } from '@/components/parking-map/marker-visuals';
-import type { ParkingZoneSummary } from '@/utils/parking-zones';
+import type { ParkingZoneSummary } from '@/types/parking-domain';
+import { formatParkingAggregateCount } from '@/utils/parking-domain';
 
 /**
  * Fixed footprint so the overlay layer can center the pill on the zone
- * anchor without measuring. Wide enough for the longest label ("50+ Spots").
+ * anchor without measuring. Wide enough for a compact capacity or area label.
  */
 export const ZONE_SUMMARY_MARKER_SIZE = { width: 104, height: 40 } as const;
-
-export const ZONE_SUMMARY_SPOT_CAP = 50;
 
 type ZoneSummaryMarkerProps = {
   summary: ParkingZoneSummary;
@@ -46,10 +44,7 @@ export const ZoneSummaryMarker = memo(function ZoneSummaryMarker({
     () => onPress(summary),
     [onPress, summary],
   );
-  const label = formatSpotCount(summary.spotCount, {
-    capped: true,
-    cap: ZONE_SUMMARY_SPOT_CAP,
-  });
+  const label = formatParkingAggregateCount(summary.stats);
   const pressScale = useSharedValue(1);
   const animatedPressStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pressScale.value }],
@@ -102,7 +97,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontVariant: ['tabular-nums'],
     fontWeight: '800',
-    letterSpacing: -0.3,
+    letterSpacing: 0,
     lineHeight: 16,
   },
   pill: {

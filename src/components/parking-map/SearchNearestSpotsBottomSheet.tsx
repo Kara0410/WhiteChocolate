@@ -31,6 +31,7 @@ type SearchNearestSpotsBottomSheetProps = {
   searchPlace: PlaceSearchResult | null;
   spots: ParkingSpotWithDistance[];
   isLoading?: boolean;
+  errorMessage?: string | null;
   onClose: () => void;
   onSpotPress: (spot: ParkingClusterResponse) => void;
 };
@@ -49,13 +50,23 @@ function clampPercentage(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
-function formatPrice(price: number | null) {
-  return price === null ? 'Free' : `$${price.toFixed(2)} / hr`;
+function formatPrice(item: ParkingClusterResponse) {
+  const price = item.avgPrice ?? item.minPrice;
+  if (item.pricingStatus === 'free') {
+    return 'Free';
+  }
+  return price === null ? 'Price unavailable' : `EUR ${price.toFixed(2)} / hr`;
 }
 
-function AvailabilityRing({ percentage }: { percentage: number }) {
-  const theme = getAvailabilityTheme(percentage);
-  const ringOffset = RING_CIRCUMFERENCE * (1 - percentage / 100);
+function AvailabilityRing({ percentage }: { percentage: number | null }) {
+  const theme =
+    percentage === null
+      ? { ring: '#94A3B8', ringTrack: '#E2E8F0', text: '#64748B' }
+      : getAvailabilityTheme(percentage);
+  const ringOffset =
+    percentage === null
+      ? RING_CIRCUMFERENCE
+      : RING_CIRCUMFERENCE * (1 - percentage / 100);
 
   return (
     <View className="items-center justify-center">
@@ -88,7 +99,7 @@ function AvailabilityRing({ percentage }: { percentage: number }) {
         className="absolute text-[11px] font-extrabold"
         style={{ color: theme.text, fontVariant: ['tabular-nums'] }}
       >
-        {percentage}%
+        {percentage === null ? '—' : `${percentage}%`}
       </Text>
     </View>
   );
@@ -101,9 +112,12 @@ const NearestSpotRow = memo(function NearestSpotRow({
   item: ParkingSpotWithDistance;
   onPress: (item: ParkingClusterResponse) => void;
 }) {
-  const percentage = clampPercentage(item.availabilityPercent);
+  const percentage =
+    item.availabilityStatus !== undefined &&
+    item.availabilityStatus !== 'unknown'
+      ? clampPercentage(item.availabilityPercent)
+      : null;
   const title = item.bestSpot.zoneName || 'Parking Area';
-  const price = item.avgPrice ?? item.minPrice;
 
   return (
     <Pressable
@@ -126,7 +140,7 @@ const NearestSpotRow = memo(function NearestSpotRow({
             {formatSearchDistance(item.distanceFromSearchMeters)}
           </Text>
           <Text className="ml-2 text-[13px] font-semibold text-slate-400">
-            {formatPrice(price)}
+            {formatPrice(item)}
           </Text>
         </View>
       </View>
@@ -141,6 +155,7 @@ function SearchNearestSpotsBottomSheetComponent({
   searchPlace,
   spots,
   isLoading = false,
+  errorMessage = null,
   onClose,
   onSpotPress,
 }: SearchNearestSpotsBottomSheetProps) {
@@ -222,7 +237,7 @@ function SearchNearestSpotsBottomSheetComponent({
         <View className="flex-row items-center justify-between">
           <View className="flex-1 pr-3">
             <Text className="text-[24px] font-extrabold text-slate-950">
-              Nearest spots
+              Nearby parking areas
             </Text>
             <View className="mt-1 flex-row items-center">
               <MapPin color="#64748B" size={14} strokeWidth={2.4} />
@@ -235,12 +250,12 @@ function SearchNearestSpotsBottomSheetComponent({
             </View>
             {spots.length > 0 ? (
               <Text className="mt-1 text-[12px] font-medium text-slate-400">
-                Showing the closest recommended spots
+                Showing the closest recommended parking areas
               </Text>
             ) : null}
           </View>
           <Pressable
-            accessibilityLabel="Close nearest spots"
+            accessibilityLabel="Close nearby parking areas"
             accessibilityRole="button"
             className="h-10 w-10 items-center justify-center rounded-full bg-white active:bg-slate-100"
             hitSlop={8}
@@ -266,8 +281,8 @@ function SearchNearestSpotsBottomSheetComponent({
             <Pressable
               accessibilityLabel={
                 isExpandedNearbyList
-                  ? 'Show fewer nearby spots'
-                  : 'Show more nearby spots'
+                  ? 'Show fewer nearby parking areas'
+                  : 'Show more nearby parking areas'
               }
               accessibilityRole="button"
               className="mt-1 flex-row items-center justify-center rounded-3xl border border-slate-200 bg-white px-4 py-3.5 active:bg-slate-50"
@@ -277,7 +292,7 @@ function SearchNearestSpotsBottomSheetComponent({
               <Text className="text-[14px] font-bold text-blue-700">
                 {isExpandedNearbyList
                   ? 'Show less'
-                  : `Show more nearby spots (${hiddenResultCount})`}
+                  : `Show more parking areas (${hiddenResultCount})`}
               </Text>
               {isExpandedNearbyList ? (
                 <ChevronUp
@@ -299,16 +314,22 @@ function SearchNearestSpotsBottomSheetComponent({
         }
         ListEmptyComponent={
           <View className="items-center justify-center rounded-[28px] border border-dashed border-slate-300 bg-white/80 px-6 py-10">
-            {isLoading ? (
+            {isLoading && errorMessage === null ? (
               <ActivityIndicator color="#2563EB" size="small" />
             ) : null}
             <Text className="mt-2 text-[18px] font-extrabold text-slate-950">
-              {isLoading ? 'Finding nearby spots' : 'No nearby spots found'}
+              {errorMessage !== null
+                ? 'Unable to load parking areas'
+                : isLoading
+                  ? 'Finding nearby parking areas'
+                  : 'No nearby parking areas found'}
             </Text>
             <Text className="mt-2 text-center text-[14px] font-medium leading-5 text-slate-500">
-              {isLoading
-                ? 'Loading parking data around this destination.'
-                : 'Try a different place or address.'}
+              {errorMessage !== null
+                ? 'Check your connection and search this area again.'
+                : isLoading
+                  ? 'Loading parking data around this destination.'
+                  : 'Try a different place or address.'}
             </Text>
           </View>
         }

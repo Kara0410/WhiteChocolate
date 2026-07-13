@@ -1,4 +1,8 @@
-import type { ParkingCoordinates } from '@/types/parking-map';
+import type {
+  GeoJsonMultiPolygon,
+  GeoJsonPolygon,
+  ParkingCoordinates,
+} from '@/types/parking-domain';
 
 export type ParkingZone = {
   id: string;
@@ -6,7 +10,10 @@ export type ParkingZone = {
   status: string | null;
   massnahme: string | null;
   geojson: unknown;
+  updatedAt?: string | null;
 };
+
+export type ParkingZoneGeometry = GeoJsonPolygon | GeoJsonMultiPolygon;
 
 export type ParkingZonePolygon = {
   id: string;

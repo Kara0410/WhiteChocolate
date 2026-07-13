@@ -5,8 +5,11 @@ import type { ParkingClusterResponse } from '../src/types/parking-map';
 import {
   clearStoredFavorites,
   FAVORITES_STORAGE_KEY,
+  loadStoredFavoriteState,
   loadStoredFavorites,
+  normalizeStoredFavoriteState,
   normalizeStoredFavorites,
+  saveFavoriteState,
   saveFavorites,
 } from '../src/utils/favorite-parking-storage';
 import { createMemoryStorage } from './helpers/memory-storage';
@@ -97,6 +100,47 @@ test('saves and loads favorites round trip', async () => {
 
   await saveFavorites(favorites, storage);
   assert.deepEqual(await loadStoredFavorites(storage), favorites);
+});
+
+test('migrates legacy snapshots to stable segment references', () => {
+  const state = normalizeStoredFavoriteState([
+    favorite('one'),
+    favorite('two'),
+  ]);
+  assert.deepEqual(
+    state.favorites.map(({ reference }) => ({
+      entityId: reference.entityId,
+      entityType: reference.entityType,
+    })),
+    [
+      { entityId: 'one', entityType: 'segment' },
+      { entityId: 'two', entityType: 'segment' },
+    ],
+  );
+  assert.equal(state.favorites[0].cachedItem?.id, 'one');
+});
+
+test('version 2 storage retains references without requiring cached data', async () => {
+  const storage = createMemoryStorage();
+  await saveFavoriteState(
+    {
+      version: 2,
+      favorites: [
+        {
+          reference: {
+            entityId: 'segment-7',
+            entityType: 'segment',
+            createdAt: '2026-07-13T10:00:00.000Z',
+          },
+          cachedItem: null,
+        },
+      ],
+    },
+    storage,
+  );
+  const state = await loadStoredFavoriteState(storage);
+  assert.equal(state.favorites[0].reference.entityId, 'segment-7');
+  assert.equal(state.favorites[0].cachedItem, null);
 });
 
 test('loading corrupted JSON falls back to no favorites', async () => {

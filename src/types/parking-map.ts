@@ -1,11 +1,9 @@
+import type {
+  ParkingBoundingBox,
+  ParkingCoordinates,
+} from '@/types/parking-domain';
+
 export type AvailabilityColorStatus = 'green' | 'orange' | 'red';
-
-export type ParkingItemType = 'zone' | 'spot';
-
-export type ParkingCoordinates = {
-  latitude: number;
-  longitude: number;
-};
 
 export type WalkingCategory = 'close' | 'acceptable' | 'far';
 
@@ -17,12 +15,22 @@ export type ParkingBestSpot = {
   pricePerHour: number | null;
 };
 
+/**
+ * @deprecated Compatibility projection for legacy sheets and lists. New map
+ * fetching and rendering use ParkingMapFeature discriminants instead.
+ */
 export type ParkingClusterResponse = {
   id: string;
   type: 'cluster' | 'spot';
   latitude: number;
   longitude: number;
   availabilityPercent: number;
+  availabilityStatus?:
+    | 'live'
+    | 'predicted'
+    | 'estimated'
+    | 'unknown'
+    | 'mixed';
   count: number;
   zoneCount?: number;
   spotCount?: number;
@@ -31,37 +39,13 @@ export type ParkingClusterResponse = {
   colorStatus: AvailabilityColorStatus;
   minPrice: number | null;
   avgPrice: number | null;
+  pricingStatus?: 'free' | 'paid' | 'unknown';
   bestSpot: ParkingBestSpot;
   zoneId?: string | null;
   zoneName?: string | null;
   expansionZoom?: number;
   distanceToDestination?: number;
   walkingCategory?: WalkingCategory;
-};
-
-export type ParkingMapRecord = {
-  id: string;
-  latitude: number;
-  longitude: number;
-  zoneId: string;
-  zoneName: string;
-  parkingZoneId: string | null;
-  parkingZoneName: string | null;
-  capacity: number;
-  available: number;
-  availabilityPercent: number;
-  updatedAt: string;
-  pricePerHour: number | null;
-  maxStay: number | null;
-  restrictions: string;
-  type: ParkingItemType;
-};
-
-export type ParkingBoundingBox = {
-  minLng: number;
-  minLat: number;
-  maxLng: number;
-  maxLat: number;
 };
 
 export type ParkingCameraState = {
@@ -83,3 +67,7 @@ export type ParkingClusterRequest = {
   tileKey: string;
   destination?: ParkingCoordinates;
 };
+export type {
+  ParkingBoundingBox,
+  ParkingCoordinates,
+} from '@/types/parking-domain';

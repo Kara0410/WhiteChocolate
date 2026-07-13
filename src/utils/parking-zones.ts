@@ -3,9 +3,12 @@ import type {
   ParkingZonePolygon,
 } from '@/types/parking-zone';
 import type {
+  ParkingAdministrativeZone,
+  ParkingAdministrativeZoneStatus,
   ParkingCoordinates,
-  ParkingMapRecord,
-} from '@/types/parking-map';
+  GeoJsonMultiPolygon,
+  GeoJsonPolygon,
+} from '@/types/parking-domain';
 
 type GeoJsonGeometry = {
   type: 'Polygon' | 'MultiPolygon';
@@ -189,20 +192,6 @@ export function createParkingZoneMatcher(polygons: ParkingZonePolygon[]) {
   };
 }
 
-export function assignParkingRecordsToZones(
-  records: ParkingMapRecord[],
-  matchZone: ReturnType<typeof createParkingZoneMatcher>,
-) {
-  return records.map((record): ParkingMapRecord => {
-    const match = matchZone(record, record.zoneName);
-    return {
-      ...record,
-      parkingZoneId: match?.zoneId ?? null,
-      parkingZoneName: match?.zoneName ?? null,
-    };
-  });
-}
-
 function averageOfVertices(
   coordinates: ParkingCoordinates[],
 ): ParkingCoordinates {
@@ -325,21 +314,6 @@ export function getZoneRepresentativePoint(
   return result;
 }
 
-export type ParkingZoneSummary = {
-  zoneId: string;
-  zoneName: string | null;
-  spotCount: number;
-  latitude: number;
-  longitude: number;
-};
-
-type ZoneAssignedPoint = {
-  latitude: number;
-  longitude: number;
-  zoneId?: string | null;
-  zoneName?: string | null;
-};
-
 function boundsArea(bounds: IndexedParkingZonePolygon['bounds']) {
   return (
     (bounds.maxLatitude - bounds.minLatitude) *
@@ -363,77 +337,9 @@ function getCachedPolygonBounds(polygon: ParkingZonePolygon) {
 }
 
 /**
- * Builds one summary per zone from already zone-assigned spots. The anchor
- * is the representative point of the zone's largest polygon so the bubble
- * sits inside the zone even for MultiPolygon zones; if no polygon is known
- * for a zoneId the mean of that zone's spot coordinates is used instead.
- */
-export function buildZoneSummaries(
-  spots: readonly ZoneAssignedPoint[],
-  polygons: ParkingZonePolygon[],
-): ParkingZoneSummary[] {
-  const grouped = new Map<
-    string,
-    { zoneName: string | null; spots: ZoneAssignedPoint[] }
-  >();
-  for (const spot of spots) {
-    if (!spot.zoneId) {
-      continue;
-    }
-    const existing = grouped.get(spot.zoneId);
-    if (existing) {
-      existing.spots.push(spot);
-      existing.zoneName ??= spot.zoneName ?? null;
-    } else {
-      grouped.set(spot.zoneId, {
-        zoneName: spot.zoneName ?? null,
-        spots: [spot],
-      });
-    }
-  }
-
-  const largestPolygonByZone = new Map<string, ParkingZonePolygon>();
-  for (const polygon of polygons) {
-    const current = largestPolygonByZone.get(polygon.zoneId);
-    if (
-      current === undefined ||
-      boundsArea(getCachedPolygonBounds(polygon)) >
-        boundsArea(getCachedPolygonBounds(current))
-    ) {
-      largestPolygonByZone.set(polygon.zoneId, polygon);
-    }
-  }
-
-  return [...grouped.entries()]
-    .sort(([firstZoneId], [secondZoneId]) =>
-      firstZoneId.localeCompare(secondZoneId),
-    )
-    .map(([zoneId, group]) => {
-      const polygon = largestPolygonByZone.get(zoneId);
-      const anchor = polygon
-        ? getZoneRepresentativePoint(polygon)
-        : averageOfVertices(
-            group.spots.map((spot) => ({
-              latitude: spot.latitude,
-              longitude: spot.longitude,
-            })),
-          );
-
-      return {
-        zoneId,
-        zoneName: group.zoneName,
-        spotCount: group.spots.length,
-        latitude: anchor.latitude,
-        longitude: anchor.longitude,
-      };
-    });
-}
-
-/**
  * Zoom used when tapping a zone summary. Fits the zone's bounds to the map
- * width where possible, but is clamped so the camera always lands inside
- * spotDetail (otherwise tapping a large zone would leave the user stuck in
- * zoneSummary with nothing changed on screen).
+ * width where possible, but is clamped to the caller's next semantic-stage
+ * floor so tapping a large zone always makes visible progress.
  */
 export function getZoneFocusZoom(
   polygons: ParkingZonePolygon[],
@@ -505,6 +411,83 @@ function parseGeometry(value: unknown): GeoJsonGeometry | null {
   };
 }
 
+function isGeoJsonPosition(value: unknown): value is number[] {
+  return (
+    Array.isArray(value) &&
+    value.length >= 2 &&
+    typeof value[0] === 'number' &&
+    Number.isFinite(value[0]) &&
+    typeof value[1] === 'number' &&
+    Number.isFinite(value[1])
+  );
+}
+
+function isGeoJsonRing(value: unknown): value is number[][] {
+  return Array.isArray(value) && value.length >= 4 && value.every(isGeoJsonPosition);
+}
+
+export function parseParkingZoneGeometry(
+  value: unknown,
+): GeoJsonPolygon | GeoJsonMultiPolygon | null {
+  const geometry = parseGeometry(value);
+  if (geometry === null) {
+    return null;
+  }
+  if (geometry.type === 'Polygon') {
+    return geometry.coordinates.every(isGeoJsonRing)
+      ? (geometry as GeoJsonPolygon)
+      : null;
+  }
+  const valid = geometry.coordinates.every(
+    (polygon) => Array.isArray(polygon) && polygon.every(isGeoJsonRing),
+  );
+  return valid ? (geometry as GeoJsonMultiPolygon) : null;
+}
+
+export function normalizeParkingZoneStatus(
+  status: string | null,
+): ParkingAdministrativeZoneStatus {
+  const normalized = status?.trim().toLocaleLowerCase('de-DE');
+  if (normalized === 'in betrieb' || normalized === 'active') {
+    return 'active';
+  }
+  if (normalized === 'in umsetzung' || normalized === 'planned') {
+    return 'planned';
+  }
+  if (
+    normalized === 'inactive' ||
+    normalized === 'ausser betrieb' ||
+    (normalized !== undefined && /^au.er betrieb$/u.test(normalized))
+  ) {
+    return 'inactive';
+  }
+  return 'unknown';
+}
+
+export function parkingZoneToAdministrativeZone(
+  zone: ParkingZone,
+): ParkingAdministrativeZone | null {
+  const geometry = parseParkingZoneGeometry(zone.geojson);
+  const polygons = parkingZonesToPolygons([zone]);
+  if (geometry === null || polygons.length === 0) {
+    return null;
+  }
+  const representativePolygon = polygons.reduce((largest, candidate) =>
+    boundsArea(getCachedPolygonBounds(candidate)) >
+    boundsArea(getCachedPolygonBounds(largest))
+      ? candidate
+      : largest,
+  );
+  return {
+    id: zone.id,
+    name: zone.name?.trim() || 'Unnamed parking zone',
+    status: normalizeParkingZoneStatus(zone.status),
+    geometry,
+    representativePoint: getZoneRepresentativePoint(representativePolygon),
+    updatedAt: zone.updatedAt ?? null,
+  };
+}
+
 function coordinateRingFromGeoJson(value: unknown) {
   if (!Array.isArray(value)) {
     return null;
@@ -571,4 +554,24 @@ export function parkingZonesToPolygons(
           ];
     });
   });
+}
+
+export function parkingAdministrativeZonesToPolygons(
+  zones: ParkingAdministrativeZone[],
+): ParkingZonePolygon[] {
+  return zones.flatMap((zone) =>
+    outerRingsFromGeometry(zone.geometry).flatMap((ring, index) => {
+      const coordinates = coordinateRingFromGeoJson(ring);
+      return coordinates === null
+        ? []
+        : [
+            {
+              id: `${zone.id}:${index}`,
+              zoneId: zone.id,
+              zoneName: zone.name,
+              coordinates,
+            },
+          ];
+    }),
+  );
 }

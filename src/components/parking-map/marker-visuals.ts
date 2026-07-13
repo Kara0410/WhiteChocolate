@@ -39,46 +39,11 @@ export function getMarkerDimensions(tier: MarkerSizeTier) {
   };
 }
 
-export type FormatSpotCountOptions = {
-  /** Cap large values, e.g. 73 -> "50+ Spots" for zone summaries. */
-  capped?: boolean;
-  /** Cap threshold used when capped is true. Defaults to 50. */
-  cap?: number;
-};
-
-export function formatSpotCount(
-  count: number,
-  options?: FormatSpotCountOptions,
-) {
-  const normalizedCount = Number.isFinite(count)
+export function formatParkingAreaCount(count: number) {
+  const normalized = Number.isFinite(count)
     ? Math.max(0, Math.round(count))
     : 0;
-
-  if (options?.capped) {
-    const cap = options.cap ?? 50;
-    if (normalizedCount >= cap) {
-      return `${cap}+ Spots`;
-    }
-  }
-
-  const displayedCount =
-    normalizedCount > 999 ? '999+' : String(normalizedCount);
-
-  return `${displayedCount} ${normalizedCount === 1 ? 'Spot' : 'Spots'}`;
-}
-
-export function displayZoneCount(zoneCount: number) {
-  if (zoneCount <= 20) {
-    return zoneCount;
-  }
-  if (zoneCount <= 100) {
-    return Math.round(zoneCount / 5) * 5;
-  }
-  return Math.round(zoneCount / 25) * 25;
-}
-
-export function zoneCountLabel(zoneCount: number) {
-  const displayed = displayZoneCount(zoneCount);
-  const suffix = zoneCount > displayed ? '+' : '';
-  return `${displayed}${suffix} ${displayed === 1 ? 'zone' : 'zones'}`;
+  return `${normalized > 999 ? '999+' : normalized} ${
+    normalized === 1 ? 'area' : 'areas'
+  }`;
 }

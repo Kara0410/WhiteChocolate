@@ -72,9 +72,14 @@ function getSpotGroupKey(spot: ParkingClusterResponse) {
   return spot.zoneId ?? spot.zoneName ?? spot.bestSpot.zoneName ?? null;
 }
 
-/** `null` price means free parking, which always outranks any paid price. */
 function getEffectivePrice(spot: ParkingClusterResponse) {
-  return spot.avgPrice ?? spot.minPrice;
+  if (spot.pricingStatus === 'free') {
+    return Number.NEGATIVE_INFINITY;
+  }
+  if (spot.pricingStatus === 'unknown') {
+    return Number.POSITIVE_INFINITY;
+  }
+  return spot.avgPrice ?? spot.minPrice ?? Number.POSITIVE_INFINITY;
 }
 
 function compareCuratedSpots(
@@ -94,12 +99,6 @@ function compareCuratedSpots(
   const firstPrice = getEffectivePrice(first);
   const secondPrice = getEffectivePrice(second);
   if (firstPrice !== secondPrice) {
-    if (firstPrice === null) {
-      return -1;
-    }
-    if (secondPrice === null) {
-      return 1;
-    }
     return firstPrice - secondPrice;
   }
 
@@ -127,7 +126,7 @@ function isDuplicateNearbyOption(
 }
 
 /**
- * Ranks spots for the search "Nearest spots" experience: primarily by
+ * Ranks segments for the nearby parking-area experience: primarily by
  * distance to the destination, with availability and free/cheaper parking
  * breaking ties between equally close options, and near-identical street
  * segments collapsed to their best representative.

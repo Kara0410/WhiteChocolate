@@ -47,7 +47,7 @@ export default function ParkingAvailabilityBubbleDemo() {
         />
       </DemoSection>
 
-      <DemoSection title="Individual spots">
+      <DemoSection title="Individual segments">
         <ParkingAvailabilityBubble percentage={72} size="large" type="spot" />
         <ParkingAvailabilityBubble percentage={46} size="large" type="spot" />
         <ParkingAvailabilityBubble percentage={28} size="large" type="spot" />

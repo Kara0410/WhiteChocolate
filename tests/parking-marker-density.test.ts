@@ -12,10 +12,7 @@ import {
   selectSpatiallySeparatedMarkers,
 } from '../src/components/parking-map/marker-density';
 import { getAvailabilityStatus } from '../src/components/parking-map/parking-availability-status';
-import {
-  formatSpotCount,
-  getMarkerDimensions,
-} from '../src/components/parking-map/marker-visuals';
+import { getMarkerDimensions } from '../src/components/parking-map/marker-visuals';
 import type { ParkingClusterResponse } from '../src/types/parking-map';
 import {
   createBufferedViewportBounds,
@@ -55,22 +52,6 @@ function marker(
     },
   };
 }
-
-test('formats cluster labels with singular, plural, and a readable cap', () => {
-  assert.equal(formatSpotCount(1), '1 Spot');
-  assert.equal(formatSpotCount(2), '2 Spots');
-  assert.equal(formatSpotCount(99), '99 Spots');
-  assert.equal(formatSpotCount(1_500), '999+ Spots');
-});
-
-test('caps zone summary labels at the configured threshold', () => {
-  assert.equal(formatSpotCount(1, { capped: true, cap: 50 }), '1 Spot');
-  assert.equal(formatSpotCount(49, { capped: true, cap: 50 }), '49 Spots');
-  assert.equal(formatSpotCount(50, { capped: true, cap: 50 }), '50+ Spots');
-  assert.equal(formatSpotCount(73, { capped: true, cap: 50 }), '50+ Spots');
-  assert.equal(formatSpotCount(73, { capped: false }), '73 Spots');
-  assert.equal(formatSpotCount(73, { capped: true }), '50+ Spots');
-});
 
 test('validates user coordinates before map projection', () => {
   assert.equal(

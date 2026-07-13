@@ -10,29 +10,36 @@ import {
 } from 'react';
 
 import type { ParkingClusterResponse } from '@/types/parking-map';
+import type { FavoriteParkingReference } from '@/types/parking-domain';
+import { fetchParkingSegmentDetails } from '@/services/parkingMapData';
 import {
   clearStoredFavorites,
-  loadStoredFavorites,
-  saveFavorites,
+  loadStoredFavoriteState,
+  saveFavoriteState,
+  type StoredFavoriteParkingItem,
 } from '@/utils/favorite-parking-storage';
+import { parkingMapFeatureToLegacyResponse } from '@/utils/parking-feature-adapters';
+import { parkingSegmentToSummary } from '@/utils/parking-segments';
 
 type FavoriteParkingContextValue = {
   favoriteItems: ParkingClusterResponse[];
+  favoriteReferences: FavoriteParkingReference[];
   favoriteIds: Set<string>;
   isFavorite: (id: string) => boolean;
   toggleFavorite: (item: ParkingClusterResponse) => void;
   addFavorite: (item: ParkingClusterResponse) => void;
   removeFavorite: (id: string) => void;
   clearFavorites: () => void;
+  refreshFavorites: () => Promise<void>;
 };
 
 const FavoriteParkingContext =
   createContext<FavoriteParkingContextValue | null>(null);
 
 export function FavoriteParkingProvider({ children }: PropsWithChildren) {
-  const [favoriteItems, setFavoriteItems] = useState<ParkingClusterResponse[]>(
-    [],
-  );
+  const [favorites, setFavorites] = useState<StoredFavoriteParkingItem[]>([]);
+  const favoritesRef = useRef(favorites);
+  favoritesRef.current = favorites;
   const hydratedRef = useRef(false);
   const interactedRef = useRef(false);
   const writeQueueRef = useRef(Promise.resolve());
@@ -40,16 +47,16 @@ export function FavoriteParkingProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     let cancelled = false;
 
-    loadStoredFavorites()
-      .then((storedFavorites) => {
+    loadStoredFavoriteState()
+      .then((storedState) => {
         // A user mutation that lands before hydration wins over stored data.
         hydratedRef.current = true;
         if (
           !cancelled &&
           !interactedRef.current &&
-          storedFavorites.length > 0
+          storedState.favorites.length > 0
         ) {
-          setFavoriteItems(storedFavorites);
+          setFavorites(storedState.favorites);
         }
       })
       .catch((error: unknown) => {
@@ -73,7 +80,7 @@ export function FavoriteParkingProvider({ children }: PropsWithChildren) {
     }
 
     writeQueueRef.current = writeQueueRef.current
-      .then(() => saveFavorites(favoriteItems))
+      .then(() => saveFavoriteState({ version: 2, favorites }))
       .catch((error: unknown) => {
         if (__DEV__) {
           console.warn(
@@ -82,11 +89,23 @@ export function FavoriteParkingProvider({ children }: PropsWithChildren) {
           );
         }
       });
-  }, [favoriteItems]);
+  }, [favorites]);
+
+  const favoriteItems = useMemo(
+    () =>
+      favorites.flatMap(({ cachedItem }) =>
+        cachedItem === null ? [] : [cachedItem],
+      ),
+    [favorites],
+  );
+  const favoriteReferences = useMemo(
+    () => favorites.map(({ reference }) => reference),
+    [favorites],
+  );
 
   const favoriteIds = useMemo(
-    () => new Set(favoriteItems.map((item) => item.id)),
-    [favoriteItems],
+    () => new Set(favorites.map((item) => item.reference.entityId)),
+    [favorites],
   );
 
   const isFavorite = useCallback(
@@ -96,35 +115,58 @@ export function FavoriteParkingProvider({ children }: PropsWithChildren) {
 
   const addFavorite = useCallback((item: ParkingClusterResponse) => {
     interactedRef.current = true;
-    setFavoriteItems((current) => [
-      item,
-      ...current.filter((favorite) => favorite.id !== item.id),
+    setFavorites((current) => [
+      {
+        reference: {
+          entityId: item.id,
+          entityType: 'segment',
+          createdAt: new Date().toISOString(),
+        },
+        cachedItem: item,
+      },
+      ...current.filter(
+        (favorite) => favorite.reference.entityId !== item.id,
+      ),
     ]);
   }, []);
 
   const removeFavorite = useCallback((id: string) => {
     interactedRef.current = true;
-    setFavoriteItems((current) =>
-      current.filter((favorite) => favorite.id !== id),
+    setFavorites((current) =>
+      current.filter((favorite) => favorite.reference.entityId !== id),
     );
   }, []);
 
   const toggleFavorite = useCallback((item: ParkingClusterResponse) => {
     interactedRef.current = true;
-    setFavoriteItems((current) => {
-      const exists = current.some((favorite) => favorite.id === item.id);
+    setFavorites((current) => {
+      const exists = current.some(
+        (favorite) => favorite.reference.entityId === item.id,
+      );
 
       if (exists) {
-        return current.filter((favorite) => favorite.id !== item.id);
+        return current.filter(
+          (favorite) => favorite.reference.entityId !== item.id,
+        );
       }
 
-      return [item, ...current];
+      return [
+        {
+          reference: {
+            entityId: item.id,
+            entityType: 'segment',
+            createdAt: new Date().toISOString(),
+          },
+          cachedItem: item,
+        },
+        ...current,
+      ];
     });
   }, []);
 
   const clearFavorites = useCallback(() => {
     interactedRef.current = true;
-    setFavoriteItems((current) => (current.length === 0 ? current : []));
+    setFavorites((current) => (current.length === 0 ? current : []));
 
     // Clear the stored key directly as well, so the data is removed even
     // if clearing happens before hydration enables the autosave effect.
@@ -140,23 +182,80 @@ export function FavoriteParkingProvider({ children }: PropsWithChildren) {
       });
   }, []);
 
+  const refreshFavorites = useCallback(async () => {
+    const snapshot = favoritesRef.current;
+    const refreshed = await Promise.all(
+      snapshot.map(async (favorite) => {
+        if (favorite.reference.entityType !== 'segment') {
+          return favorite;
+        }
+        try {
+          const detail = await fetchParkingSegmentDetails(
+            favorite.reference.entityId,
+          );
+          if (detail === null) {
+            return favorite;
+          }
+          const segment = parkingSegmentToSummary(detail);
+          const cachedItem = parkingMapFeatureToLegacyResponse({
+            id: segment.id,
+            kind: 'segment',
+            coordinates: segment.coordinates,
+            stats: {
+              segmentCount: 1,
+              totalCapacity: segment.capacity,
+              availableCapacity: segment.availability.availableSpaces,
+              availabilityPercent: segment.availability.percent,
+              pricing: {
+                minimumHourlyRate:
+                  segment.pricing.status === 'paid'
+                    ? segment.pricing.hourlyRate
+                    : null,
+                maximumHourlyRate:
+                  segment.pricing.status === 'paid'
+                    ? segment.pricing.hourlyRate
+                    : null,
+                hasFreeParking: segment.pricing.status === 'free',
+                hasUnknownPricing: segment.pricing.status === 'unknown',
+              },
+              availabilityStatus: segment.availability.status,
+              updatedAt: segment.updatedAt,
+            },
+            parentId: segment.zoneId,
+            segment,
+          });
+          return { ...favorite, cachedItem };
+        } catch {
+          return favorite;
+        }
+      }),
+    );
+    setFavorites((current) =>
+      current === snapshot ? refreshed : current,
+    );
+  }, []);
+
   const value = useMemo(
     () => ({
       favoriteItems,
+      favoriteReferences,
       favoriteIds,
       isFavorite,
       toggleFavorite,
       addFavorite,
       removeFavorite,
       clearFavorites,
+      refreshFavorites,
     }),
     [
       addFavorite,
       clearFavorites,
       favoriteIds,
       favoriteItems,
+      favoriteReferences,
       isFavorite,
       removeFavorite,
+      refreshFavorites,
       toggleFavorite,
     ],
   );

@@ -20,6 +20,7 @@ import {
 import type { ParkingClusterResponse } from '@/types/parking-map';
 
 type ParkingListBottomSheetProps = {
+  errorMessage?: string | null;
   onClose: () => void;
   onSpotPress: (item: ParkingClusterResponse) => void;
   spots: ParkingClusterResponse[];
@@ -32,13 +33,27 @@ const ParkingListRow = memo(function ParkingListRow({
   item: ParkingClusterResponse;
   onPress: (item: ParkingClusterResponse) => void;
 }) {
-  const percentage = Math.max(
-    0,
-    Math.min(100, Math.round(item.availabilityPercent)),
-  );
+  const hasKnownAvailability =
+    item.availabilityStatus !== undefined &&
+    item.availabilityStatus !== 'unknown';
+  const percentage = hasKnownAvailability
+    ? Math.max(0, Math.min(100, Math.round(item.availabilityPercent)))
+    : null;
   const price = item.avgPrice ?? item.minPrice;
   const availabilityColor =
-    percentage >= 55 ? '#059669' : percentage >= 25 ? '#D97706' : '#DC2626';
+    percentage === null
+      ? '#64748B'
+      : percentage >= 55
+        ? '#059669'
+        : percentage >= 25
+          ? '#D97706'
+          : '#DC2626';
+  const priceLabel =
+    item.pricingStatus === 'free'
+      ? 'Free'
+      : price !== null
+        ? `EUR ${price.toFixed(2)}/hr`
+        : 'Price unavailable';
 
   return (
     <Pressable
@@ -63,10 +78,12 @@ const ParkingListRow = memo(function ParkingListRow({
             className="text-[13px] font-extrabold"
             style={{ color: availabilityColor }}
           >
-            {percentage}% available
+            {percentage === null
+              ? 'Availability unavailable'
+              : `${percentage}% estimated`}
           </Text>
           <Text className="ml-2 text-[13px] font-semibold text-slate-400">
-            {price === null ? 'Free' : `€${price.toFixed(2)}/hr`}
+            {priceLabel}
           </Text>
         </View>
       </View>
@@ -76,6 +93,7 @@ const ParkingListRow = memo(function ParkingListRow({
 });
 
 export function ParkingListBottomSheet({
+  errorMessage = null,
   onClose,
   onSpotPress,
   spots,
@@ -150,7 +168,7 @@ export function ParkingListBottomSheet({
                 Parking nearby
               </Text>
               <Text className="mt-1 text-[14px] font-semibold text-slate-500">
-                {spots.length} live parking areas
+                {spots.length} parking areas
               </Text>
             </View>
             <Pressable
@@ -171,8 +189,15 @@ export function ParkingListBottomSheet({
               <Car color="#2563EB" size={28} strokeWidth={2.2} />
             </View>
             <Text className="text-[18px] font-extrabold text-slate-950">
-              No parking areas found
+              {errorMessage === null
+                ? 'No parking areas found'
+                : 'Unable to load parking areas'}
             </Text>
+            {errorMessage !== null ? (
+              <Text className="mt-2 text-center text-[14px] font-medium leading-5 text-slate-500">
+                Check your connection and try again.
+              </Text>
+            ) : null}
           </View>
         }
         maxToRenderPerBatch={12}

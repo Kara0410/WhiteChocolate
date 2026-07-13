@@ -5,11 +5,11 @@ import {
   PARKING_ZONE_FIELDS,
   PARKING_ZONE_TABLE,
 } from '@/services/parkingZones';
-import type { ParkingZone } from '@/types/parking-zone';
-import { parkingZonesToPolygons } from '@/utils/parking-zones';
+import type { ParkingAdministrativeZone } from '@/types/parking-domain';
+import { parkingAdministrativeZonesToPolygons } from '@/utils/parking-zones';
 
 export function useParkingZones() {
-  const [zones, setZones] = useState<ParkingZone[]>([]);
+  const [zones, setZones] = useState<ParkingAdministrativeZone[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -44,7 +44,10 @@ export function useParkingZones() {
     };
   }, []);
 
-  const polygons = useMemo(() => parkingZonesToPolygons(zones), [zones]);
+  const polygons = useMemo(
+    () => parkingAdministrativeZonesToPolygons(zones),
+    [zones],
+  );
 
   useEffect(() => {
     if (!__DEV__ || isLoading) {
@@ -57,7 +60,6 @@ export function useParkingZones() {
       firstPolygonCoordinateSample:
         polygons[0]?.coordinates[0] ?? null,
       firstZoneName: zones[0]?.name ?? null,
-      nullGeojsonRows: zones.filter((zone) => zone.geojson === null).length,
       renderablePolygons: polygons.length,
       schema: 'public',
       table: PARKING_ZONE_TABLE,
@@ -78,6 +80,7 @@ export function useParkingZones() {
     error,
     isLoading,
     polygons,
+    administrativeZones: zones,
     zones,
   };
 }

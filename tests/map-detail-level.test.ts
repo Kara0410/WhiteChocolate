@@ -2,81 +2,101 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
-  deriveMapDetailLevel,
-  MAP_DETAIL_THRESHOLDS,
+  deriveParkingSemanticZoomStage,
+  PARKING_SEMANTIC_ZOOM_THRESHOLDS,
   resolveDetailZoom,
+  type ParkingSemanticZoomStage,
 } from '../src/components/parking-map/map-detail-level';
 
-test('classifies levels from zoom without a previous level', () => {
-  assert.equal(deriveMapDetailLevel({ zoom: 11 }), 'overview');
-  assert.equal(deriveMapDetailLevel({ zoom: 13 }), 'zoneSummary');
-  assert.equal(deriveMapDetailLevel({ zoom: 16 }), 'spotDetail');
+test('classifies all five stages without previous state', () => {
+  assert.equal(deriveParkingSemanticZoomStage({ zoom: 11 }), 'city');
+  assert.equal(deriveParkingSemanticZoomStage({ zoom: 12 }), 'zone');
+  assert.equal(deriveParkingSemanticZoomStage({ zoom: 13.5 }), 'cell');
+  assert.equal(
+    deriveParkingSemanticZoomStage({ zoom: 15 }),
+    'segmentCluster',
+  );
+  assert.equal(deriveParkingSemanticZoomStage({ zoom: 17 }), 'segment');
 });
 
-test('prefers zoom and falls back to longitudeDelta only when needed', () => {
+test('prefers native zoom and safely falls back to longitude delta', () => {
   assert.equal(resolveDetailZoom({ zoom: 14, longitudeDelta: 20 }), 14);
-
-  const fallback = resolveDetailZoom({
-    zoom: Number.NaN,
-    longitudeDelta: 360 / 2 ** 13,
-  });
-  assert.ok(fallback !== null && Math.abs(fallback - 13) < 0.001);
-
+  assert.equal(
+    resolveDetailZoom({
+      zoom: Number.NaN,
+      longitudeDelta: 360 / 2 ** 13,
+    }),
+    13,
+  );
   assert.equal(resolveDetailZoom({ zoom: Number.NaN }), null);
-  assert.equal(deriveMapDetailLevel({ zoom: Number.NaN }), 'overview');
+  assert.equal(deriveParkingSemanticZoomStage({ zoom: Number.NaN }), 'city');
   assert.equal(
-    deriveMapDetailLevel({ zoom: Number.NaN }, 'spotDetail'),
-    'spotDetail',
+    deriveParkingSemanticZoomStage({ zoom: Number.NaN }, 'segment'),
+    'segment',
   );
 });
 
-test('hysteresis keeps the level stable near the overview boundary', () => {
-  const { overviewReturnZoom, zoneSummaryEnterZoom } = MAP_DETAIL_THRESHOLDS;
-  const betweenThresholds = (overviewReturnZoom + zoneSummaryEnterZoom) / 2;
+test('every semantic boundary uses enter and return hysteresis', () => {
+  const thresholdPairs: Array<{
+    lower: ParkingSemanticZoomStage;
+    upper: ParkingSemanticZoomStage;
+    enter: number;
+    exit: number;
+  }> = [
+    {
+      lower: 'city',
+      upper: 'zone',
+      enter: PARKING_SEMANTIC_ZOOM_THRESHOLDS.zoneEnter,
+      exit: PARKING_SEMANTIC_ZOOM_THRESHOLDS.cityReturn,
+    },
+    {
+      lower: 'zone',
+      upper: 'cell',
+      enter: PARKING_SEMANTIC_ZOOM_THRESHOLDS.cellEnter,
+      exit: PARKING_SEMANTIC_ZOOM_THRESHOLDS.zoneReturn,
+    },
+    {
+      lower: 'cell',
+      upper: 'segmentCluster',
+      enter: PARKING_SEMANTIC_ZOOM_THRESHOLDS.segmentClusterEnter,
+      exit: PARKING_SEMANTIC_ZOOM_THRESHOLDS.cellReturn,
+    },
+    {
+      lower: 'segmentCluster',
+      upper: 'segment',
+      enter: PARKING_SEMANTIC_ZOOM_THRESHOLDS.segmentEnter,
+      exit: PARKING_SEMANTIC_ZOOM_THRESHOLDS.segmentClusterReturn,
+    },
+  ];
 
-  assert.equal(
-    deriveMapDetailLevel({ zoom: betweenThresholds }, 'overview'),
-    'overview',
-  );
-  assert.equal(
-    deriveMapDetailLevel({ zoom: betweenThresholds }, 'zoneSummary'),
-    'zoneSummary',
-  );
-  assert.equal(
-    deriveMapDetailLevel({ zoom: zoneSummaryEnterZoom }, 'overview'),
-    'zoneSummary',
-  );
-  assert.equal(
-    deriveMapDetailLevel({ zoom: overviewReturnZoom }, 'zoneSummary'),
-    'overview',
-  );
+  for (const pair of thresholdPairs) {
+    const between = (pair.enter + pair.exit) / 2;
+    assert.equal(
+      deriveParkingSemanticZoomStage({ zoom: between }, pair.lower),
+      pair.lower,
+    );
+    assert.equal(
+      deriveParkingSemanticZoomStage({ zoom: between }, pair.upper),
+      pair.upper,
+    );
+    assert.equal(
+      deriveParkingSemanticZoomStage({ zoom: pair.enter }, pair.lower),
+      pair.upper,
+    );
+    assert.equal(
+      deriveParkingSemanticZoomStage({ zoom: pair.exit }, pair.upper),
+      pair.lower,
+    );
+  }
 });
 
-test('hysteresis keeps the level stable near the spot-detail boundary', () => {
-  const { spotDetailEnterZoom, zoneSummaryReturnZoom } =
-    MAP_DETAIL_THRESHOLDS;
-  const betweenThresholds =
-    (zoneSummaryReturnZoom + spotDetailEnterZoom) / 2;
-
+test('direct zoom jumps resolve without stepping through intermediate stages', () => {
   assert.equal(
-    deriveMapDetailLevel({ zoom: betweenThresholds }, 'zoneSummary'),
-    'zoneSummary',
+    deriveParkingSemanticZoomStage({ zoom: 17 }, 'city'),
+    'segment',
   );
   assert.equal(
-    deriveMapDetailLevel({ zoom: betweenThresholds }, 'spotDetail'),
-    'spotDetail',
+    deriveParkingSemanticZoomStage({ zoom: 11 }, 'segment'),
+    'city',
   );
-  assert.equal(
-    deriveMapDetailLevel({ zoom: spotDetailEnterZoom }, 'zoneSummary'),
-    'spotDetail',
-  );
-  assert.equal(
-    deriveMapDetailLevel({ zoom: zoneSummaryReturnZoom }, 'spotDetail'),
-    'zoneSummary',
-  );
-});
-
-test('large zoom jumps can cross both boundaries at once', () => {
-  assert.equal(deriveMapDetailLevel({ zoom: 17 }, 'overview'), 'spotDetail');
-  assert.equal(deriveMapDetailLevel({ zoom: 11 }, 'spotDetail'), 'overview');
 });

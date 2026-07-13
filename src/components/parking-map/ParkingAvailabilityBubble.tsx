@@ -18,8 +18,9 @@ import {
   getAvailabilityStatus,
   getAvailabilityTheme,
   type AvailabilityStatus,
+  type AvailabilityTheme,
 } from './parking-availability-status';
-import { formatSpotCount } from './marker-visuals';
+import { formatParkingAreaCount } from './marker-visuals';
 
 export type BubbleType = 'cluster' | 'spot';
 export type BubbleSize = 'small' | 'medium' | 'large';
@@ -27,7 +28,7 @@ export type BubbleState = 'default' | 'pressed' | 'selected';
 
 export type ParkingAvailabilityBubbleProps = {
   type: BubbleType;
-  percentage: number;
+  percentage: number | null;
   count?: number;
   zoneCount?: number;
   size?: BubbleSize;
@@ -80,6 +81,17 @@ const SELECTION_TIMING_CONFIG = {
   duration: 160,
   reduceMotion: ReduceMotion.System,
 } as const;
+const UNKNOWN_AVAILABILITY_THEME: AvailabilityTheme = {
+  fill: '#64748B',
+  text: '#FFFFFF',
+  ring: '#94A3B8',
+  ringTrack: 'rgba(148, 163, 184, 0.24)',
+  glow: 'rgba(100, 116, 139, 0.26)',
+  glowStrong: 'rgba(100, 116, 139, 0.34)',
+  backgroundTint: '#64748B',
+  border: '#FFFFFF',
+  movingFill: '#64748B',
+};
 
 export { getAvailabilityStatus };
 export type { AvailabilityStatus };
@@ -128,8 +140,13 @@ function ParkingAvailabilityBubble({
   className,
   onPress,
 }: ParkingAvailabilityBubbleProps) {
-  const clampedPercentage = clampPercentage(percentage);
-  const theme = getAvailabilityTheme(clampedPercentage);
+  const availabilityKnown = percentage !== null && Number.isFinite(percentage);
+  const clampedPercentage = availabilityKnown
+    ? clampPercentage(percentage)
+    : 0;
+  const theme = availabilityKnown
+    ? getAvailabilityTheme(clampedPercentage)
+    : UNKNOWN_AVAILABILITY_THEME;
   const selected = state === 'selected';
   const forcedPressed = state === 'pressed';
   const moving = performanceMode === 'moving';
@@ -148,8 +165,10 @@ function ParkingAvailabilityBubble({
   const selectionProgress = useSharedValue(selected && !moving ? 1 : 0);
   const clusterCount = normalizeClusterCount(count ?? zoneCount);
   const label = isCluster
-    ? `${formatSpotCount(clusterCount)} parking cluster`
-    : `${clampedPercentage}% parking availability`;
+    ? `${formatParkingAreaCount(clusterCount)} parking areas`
+    : availabilityKnown
+      ? `${clampedPercentage}% estimated parking availability`
+      : 'Parking availability unavailable';
 
   const animateScale = useCallback(
     (toValue: number) => {
@@ -191,15 +210,23 @@ function ParkingAvailabilityBubble({
 
   const fillColor = isCluster
     ? '#FFFFFF'
+    : !availabilityKnown
+      ? '#F8FAFC'
     : moving
       ? theme.movingFill
       : theme.fill;
-  const textColor = isCluster ? '#0F172A' : theme.text;
+  const textColor = isCluster
+    ? '#0F172A'
+    : availabilityKnown
+      ? theme.text
+      : '#64748B';
   const borderColor = isCluster
     ? selected
       ? '#2563EB'
       : '#DBEAFE'
     : theme.border;
+  const resolvedBorderColor =
+    !isCluster && !availabilityKnown ? '#CBD5E1' : borderColor;
 
   return (
     <Animated.View
@@ -250,7 +277,7 @@ function ParkingAvailabilityBubble({
             styles.pill,
             {
               backgroundColor: fillColor,
-              borderColor,
+              borderColor: resolvedBorderColor,
               borderWidth: isCluster ? (selected ? 2 : 1) : selected ? 3.5 : 3,
               boxShadow: markerShadow(
                 selected,
@@ -293,8 +320,10 @@ function ParkingAvailabilityBubble({
             ]}
           >
             {isCluster
-              ? formatSpotCount(clusterCount)
-              : `${clampedPercentage}%`}
+              ? formatParkingAreaCount(clusterCount)
+              : availabilityKnown
+                ? `${clampedPercentage}%`
+                : '—'}
           </Text>
         </View>
 

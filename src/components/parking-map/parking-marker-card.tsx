@@ -41,7 +41,11 @@ export const ParkingMarkerCard = memo(function ParkingMarkerCard({
       <ParkingAvailabilityBubble
         count={item.spotCount ?? item.zoneCount ?? item.count}
         onPress={handlePress}
-        percentage={item.availabilityPercent}
+        percentage={
+          item.availabilityStatus === 'unknown'
+            ? null
+            : item.availabilityPercent
+        }
         performanceMode={performanceMode}
         size={size}
         state={selected ? 'selected' : 'default'}

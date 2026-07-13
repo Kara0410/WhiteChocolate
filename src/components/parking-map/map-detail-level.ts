@@ -1,43 +1,23 @@
 import type { ParkingCameraState } from '@/types/parking-map';
 
-/**
- * Strict three-level map detail model.
- *
- * - overview:    Munich-wide view. Zone polygons only, no count bubbles.
- * - zoneSummary: one capped "X Spots" / "50+ Spots" bubble per parking zone.
- * - spotDetail:  regular clusters and individual spot markers.
- */
-export type MapDetailLevel = 'overview' | 'zoneSummary' | 'spotDetail';
+export type ParkingSemanticZoomStage =
+  | 'city'
+  | 'zone'
+  | 'cell'
+  | 'segmentCluster'
+  | 'segment';
 
-/**
- * Web Mercator zoom thresholds with hysteresis. Enter and exit values are
- * intentionally different so the level cannot flicker while the user hovers
- * near a boundary: after entering a level the camera must move past the
- * *other* threshold of the pair to leave it again.
- *
- * Why these values:
- * - The Munich overview camera sits at zoom 11 and must classify as
- *   overview, so zoneSummary only starts at 12.0 (exit back at 11.5).
- * - Supercluster stops merging at zoom 16 (MAX_CLUSTER_ZOOM) and search /
- *   location flows land at zoom 16-17, so spotDetail starts at 15.0 where
- *   individual streets are readable (exit back at 14.5).
- */
-export const MAP_DETAIL_THRESHOLDS = {
-  /** overview -> zoneSummary while zooming in. */
-  zoneSummaryEnterZoom: 12.0,
-  /** zoneSummary -> overview while zooming out. */
-  overviewReturnZoom: 11.5,
-  /** zoneSummary -> spotDetail while zooming in. */
-  spotDetailEnterZoom: 15.0,
-  /** spotDetail -> zoneSummary while zooming out. */
-  zoneSummaryReturnZoom: 14.5,
+export const PARKING_SEMANTIC_ZOOM_THRESHOLDS = {
+  zoneEnter: 11.8,
+  cityReturn: 11.4,
+  cellEnter: 13.2,
+  zoneReturn: 12.8,
+  segmentClusterEnter: 14.7,
+  cellReturn: 14.3,
+  segmentEnter: 16.2,
+  segmentClusterReturn: 15.8,
 } as const;
 
-/**
- * Zoom used for detail-level decisions. Prefers the zoom reported by the
- * Expo Maps camera event; falls back to an unrounded Web Mercator zoom
- * derived from longitudeDelta only when zoom is unavailable.
- */
 export function resolveDetailZoom(
   camera: Pick<ParkingCameraState, 'zoom' | 'longitudeDelta'>,
 ): number | null {
@@ -54,45 +34,68 @@ export function resolveDetailZoom(
   return null;
 }
 
-export function deriveMapDetailLevel(
+function stageForZoom(zoom: number): ParkingSemanticZoomStage {
+  const thresholds = PARKING_SEMANTIC_ZOOM_THRESHOLDS;
+  if (zoom >= thresholds.segmentEnter) {
+    return 'segment';
+  }
+  if (zoom >= thresholds.segmentClusterEnter) {
+    return 'segmentCluster';
+  }
+  if (zoom >= thresholds.cellEnter) {
+    return 'cell';
+  }
+  return zoom >= thresholds.zoneEnter ? 'zone' : 'city';
+}
+
+export function deriveParkingSemanticZoomStage(
   camera: Pick<ParkingCameraState, 'zoom' | 'longitudeDelta'>,
-  previousLevel?: MapDetailLevel,
-): MapDetailLevel {
+  previousStage?: ParkingSemanticZoomStage,
+): ParkingSemanticZoomStage {
   const zoom = resolveDetailZoom(camera);
   if (zoom === null) {
-    return previousLevel ?? 'overview';
+    return previousStage ?? 'city';
+  }
+  if (previousStage === undefined) {
+    return stageForZoom(zoom);
   }
 
-  const {
-    overviewReturnZoom,
-    spotDetailEnterZoom,
-    zoneSummaryEnterZoom,
-    zoneSummaryReturnZoom,
-  } = MAP_DETAIL_THRESHOLDS;
-
-  if (previousLevel === undefined) {
-    if (zoom >= spotDetailEnterZoom) {
-      return 'spotDetail';
-    }
-    return zoom >= zoneSummaryEnterZoom ? 'zoneSummary' : 'overview';
+  const thresholds = PARKING_SEMANTIC_ZOOM_THRESHOLDS;
+  switch (previousStage) {
+    case 'city':
+      return zoom < thresholds.zoneEnter ? 'city' : stageForZoom(zoom);
+    case 'zone':
+      if (zoom <= thresholds.cityReturn) {
+        return 'city';
+      }
+      return zoom < thresholds.cellEnter ? 'zone' : stageForZoom(zoom);
+    case 'cell':
+      if (zoom <= thresholds.zoneReturn) {
+        return zoom <= thresholds.cityReturn ? 'city' : 'zone';
+      }
+      return zoom < thresholds.segmentClusterEnter
+        ? 'cell'
+        : stageForZoom(zoom);
+    case 'segmentCluster':
+      if (zoom <= thresholds.cellReturn) {
+        if (zoom <= thresholds.cityReturn) {
+          return 'city';
+        }
+        return zoom <= thresholds.zoneReturn ? 'zone' : 'cell';
+      }
+      return zoom < thresholds.segmentEnter
+        ? 'segmentCluster'
+        : 'segment';
+    case 'segment':
+      if (zoom > thresholds.segmentClusterReturn) {
+        return 'segment';
+      }
+      if (zoom <= thresholds.cityReturn) {
+        return 'city';
+      }
+      if (zoom <= thresholds.zoneReturn) {
+        return 'zone';
+      }
+      return zoom <= thresholds.cellReturn ? 'cell' : 'segmentCluster';
   }
-
-  if (previousLevel === 'overview') {
-    if (zoom < zoneSummaryEnterZoom) {
-      return 'overview';
-    }
-    return zoom >= spotDetailEnterZoom ? 'spotDetail' : 'zoneSummary';
-  }
-
-  if (previousLevel === 'zoneSummary') {
-    if (zoom >= spotDetailEnterZoom) {
-      return 'spotDetail';
-    }
-    return zoom <= overviewReturnZoom ? 'overview' : 'zoneSummary';
-  }
-
-  if (zoom > zoneSummaryReturnZoom) {
-    return 'spotDetail';
-  }
-  return zoom <= overviewReturnZoom ? 'overview' : 'zoneSummary';
 }

@@ -13,7 +13,7 @@ import { AppleMaps, GoogleMaps, type CameraPosition } from 'expo-maps';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import InfoRow from '@/components/InfoRow';
-import { fetchParkingSegmentById } from '@/services/parkingSegments';
+import { fetchParkingSegmentDetails } from '@/services/parkingMapData';
 import type { ParkingSegment } from '@/types/parking-segment';
 import { getBadgeColor } from '@/utils/parking';
 
@@ -63,7 +63,7 @@ export default function ParkingDetailScreen() {
     }
 
     setState({ status: 'loading' });
-    void fetchParkingSegmentById(id)
+    void fetchParkingSegmentDetails(id)
       .then((item) => {
         if (!active) {
           return;
@@ -103,28 +103,29 @@ export default function ParkingDetailScreen() {
   }
 
   const { item } = state;
-  const title = item.street ?? item.prmName ?? 'Parking segment';
-  const groupName = item.groupName ?? item.geoportalClass ?? 'Parking';
+  const title = item.streetName ?? item.sourceAreaName ?? 'Parking segment';
+  const groupName =
+    item.regulation.groupName ?? item.geoportalClass ?? 'Parking';
   const badgeColor = getBadgeColor(groupName);
   const darkBadge = badgeColor === '#6b7280' || badgeColor === '#f87171';
   const hasCoords =
-    Number.isFinite(item.lat) &&
-    item.lat >= -90 &&
-    item.lat <= 90 &&
-    Number.isFinite(item.lon) &&
-    item.lon >= -180 &&
-    item.lon <= 180;
+    Number.isFinite(item.coordinates.latitude) &&
+    item.coordinates.latitude >= -90 &&
+    item.coordinates.latitude <= 90 &&
+    Number.isFinite(item.coordinates.longitude) &&
+    item.coordinates.longitude >= -180 &&
+    item.coordinates.longitude <= 180;
 
   const openOSM = () =>
     Linking.openURL(
-      `https://www.openstreetmap.org/?mlat=${item.lat}&mlon=${item.lon}&zoom=17`,
+      `https://www.openstreetmap.org/?mlat=${item.coordinates.latitude}&mlon=${item.coordinates.longitude}&zoom=17`,
     );
 
   const cameraPosition: CameraPosition | undefined = hasCoords
     ? {
         coordinates: {
-          latitude: item.lat,
-          longitude: item.lon,
+          latitude: item.coordinates.latitude,
+          longitude: item.coordinates.longitude,
         },
         zoom: 17,
       }
@@ -135,8 +136,8 @@ export default function ParkingDetailScreen() {
         {
           id: item.id,
           coordinates: {
-            latitude: item.lat,
-            longitude: item.lon,
+            latitude: item.coordinates.latitude,
+            longitude: item.coordinates.longitude,
           },
           title,
         },
@@ -148,8 +149,8 @@ export default function ParkingDetailScreen() {
         {
           id: item.id,
           coordinates: {
-            latitude: item.lat,
-            longitude: item.lon,
+            latitude: item.coordinates.latitude,
+            longitude: item.coordinates.longitude,
           },
           title,
           snippet: groupName,
@@ -216,7 +217,8 @@ export default function ParkingDetailScreen() {
               </Text>
               {hasCoords ? (
                 <Text className="text-xs text-gray-500">
-                  {item.lat.toFixed(5)}, {item.lon.toFixed(5)}
+                  {item.coordinates.latitude.toFixed(5)},{' '}
+                  {item.coordinates.longitude.toFixed(5)}
                 </Text>
               ) : null}
             </Pressable>
@@ -244,27 +246,29 @@ export default function ParkingDetailScreen() {
           <InfoRow
             icon="document-text-outline"
             label="Regulation"
-            value={item.description ?? 'No regulation description'}
+            value={
+              item.regulation.description ?? 'No regulation description'
+            }
           />
-          {item.prmName ? (
+          {item.sourceAreaName ? (
             <InfoRow
               icon="location-outline"
               label="District"
-              value={item.prmName}
+              value={item.sourceAreaName}
             />
           ) : null}
           {item.capacity !== null ? (
             <InfoRow
               icon="car-outline"
               label="Spaces"
-              value={`${item.capacity} parking spots`}
+              value={`${item.capacity} spaces`}
             />
           ) : null}
           {hasCoords ? (
             <InfoRow
               icon="navigate-outline"
               label="Coordinates"
-              value={`${item.lat.toFixed(5)} deg N, ${item.lon.toFixed(5)} deg E`}
+              value={`${item.coordinates.latitude.toFixed(5)} deg N, ${item.coordinates.longitude.toFixed(5)} deg E`}
             />
           ) : null}
         </View>

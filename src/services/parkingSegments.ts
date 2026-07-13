@@ -8,7 +8,7 @@ import {
 } from '@/utils/parking-segments';
 
 const PARKING_SEGMENT_COLUMNS =
-  'id,strasse,angebot,parkregel_beschreibung,parkregel_gruppe,parkregel_name,prm_name,geoportal_class,lat,lon';
+  'id,strasse,angebot,parkregel_beschreibung,parkregel_gruppe,parkregel_name,prm_name,geoportal_class,lat,lon,updated_at';
 const MAX_SEGMENTS_PER_REQUEST = 2_000;
 const SEGMENT_PAGE_SIZE = 1_000;
 const QUERY_TIMEOUT_MS = 10_000;

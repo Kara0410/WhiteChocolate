@@ -1,12 +1,20 @@
+import type {
+  ParkingAvailability,
+  ParkingCoordinates,
+  ParkingPricing,
+  ParkingRegulation,
+} from '@/types/parking-domain';
+
 export type ParkingSegment = {
   id: string;
-  street: string | null;
+  zoneId: string | null;
+  streetName: string | null;
+  sourceAreaName: string | null;
+  coordinates: ParkingCoordinates;
   capacity: number | null;
-  description: string | null;
-  groupName: string | null;
-  parkregelName: string | null;
-  prmName: string | null;
+  pricing: ParkingPricing;
+  availability: ParkingAvailability;
+  regulation: ParkingRegulation;
   geoportalClass: string | null;
-  lat: number;
-  lon: number;
+  updatedAt: string | null;
 };

@@ -25,6 +25,7 @@ function spot(
     colorStatus: 'orange',
     minPrice: 2,
     avgPrice: 2,
+    pricingStatus: 'paid',
     bestSpot: {
       id: overrides.id,
       zoneName: overrides.zoneName ?? 'Zone A',
@@ -145,6 +146,7 @@ test('prefers free parking between equally close, equally available options', ()
         zoneId: 'zone-b',
         minPrice: null,
         avgPrice: null,
+        pricingStatus: 'free',
       }),
     ],
   });
@@ -152,6 +154,28 @@ test('prefers free parking between equally close, equally available options', ()
   assert.deepEqual(
     results.map((result) => result.id),
     ['free', 'paid'],
+  );
+});
+
+test('does not rank unknown pricing as free', () => {
+  const results = getCuratedNearbyParkingSpots({
+    origin: ORIGIN,
+    spots: [
+      spot({ id: 'paid', latitude: latitudeMetersNorth(110) }),
+      spot({
+        id: 'unknown',
+        latitude: latitudeMetersNorth(100),
+        zoneId: 'zone-b',
+        minPrice: null,
+        avgPrice: null,
+        pricingStatus: 'unknown',
+      }),
+    ],
+  });
+
+  assert.deepEqual(
+    results.map((result) => result.id),
+    ['paid', 'unknown'],
   );
 });
 

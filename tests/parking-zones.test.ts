@@ -3,11 +3,13 @@ import test from 'node:test';
 
 import type { ParkingZone } from '../src/types/parking-zone';
 import {
-  buildZoneSummaries,
   createParkingZoneMatcher,
   getZoneFocusZoom,
   getZoneRepresentativePoint,
   isCoordinateInsidePolygon,
+  normalizeParkingZoneStatus,
+  parkingAdministrativeZonesToPolygons,
+  parkingZoneToAdministrativeZone,
   parkingZonesToPolygons,
 } from '../src/utils/parking-zones';
 
@@ -72,6 +74,36 @@ test('ignores null, malformed, and unsupported geometry safely', () => {
   assert.deepEqual(polygons, []);
 });
 
+test('normalizes source zones into administrative domain entities', () => {
+  const administrativeZone = parkingZoneToAdministrativeZone(
+    zone({
+      type: 'Polygon',
+      coordinates: [
+        [
+          [11.5, 48.1],
+          [11.6, 48.1],
+          [11.6, 48.2],
+          [11.5, 48.1],
+        ],
+      ],
+    }),
+  );
+  assert.ok(administrativeZone);
+  assert.equal(administrativeZone.status, 'active');
+  assert.equal(administrativeZone.geometry.type, 'Polygon');
+  assert.equal(
+    parkingAdministrativeZonesToPolygons([administrativeZone]).length,
+    1,
+  );
+});
+
+test('normalizes operational, planned, inactive, and unknown zone status', () => {
+  assert.equal(normalizeParkingZoneStatus('in Betrieb'), 'active');
+  assert.equal(normalizeParkingZoneStatus('in Umsetzung'), 'planned');
+  assert.equal(normalizeParkingZoneStatus('ausser Betrieb'), 'inactive');
+  assert.equal(normalizeParkingZoneStatus(null), 'unknown');
+});
+
 test('matches points inside zones and treats polygon boundaries as contained', () => {
   const polygon = [
     { latitude: 48.1, longitude: 11.5 },
@@ -128,43 +160,7 @@ test('zone representative point stays inside a concave polygon', () => {
   assert.equal(isCoordinateInsidePolygon(point, uShape), true);
 });
 
-test('builds one capped summary per zone from assigned spots', () => {
-  const polygons = parkingZonesToPolygons([
-    zone({
-      type: 'Polygon',
-      coordinates: [
-        [
-          [11.5, 48.1],
-          [11.6, 48.1],
-          [11.6, 48.2],
-          [11.5, 48.2],
-          [11.5, 48.1],
-        ],
-      ],
-    }),
-  ]);
-  const spots = [
-    ...Array.from({ length: 3 }, (_, index) => ({
-      latitude: 48.15,
-      longitude: 11.55,
-      zoneId: 'zone-1',
-      zoneName: 'Test zone',
-      id: `spot-${index}`,
-    })),
-    { latitude: 48.15, longitude: 11.55, zoneId: null, zoneName: null },
-  ];
-
-  const summaries = buildZoneSummaries(spots, polygons);
-  assert.equal(summaries.length, 1);
-  assert.equal(summaries[0].zoneId, 'zone-1');
-  assert.equal(summaries[0].spotCount, 3);
-  assert.equal(
-    isCoordinateInsidePolygon(summaries[0], polygons[0].coordinates),
-    true,
-  );
-});
-
-test('zone focus zoom fits small zones but always lands in spot detail', () => {
+test('zone focus zoom fits small zones while respecting the requested floor', () => {
   const polygons = parkingZonesToPolygons([
     zone({
       type: 'Polygon',

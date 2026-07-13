@@ -593,7 +593,7 @@ export default function OnboardingScreen() {
                     <View className="mt-8">
                       <AccountBenefitRow
                         icon={Heart}
-                        subtitle="Keep your best parking spots in one place."
+                        subtitle="Keep your best parking areas in one place."
                         title="Save your favorites"
                       />
                       <AccountBenefitRow

@@ -8,10 +8,14 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import {
+  CELL_SUMMARY_MARKER_SIZE,
+  CellSummaryMarker,
+} from '@/components/parking-map/cell-summary-marker';
+import type { ParkingSemanticZoomStage } from '@/components/parking-map/map-detail-level';
+import {
   MAP_ELEVATIONS,
   MAP_LAYERS,
 } from '@/components/parking-map/map-layers';
-import type { MapDetailLevel } from '@/components/parking-map/map-detail-level';
 import type { ProjectedParkingMarker } from '@/components/parking-map/marker-density';
 import { ParkingMarkerCard } from '@/components/parking-map/parking-marker-card';
 import {
@@ -19,7 +23,10 @@ import {
   ZoneSummaryMarker,
 } from '@/components/parking-map/zone-summary-marker';
 import type { ParkingClusterResponse } from '@/types/parking-map';
-import type { ParkingZoneSummary } from '@/utils/parking-zones';
+import type {
+  ParkingCellSummary,
+  ParkingZoneSummary,
+} from '@/types/parking-domain';
 
 type ProjectedZoneSummary = {
   summary: ParkingZoneSummary;
@@ -28,12 +35,18 @@ type ProjectedZoneSummary = {
 };
 
 type ParkingMarkerOverlayProps = {
-  detailLevel: MapDetailLevel;
+  semanticStage: ParkingSemanticZoomStage;
   isMapMoving: boolean;
   isSearchRecommendationMode: boolean;
   onMarkerPress: (item: ParkingClusterResponse) => void;
+  onCellSummaryPress: (summary: ParkingCellSummary) => void;
   onZoneSummaryPress: (summary: ParkingZoneSummary) => void;
   projectedMarkers: ProjectedParkingMarker[];
+  projectedCellSummaries: {
+    summary: ParkingCellSummary;
+    x: number;
+    y: number;
+  }[];
   projectedZoneSummaries: ProjectedZoneSummary[];
   selectedParkingItemId?: string;
 };
@@ -52,12 +65,14 @@ const SEARCH_MARKER_EXITING = FadeOut.duration(140).reduceMotion(
 );
 
 export const ParkingMarkerOverlay = memo(function ParkingMarkerOverlay({
-  detailLevel,
+  semanticStage,
   isMapMoving,
   isSearchRecommendationMode,
   onMarkerPress,
+  onCellSummaryPress,
   onZoneSummaryPress,
   projectedMarkers,
+  projectedCellSummaries,
   projectedZoneSummaries,
   selectedParkingItemId,
 }: ParkingMarkerOverlayProps) {
@@ -75,7 +90,7 @@ export const ParkingMarkerOverlay = memo(function ParkingMarkerOverlay({
         }}
       >
         <Animated.View
-          key={`marker-layer-${detailLevel}`}
+          key={`marker-layer-${semanticStage}`}
           entering={DETAIL_LAYER_ENTERING}
           exiting={DETAIL_LAYER_EXITING}
           pointerEvents="box-none"
@@ -125,6 +140,48 @@ export const ParkingMarkerOverlay = memo(function ParkingMarkerOverlay({
             </View>
           ))}
         </Animated.View>
+      </View>
+
+      <View
+        pointerEvents="box-none"
+        style={{
+          elevation: MAP_ELEVATIONS.markers,
+          position: 'absolute',
+          inset: 0,
+          zIndex: MAP_LAYERS.markers,
+        }}
+      >
+        {projectedCellSummaries.length > 0 ? (
+          <Animated.View
+            entering={DETAIL_LAYER_ENTERING}
+            exiting={DETAIL_LAYER_EXITING}
+            pointerEvents="box-none"
+            style={{ flex: 1 }}
+          >
+            {projectedCellSummaries.map(({ summary, x, y }) => (
+              <View
+                key={summary.id}
+                pointerEvents="box-none"
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  top: 0,
+                  transform: [
+                    { translateX: x - CELL_SUMMARY_MARKER_SIZE.width / 2 },
+                    { translateY: y - CELL_SUMMARY_MARKER_SIZE.height / 2 },
+                  ],
+                  width: CELL_SUMMARY_MARKER_SIZE.width,
+                  height: CELL_SUMMARY_MARKER_SIZE.height,
+                }}
+              >
+                <CellSummaryMarker
+                  onPress={onCellSummaryPress}
+                  summary={summary}
+                />
+              </View>
+            ))}
+          </Animated.View>
+        ) : null}
       </View>
 
       <View

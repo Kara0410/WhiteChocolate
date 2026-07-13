@@ -1,8 +1,10 @@
 import type { ParkingSegmentRow } from '@/types/database';
-import type { ParkingMapRecord } from '@/types/parking-map';
+import type {
+  ParkingAvailability,
+  ParkingPricing,
+  ParkingSegmentSummary,
+} from '@/types/parking-domain';
 import type { ParkingSegment } from '@/types/parking-segment';
-
-const FALLBACK_UPDATED_AT = '1970-01-01T00:00:00.000Z';
 
 export type ParkingSegmentSelectRow = Pick<
   ParkingSegmentRow,
@@ -16,7 +18,10 @@ export type ParkingSegmentSelectRow = Pick<
   | 'geoportal_class'
   | 'lat'
   | 'lon'
->;
+> &
+  Partial<
+    Pick<ParkingSegmentRow, 'parking_zone_id' | 'updated_at'>
+  >;
 
 function cleanText(value: unknown) {
   const cleaned = typeof value === 'string' ? value.trim() : '';
@@ -75,18 +80,40 @@ export function parkingSegmentFromRow(
 
   return {
     id,
-    street: cleanText(row.strasse),
+    zoneId:
+      typeof row.parking_zone_id === 'number' &&
+      Number.isFinite(row.parking_zone_id)
+        ? String(row.parking_zone_id)
+        : null,
+    streetName: cleanText(row.strasse),
+    sourceAreaName: cleanText(row.prm_name),
+    coordinates: { latitude: row.lat, longitude: row.lon },
     capacity:
       typeof row.angebot === 'number' && Number.isFinite(row.angebot)
         ? Math.max(0, row.angebot)
         : null,
-    description: cleanText(row.parkregel_beschreibung),
-    groupName: cleanText(row.parkregel_gruppe),
-    parkregelName: cleanText(row.parkregel_name),
-    prmName: cleanText(row.prm_name),
+    pricing: pricingFor(
+      cleanText(row.parkregel_gruppe),
+      cleanText(row.parkregel_name),
+      cleanText(row.parkregel_beschreibung),
+    ),
+    availability: availabilityFor(
+      id,
+      typeof row.angebot === 'number' && Number.isFinite(row.angebot)
+        ? Math.max(0, row.angebot)
+        : null,
+      cleanText(row.updated_at),
+    ),
+    regulation: {
+      description: cleanText(row.parkregel_beschreibung),
+      groupName: cleanText(row.parkregel_gruppe),
+      name: cleanText(row.parkregel_name),
+      maximumStayMinutes: maxStayFor(
+        cleanText(row.parkregel_beschreibung),
+      ),
+    },
     geoportalClass: cleanText(row.geoportal_class),
-    lat: row.lat,
-    lon: row.lon,
+    updatedAt: cleanText(row.updated_at),
   };
 }
 
@@ -101,7 +128,7 @@ function hashString(value: string) {
   return hash >>> 0;
 }
 
-function priceFor(groupName: string | null) {
+function inferredHourlyRate(groupName: string | null) {
   if (groupName?.startsWith('Kurzzeitparken')) {
     return 2.5;
   }
@@ -114,33 +141,81 @@ function priceFor(groupName: string | null) {
   return null;
 }
 
+const EXPLICIT_FREE_PATTERN = /\b(kostenlos|gebührenfrei|entgeltfrei)\b/i;
+
+export function pricingFor(
+  groupName: string | null,
+  regulationName: string | null,
+  description: string | null,
+): ParkingPricing {
+  const sourceText = [groupName, regulationName, description]
+    .filter((value): value is string => value !== null)
+    .join(' ');
+  if (EXPLICIT_FREE_PATTERN.test(sourceText)) {
+    return { status: 'free', currency: 'EUR' };
+  }
+
+  const hourlyRate = inferredHourlyRate(groupName);
+  if (hourlyRate !== null) {
+    return {
+      status: 'paid',
+      currency: 'EUR',
+      hourlyRate,
+      dailyRate: null,
+    };
+  }
+
+  return { status: 'unknown', currency: 'EUR' };
+}
+
 function maxStayFor(description: string | null) {
   const match = description?.match(/(\d+)\s*h/i);
   return match ? Number(match[1]) * 60 : null;
 }
 
-export function parkingSegmentToMapRecord(
-  segment: ParkingSegment,
-): ParkingMapRecord {
-  const capacity = segment.capacity ?? 0;
-  const available = capacity === 0 ? 0 : hashString(segment.id) % (capacity + 1);
+export function availabilityFor(
+  id: string,
+  capacity: number | null,
+  observedAt: string | null,
+): ParkingAvailability {
+  if (capacity === null) {
+    return {
+      status: 'unknown',
+      availableSpaces: null,
+      totalSpaces: null,
+      percent: null,
+      confidence: null,
+      observedAt: null,
+    };
+  }
 
+  const availableSpaces =
+    capacity === 0 ? 0 : hashString(id) % (capacity + 1);
+  return {
+    status: 'estimated',
+    availableSpaces,
+    totalSpaces: capacity,
+    percent:
+      capacity === 0
+        ? null
+        : Math.round((availableSpaces / capacity) * 100),
+    confidence: null,
+    observedAt,
+  };
+}
+
+export function parkingSegmentToSummary(
+  segment: ParkingSegment,
+): ParkingSegmentSummary {
   return {
     id: segment.id,
-    latitude: segment.lat,
-    longitude: segment.lon,
-    zoneId: segment.prmName ?? segment.street ?? segment.id,
-    zoneName: segment.prmName ?? segment.street ?? 'Unnamed parking segment',
-    parkingZoneId: null,
-    parkingZoneName: null,
-    capacity,
-    available,
-    availabilityPercent:
-      capacity === 0 ? 0 : Math.round((available / capacity) * 100),
-    updatedAt: FALLBACK_UPDATED_AT,
-    pricePerHour: priceFor(segment.groupName),
-    maxStay: maxStayFor(segment.description),
-    restrictions: segment.description ?? '',
-    type: 'zone',
+    zoneId: segment.zoneId,
+    streetName: segment.streetName,
+    sourceAreaName: segment.sourceAreaName,
+    coordinates: segment.coordinates,
+    capacity: segment.capacity,
+    pricing: segment.pricing,
+    availability: segment.availability,
+    updatedAt: segment.updatedAt,
   };
 }

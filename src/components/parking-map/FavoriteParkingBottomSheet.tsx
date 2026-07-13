@@ -69,9 +69,12 @@ function formatDistance(distance?: number) {
   return `${walkingMinutes} min walk`;
 }
 
-function FavoriteProgressRing({ percentage }: { percentage: number }) {
-  const theme = getAvailabilityTheme(percentage);
-  const ringOffset = RING_CIRCUMFERENCE * (1 - percentage / 100);
+function FavoriteProgressRing({ percentage }: { percentage: number | null }) {
+  const theme = getAvailabilityTheme(percentage ?? 0);
+  const ringOffset =
+    percentage === null
+      ? RING_CIRCUMFERENCE
+      : RING_CIRCUMFERENCE * (1 - percentage / 100);
 
   return (
     <View className="items-center justify-center">
@@ -93,7 +96,7 @@ function FavoriteProgressRing({ percentage }: { percentage: number }) {
           cy={RING_SIZE / 2}
           fill="none"
           r={RING_RADIUS}
-          stroke={theme.ring}
+          stroke={percentage === null ? '#94A3B8' : theme.ring}
           strokeDasharray={`${RING_CIRCUMFERENCE} ${RING_CIRCUMFERENCE}`}
           strokeDashoffset={ringOffset}
           strokeLinecap="round"
@@ -102,9 +105,12 @@ function FavoriteProgressRing({ percentage }: { percentage: number }) {
       </Svg>
       <Text
         className="absolute text-[11px] font-extrabold"
-        style={{ color: theme.text, fontVariant: ['tabular-nums'] }}
+        style={{
+          color: percentage === null ? '#64748B' : theme.text,
+          fontVariant: ['tabular-nums'],
+        }}
       >
-        {percentage}%
+        {percentage === null ? '—' : `${percentage}%`}
       </Text>
     </View>
   );
@@ -129,7 +135,10 @@ const FavoriteSpotRow = memo(function FavoriteSpotRow({
   onOpenRow: (id: string) => void;
   onPress: (item: ParkingClusterResponse) => void;
 }) {
-  const percentage = clampPercentage(item.availabilityPercent);
+  const percentage =
+    item.availabilityStatus === 'unknown'
+      ? null
+      : clampPercentage(item.availabilityPercent);
   const title = item.bestSpot.zoneName || 'Parking Area';
   const distanceLabel = formatDistance(item.distanceToDestination);
   const translateX = useSharedValue(0);
@@ -343,7 +352,9 @@ const FavoriteSpotRow = memo(function FavoriteSpotRow({
               </Text>
               <View className="mt-1 flex-row items-center">
                 <Text className="text-[13px] font-bold text-slate-600">
-                  {percentage}% available
+                  {percentage === null
+                    ? 'Availability unavailable'
+                    : `${percentage}% estimated available`}
                 </Text>
                 {distanceLabel ? (
                   <Text className="ml-2 text-[13px] font-semibold text-slate-400">
@@ -374,7 +385,8 @@ export function FavoriteParkingBottomSheet({
   const sheetRef = useRef<ComponentRef<typeof BottomSheet>>(null);
   const pendingSpotRef = useRef<ParkingClusterResponse | null>(null);
   const insets = useSafeAreaInsets();
-  const { favoriteItems, removeFavorite } = useFavoriteParking();
+  const { favoriteItems, refreshFavorites, removeFavorite } =
+    useFavoriteParking();
   const [openRowId, setOpenRowId] = useState<string | null>(null);
   const snapPoints = useMemo(() => ['18%', '70%'], []);
   const animationConfigs = useBottomSheetSpringConfigs({
@@ -383,6 +395,10 @@ export function FavoriteParkingBottomSheet({
     overshootClamping: false,
     stiffness: 280,
   });
+
+  useEffect(() => {
+    void refreshFavorites();
+  }, [refreshFavorites]);
 
   const closeOpenRow = useCallback(() => {
     setOpenRowId(null);
@@ -475,10 +491,10 @@ export function FavoriteParkingBottomSheet({
               <Heart color="#E11D48" size={28} strokeWidth={2.2} />
             </View>
             <Text className="text-[18px] font-extrabold text-slate-950">
-              No favorite spots yet
+              No favorite parking areas yet
             </Text>
             <Text className="mt-2 text-center text-[14px] font-medium leading-5 text-slate-500">
-              Tap the heart on a parking spot to add it here.
+              Tap the heart on a parking area to add it here.
             </Text>
           </Animated.View>
         }
@@ -486,16 +502,16 @@ export function FavoriteParkingBottomSheet({
           <View className="mb-5 flex-row items-center justify-between">
             <View className="flex-1 pr-3">
               <Text className="text-[26px] font-extrabold text-slate-950">
-                Favorite spots
+                Favorite parking areas
               </Text>
               <Text className="mt-1 text-[14px] font-semibold text-slate-500">
                 {favoriteItems.length === 1
-                  ? '1 favorited parking spot'
-                  : `${favoriteItems.length} favorited parking spots`}
+                  ? '1 favorite parking area'
+                  : `${favoriteItems.length} favorite parking areas`}
               </Text>
             </View>
             <Pressable
-              accessibilityLabel="Close favorite spots"
+              accessibilityLabel="Close favorite parking areas"
               accessibilityRole="button"
               className="h-11 w-11 items-center justify-center rounded-full bg-white active:bg-slate-100"
               hitSlop={8}

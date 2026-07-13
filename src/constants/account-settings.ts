@@ -248,7 +248,11 @@ export function getAppDataSettings({
     {
       id: 'favorites',
       title: 'View favorites',
-      subtitle: countLabel(favoriteCount, 'favorite spot', 'favorite spots'),
+      subtitle: countLabel(
+        favoriteCount,
+        'favorite parking area',
+        'favorite parking areas',
+      ),
       icon: Heart,
       type: 'navigation',
       navigationTarget: '/favorites',
@@ -256,10 +260,10 @@ export function getAppDataSettings({
       group: 'app-data',
       accessibilityLabel: `View favorites, ${countLabel(
         favoriteCount,
-        'favorite spot',
-        'favorite spots',
+        'favorite parking area',
+        'favorite parking areas',
       )}`,
-      accessibilityHint: 'Opens favorite parking spots on the map',
+      accessibilityHint: 'Opens favorite parking areas on the map',
     },
     {
       id: 'location-permission',

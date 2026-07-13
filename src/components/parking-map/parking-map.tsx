@@ -21,7 +21,7 @@ import {
   MAP_ELEVATIONS,
   MAP_LAYERS,
 } from '@/components/parking-map/map-layers';
-import { MAP_DETAIL_THRESHOLDS } from '@/components/parking-map/map-detail-level';
+import { PARKING_SEMANTIC_ZOOM_THRESHOLDS } from '@/components/parking-map/map-detail-level';
 import {
   ParkingBottomSheet,
   type ParkingBottomSheetHandle,
@@ -35,14 +35,17 @@ import { UserLocationMarker } from '@/components/parking-map/user-location-marke
 import { useParkingMarkerPipeline } from '@/components/parking-map/use-parking-marker-pipeline';
 import { useFavoriteParking } from '@/context/FavoriteParkingContext';
 import { useMapOverlay } from '@/context/MapOverlayContext';
-import { useMapDetailLevel } from '@/hooks/use-map-detail-level';
-import { useParkingClusters } from '@/hooks/use-parking-clusters';
+import { useParkingMapData } from '@/hooks/use-parking-map-data';
 import {
   MUNICH_CENTER,
   MUNICH_OVERVIEW_CAMERA,
 } from '@/hooks/use-map-location';
 import { useParkingZones } from '@/hooks/use-parking-zones';
 import type { PlaceSearchResult } from '@/hooks/use-google-place-search';
+import type {
+  ParkingCellSummary,
+  ParkingZoneSummary,
+} from '@/types/parking-domain';
 import type {
   ParkingCameraState,
   ParkingClusterResponse,
@@ -54,10 +57,7 @@ import {
   haversineDistanceMeters,
   isCoordinateInsideBounds,
 } from '@/utils/parking-map-geo';
-import {
-  getZoneFocusZoom,
-  type ParkingZoneSummary,
-} from '@/utils/parking-zones';
+import { getZoneFocusZoom } from '@/utils/parking-zones';
 import {
   getCuratedNearbyParkingSpots,
   SEARCH_NEARBY_RESULT_LIMIT,
@@ -190,6 +190,7 @@ type SearchSpotsSnapshot = {
 
 type SearchParkingRequest = {
   key: string;
+  origin: ParkingCoordinates;
   startedAtVersion: number;
 };
 
@@ -253,9 +254,10 @@ export function ParkingMap({
     loadedRequestVersion,
     onCameraMove,
     requestParkingForCamera,
-    visibleClusters,
+    layerState,
+    semanticStage,
     visibleSpots,
-  } = useParkingClusters(
+  } = useParkingMapData(
     initialCamera,
     destination,
     mapSize,
@@ -332,6 +334,10 @@ export function ParkingMap({
       return;
     }
 
+    const searchOrigin = searchParkingRequest?.origin ?? {
+      latitude: selectedSearchPlace.latitude,
+      longitude: selectedSearchPlace.longitude,
+    };
     const activeRequestKey = searchParkingRequest?.key ?? null;
     const snapshotMatchesPlace =
       searchSpotsSnapshot !== null &&
@@ -353,7 +359,7 @@ export function ParkingMap({
       searchParkingRequest !== null &&
       loadedRequestVersion > searchParkingRequest.startedAtVersion &&
       loadedRequestBounds !== null &&
-      isCoordinateInsideBounds(selectedSearchPlace, loadedRequestBounds);
+      isCoordinateInsideBounds(searchOrigin, loadedRequestBounds);
     // Last resort: usable data near the destination always resolves the
     // search, because the clustering hook can silently drop the tracked
     // fetch (dedupe/supersede) and neither condition above would ever pass.
@@ -361,7 +367,7 @@ export function ParkingMap({
       visibleSpots.length > 0 &&
       visibleSpots.some(
         (spot) =>
-          haversineDistanceMeters(spot, selectedSearchPlace) <=
+          haversineDistanceMeters(spot, searchOrigin) <=
           SEARCH_FALLBACK_ACCEPT_RADIUS_METERS,
       );
 
@@ -379,7 +385,7 @@ export function ParkingMap({
           placeId: selectedSearchPlace.placeId,
           placeInsideLoadedBounds:
             loadedRequestBounds !== null &&
-            isCoordinateInsideBounds(selectedSearchPlace, loadedRequestBounds),
+            isCoordinateInsideBounds(searchOrigin, loadedRequestBounds),
           reason:
             searchParkingRequest === null
               ? 'no active parking request yet'
@@ -395,10 +401,7 @@ export function ParkingMap({
     }
 
     const curatedNearbyResults = getCuratedNearbyParkingSpots({
-      origin: {
-        latitude: selectedSearchPlace.latitude,
-        longitude: selectedSearchPlace.longitude,
-      },
+      origin: searchOrigin,
       spots: visibleSpots,
       limit: SEARCH_NEARBY_RESULT_LIMIT,
     });
@@ -442,7 +445,12 @@ export function ParkingMap({
       : EMPTY_SEARCH_SPOTS;
   const isSearchParkingLoading =
     selectedSearchPlace !== null &&
-    searchSpotsSnapshot?.placeId !== selectedSearchPlace.placeId;
+    searchSpotsSnapshot?.placeId !== selectedSearchPlace.placeId &&
+    layerState.status !== 'error';
+  const searchParkingError =
+    selectedSearchPlace !== null && layerState.status === 'error'
+      ? layerState.error
+      : null;
   // Only the top recommendations become map markers. While a new place's
   // results load, the previous snapshot keeps its markers on screen so the
   // layer crossfades instead of blanking out.
@@ -484,8 +492,8 @@ export function ParkingMap({
     selectedSearchPlace,
   ]);
 
-  const detailLevel = useMapDetailLevel(displayCamera);
   const {
+    projectedCellSummaries,
     projectedMarkers,
     projectedSearchDestination,
     projectedUserLocation,
@@ -493,7 +501,7 @@ export function ParkingMap({
   } = useParkingMarkerPipeline({
     activeOverlay,
     currentRegion,
-    detailLevel,
+    semanticStage: layerState.visibleStage,
     displayCamera,
     highlightedSearchSpots,
     isAutomaticParkingFetchEnabled,
@@ -501,16 +509,16 @@ export function ParkingMap({
     loadedRequestBounds,
     mapMode,
     mapSize,
-    parkingZonePolygons,
+    layerFeatures: layerState.visibleFeatures,
     selectedParkingItem,
     selectedSearchPlace,
     userLocation,
-    visibleClusters,
-    visibleSpots,
   });
   const nativeZonePolygons = useMemo(
     () =>
-      mapMode === 'munichOverview' || detailLevel === 'overview'
+      mapMode === 'munichOverview' ||
+      semanticStage === 'city' ||
+      semanticStage === 'zone'
         ? parkingZonePolygons.map((polygon) => ({
             id: polygon.id,
             coordinates: polygon.coordinates,
@@ -519,7 +527,7 @@ export function ParkingMap({
             lineWidth: 1,
           }))
         : [],
-    [detailLevel, mapMode, parkingZonePolygons],
+    [mapMode, parkingZonePolygons, semanticStage],
   );
 
   const canFocusCamera = useCallback(
@@ -753,7 +761,7 @@ export function ParkingMap({
 
       const startedAtVersion = loadedRequestVersion;
       const key = requestParkingForCamera(searchCamera);
-      setSearchParkingRequest({ key, startedAtVersion });
+      setSearchParkingRequest({ key, origin: coordinates, startedAtVersion });
 
       runOrQueueCameraCommand({
         duration: 360,
@@ -897,7 +905,7 @@ export function ParkingMap({
       cancelPendingCameraFocus();
       const currentZoom = Number.isFinite(displayCamera.zoom)
         ? displayCamera.zoom
-        : MAP_DETAIL_THRESHOLDS.spotDetailEnterZoom;
+        : PARKING_SEMANTIC_ZOOM_THRESHOLDS.segmentEnter;
       // Always zoom in at least one level so repeated taps make progress
       // even when supercluster reports an expansion zoom we already passed.
       const targetZoom = Math.min(
@@ -951,11 +959,12 @@ export function ParkingMap({
         parkingZonePolygons,
         summary.zoneId,
         mapSize.width,
-        MAP_DETAIL_THRESHOLDS.spotDetailEnterZoom + 0.2,
+        PARKING_SEMANTIC_ZOOM_THRESHOLDS.cellEnter + 0.15,
+        PARKING_SEMANTIC_ZOOM_THRESHOLDS.segmentClusterEnter - 0.2,
       );
       const coordinates = {
-        latitude: summary.latitude,
-        longitude: summary.longitude,
+        latitude: summary.representativePoint.latitude,
+        longitude: summary.representativePoint.longitude,
       };
 
       setMapMode('focusedArea');
@@ -974,6 +983,52 @@ export function ParkingMap({
       parkingZonePolygons,
       requestParkingForCamera,
     ],
+  );
+
+  const handleCellSummaryPress = useCallback(
+    (summary: ParkingCellSummary) => {
+      cancelPendingCameraFocus();
+      const targetZoom =
+        PARKING_SEMANTIC_ZOOM_THRESHOLDS.segmentClusterEnter + 0.2;
+      setMapMode('focusedArea');
+      setAutomaticParkingFetchEnabled(true);
+      requestParkingForCamera({ ...summary.center, zoom: targetZoom });
+      focusLocationSafely(
+        summary.center,
+        'Unable to focus the parking area',
+        targetZoom,
+      );
+    },
+    [
+      cancelPendingCameraFocus,
+      focusLocationSafely,
+      requestParkingForCamera,
+    ],
+  );
+
+  const handleZonePolygonPress = useCallback(
+    (polygon: { id?: string }) => {
+      if (!polygon.id) {
+        return;
+      }
+      const zoneId = polygon.id.split(':')[0];
+      const feature = layerState.visibleFeatures.find(
+        (candidate) =>
+          candidate.kind === 'zone' && candidate.zoneId === zoneId,
+      );
+      if (!feature || feature.kind !== 'zone') {
+        return;
+      }
+      const targetZoom = PARKING_SEMANTIC_ZOOM_THRESHOLDS.zoneEnter + 0.2;
+      setMapMode('focusedArea');
+      setAutomaticParkingFetchEnabled(true);
+      focusLocationSafely(
+        feature.coordinates,
+        'Unable to focus the parking zone',
+        targetZoom,
+      );
+    },
+    [focusLocationSafely, layerState.visibleFeatures],
   );
 
   const handleSelectSearchPlace = useCallback(
@@ -1019,16 +1074,23 @@ export function ParkingMap({
       longitude: displayCamera.longitude,
       zoom: Number.isFinite(displayCamera.zoom)
         ? displayCamera.zoom
-        : MAP_DETAIL_THRESHOLDS.spotDetailEnterZoom,
+        : PARKING_SEMANTIC_ZOOM_THRESHOLDS.segmentEnter,
       latitudeDelta: displayCamera.latitudeDelta,
       longitudeDelta: displayCamera.longitudeDelta,
     };
     const startedAtVersion = loadedRequestVersion;
     const key = requestParkingForCamera(camera);
     // A new request key invalidates the snapshot; the effect above rebuilds
-    // recommendations from the freshly fetched area once the fetch lands,
-    // still ranked by distance to the searched destination.
-    setSearchParkingRequest({ key, startedAtVersion });
+    // recommendations from the freshly fetched area and ranks them from the
+    // visible map center, matching the action label.
+    setSearchParkingRequest({
+      key,
+      origin: {
+        latitude: displayCamera.latitude,
+        longitude: displayCamera.longitude,
+      },
+      startedAtVersion,
+    });
   }, [
     displayCamera.latitude,
     displayCamera.latitudeDelta,
@@ -1377,7 +1439,7 @@ export function ParkingMap({
           cameraPosition={cameraPosition}
           onCameraMove={handleCameraMove}
           onMapClick={handleMapPress}
-          onPolygonClick={handleMapPress}
+          onPolygonClick={handleZonePolygonPress}
           polygons={nativeZonePolygons}
           properties={APPLE_MAP_PROPERTIES}
           style={MAP_VIEW_STYLE}
@@ -1389,7 +1451,7 @@ export function ParkingMap({
           cameraPosition={cameraPosition}
           onCameraMove={handleCameraMove}
           onMapClick={handleMapPress}
-          onPolygonClick={handleMapPress}
+          onPolygonClick={handleZonePolygonPress}
           polygons={nativeZonePolygons}
           properties={GOOGLE_MAP_PROPERTIES}
           style={MAP_VIEW_STYLE}
@@ -1402,12 +1464,14 @@ export function ParkingMap({
       )}
 
       <ParkingMarkerOverlay
-        detailLevel={detailLevel}
+        semanticStage={layerState.visibleStage}
         isMapMoving={isMapMoving}
         isSearchRecommendationMode={isSearchRecommendationMode}
         onMarkerPress={handleMarkerPress}
+        onCellSummaryPress={handleCellSummaryPress}
         onZoneSummaryPress={handleZoneSummaryPress}
         projectedMarkers={projectedMarkers}
+        projectedCellSummaries={projectedCellSummaries}
         projectedZoneSummaries={projectedZoneSummaries}
         selectedParkingItemId={selectedParkingItem?.id}
       />
@@ -1578,6 +1642,7 @@ export function ParkingMap({
         />
 
         <SearchNearestSpotsBottomSheet
+          errorMessage={searchParkingError}
           isLoading={isSearchParkingLoading}
           onClose={closeSearchResults}
           onSpotPress={handleSearchSpotPress}
@@ -1587,6 +1652,11 @@ export function ParkingMap({
 
         {activeOverlay === 'parking' ? (
           <ParkingListBottomSheet
+            errorMessage={
+              visibleSpots.length === 0 && layerState.status === 'error'
+                ? layerState.error
+                : null
+            }
             onClose={closeOverlay}
             onSpotPress={handleParkingOverlaySpotPress}
             spots={visibleSpots}
