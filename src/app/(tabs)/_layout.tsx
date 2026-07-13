@@ -1,7 +1,9 @@
 import { useCallback, useEffect } from 'react';
 import { Stack, usePathname, useRouter } from 'expo-router';
 import { BackHandler, View } from 'react-native';
-import BottomNavBar from '@/components/BottomNavBar';
+import BottomNavBar, {
+  type NavItemKey,
+} from '@/components/BottomNavBar';
 import { FavoriteParkingProvider } from '@/context/FavoriteParkingContext';
 import { PreferencesProvider } from '@/context/PreferencesContext';
 import {
@@ -56,14 +58,14 @@ function TabNavigation() {
     [isMapRoute, router, toggleOverlay],
   );
 
-  const activeKey =
+  const activeKey: NavItemKey =
     isAccountRoute
       ? 'profile'
       : activeOverlay === 'favorites'
         ? 'favorite'
         : activeOverlay === 'search'
           ? 'search'
-          : undefined;
+          : 'search';
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>

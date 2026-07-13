@@ -25,6 +25,7 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react-native';
+import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   MAP_ELEVATIONS,
@@ -65,10 +66,10 @@ type NavItem = {
 };
 
 const ACTIVE_COLOR = '#FFFFFF';
-const INACTIVE_COLOR = 'rgba(255,255,255,0.52)';
+const INACTIVE_COLOR = 'rgba(255,255,255,0.64)';
 const MORPH_DURATION = 320;
-const SEARCH_BAR_HEIGHT = 56;
-const NAVBAR_HEIGHT = 76;
+const SEARCH_BAR_HEIGHT = 54;
+const NAVBAR_HEIGHT = 66;
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const SearchResultRow = memo(function SearchResultRow({
@@ -120,11 +121,28 @@ const NavigationItem = memo(function NavigationItem({
   active: boolean;
 }) {
   const pressedScale = useSharedValue(1);
+  const activeProgress = useSharedValue(active ? 1 : 0);
   const Icon = item.icon;
   const color = active ? ACTIVE_COLOR : INACTIVE_COLOR;
 
+  useEffect(() => {
+    activeProgress.value = withTiming(active ? 1 : 0, { duration: 180 });
+  }, [active, activeProgress]);
+
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pressedScale.value }],
+  }));
+  const activeStyle = useAnimatedStyle(() => ({
+    backgroundColor: interpolateColor(
+      activeProgress.value,
+      [0, 1],
+      ['rgba(255,255,255,0)', 'rgba(255,255,255,0.1)'],
+    ),
+    borderColor: interpolateColor(
+      activeProgress.value,
+      [0, 1],
+      ['rgba(255,255,255,0)', 'rgba(255,255,255,0.13)'],
+    ),
   }));
 
   return (
@@ -142,14 +160,20 @@ const NavigationItem = memo(function NavigationItem({
       }}
       style={styles.navigationItem}
     >
-      <Animated.View style={[styles.navigationItemContent, animatedStyle]}>
+      <Animated.View
+        style={[
+          styles.navigationItemContent,
+          activeStyle,
+          animatedStyle,
+        ]}
+      >
         <View
           style={[
             styles.navigationIcon,
             active ? styles.navigationIconActive : null,
           ]}
         >
-          <Icon color={color} size={20} strokeWidth={active ? 2.4 : 2.05} />
+          <Icon color={color} size={19} strokeWidth={active ? 2.45 : 2.05} />
         </View>
         <Text numberOfLines={1} style={[styles.navigationLabel, { color }]}>
           {item.label}
@@ -195,9 +219,9 @@ export default function BottomNavBar({
     selectSuggestion,
     setQuery,
   } = useGooglePlaceSearch();
-  const normalWidth = Math.min(windowWidth - 24, 420);
+  const normalWidth = Math.min(windowWidth - 48, 336);
   const searchWidth = Math.min(windowWidth - 32, 420);
-  const bottomOffset = Math.max(insets.bottom, 10) + 10;
+  const bottomOffset = Math.max(insets.bottom, 8) + 12;
   const normalTop = windowHeight - bottomOffset - NAVBAR_HEIGHT;
   const searchTop = insets.top + 12;
   const searchTranslateY = searchTop - normalTop;
@@ -339,6 +363,14 @@ export default function BottomNavBar({
       ],
     ),
   }));
+  const surfaceShadeStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      morphProgress.value,
+      [0, 0.35],
+      [1, 0],
+      Extrapolation.CLAMP,
+    ),
+  }));
   const navStyle = useAnimatedStyle(() => ({
     opacity: interpolate(
       morphProgress.value,
@@ -415,6 +447,16 @@ export default function BottomNavBar({
         style={[styles.wrapper, { bottom: bottomOffset }, wrapperStyle]}
       >
         <Animated.View style={[styles.morphSurface, surfaceStyle]}>
+          <BlurView
+            intensity={34}
+            pointerEvents="none"
+            style={styles.surfaceBlur}
+            tint="dark"
+          />
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.surfaceShade, surfaceShadeStyle]}
+          />
           <Animated.View
             pointerEvents={isSearchActive ? 'none' : 'auto'}
             style={[styles.normalContent, navStyle]}
@@ -556,19 +598,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   morphSurface: {
-    borderRadius: 32,
+    borderRadius: 30,
     borderCurve: 'continuous',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    boxShadow: '0 10px 24px rgba(0,0,0,0.24)',
+    borderColor: 'rgba(255,255,255,0.12)',
+    boxShadow: '0 14px 32px rgba(2,6,23,0.28)',
     overflow: 'hidden',
+  },
+  surfaceBlur: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  surfaceShade: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15,23,42,0.12)',
   },
   normalContent: {
     ...StyleSheet.absoluteFillObject,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingLeft: 8,
-    paddingRight: 8,
+    paddingHorizontal: 6,
   },
   searchContent: {
     ...StyleSheet.absoluteFillObject,
@@ -601,29 +649,33 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   navigationItemContent: {
-    minWidth: 46,
+    minWidth: 72,
+    minHeight: 54,
     alignItems: 'center',
     justifyContent: 'center',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0)',
     gap: 3,
   },
   navigationIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 29,
+    height: 29,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'transparent',
   },
   navigationIconActive: {
-    backgroundColor: 'rgba(59,130,246,0.22)',
+    backgroundColor: 'rgba(96,165,250,0.22)',
     borderWidth: 1,
-    borderColor: 'rgba(147,197,253,0.22)',
+    borderColor: 'rgba(191,219,254,0.22)',
   },
   navigationLabel: {
-    fontSize: 8,
-    lineHeight: 9,
+    fontSize: 8.5,
+    lineHeight: 10,
     fontWeight: '800',
-    letterSpacing: 0.45,
+    letterSpacing: 0.35,
   },
   activeDot: {
     width: 4,
