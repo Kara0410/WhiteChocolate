@@ -1,4 +1,5 @@
 // Import the compiled Tailwind stylesheet — must happen once at the app root.
+import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import '../../global.css';
 
@@ -13,6 +14,7 @@ import {
 } from '@/context/OnboardingContext';
 import { AccountProvider } from '@/context/AccountContext';
 import { AuthSheetProvider } from '@/context/AuthSheetContext';
+import { cleanupLegacyGarageStorage } from '@/utils/legacy-storage-cleanup';
 
 // SafeAreaView is a third-party component; NativeWind doesn't patch it automatically.
 // cssInterop wires its className prop to the underlying style prop.
@@ -54,6 +56,10 @@ function RootStack() {
 }
 
 export default function RootLayout() {
+  useEffect(() => {
+    void cleanupLegacyGarageStorage();
+  }, []);
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AccountProvider>

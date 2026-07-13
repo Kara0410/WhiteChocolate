@@ -17,7 +17,6 @@ import {
 } from 'react-native';
 import {
   ArrowLeft,
-  CarFront,
   Heart,
   Info,
   LocateFixed,
@@ -69,14 +68,14 @@ const STEPS: OnboardingStep[] = [
     id: 'account',
     title: 'Create a free account',
     subtitle:
-      'Create an account to unlock all features and keep your parking setup in sync across devices.',
+      'Create an account to save favorites and keep parking preferences ready for future sync.',
     icon: User,
   },
   {
     id: 'ready',
     title: 'Ready to explore',
     subtitle:
-      `Use ${APP_DISPLAY_NAME} as a guest, or create an account later to sync favorites and vehicles.`,
+      `Use ${APP_DISPLAY_NAME} as a guest, or create an account later to save favorites and preferences.`,
     icon: Navigation,
   },
 ];
@@ -118,7 +117,7 @@ function FeatureIcons() {
         <Heart color="#E11D48" size={23} strokeWidth={2.5} />
       </View>
       <View className="h-14 w-14 items-center justify-center rounded-[22px] bg-amber-50">
-        <CarFront color="#D97706" size={24} strokeWidth={2.5} />
+        <Info color="#D97706" size={24} strokeWidth={2.5} />
       </View>
     </View>
   );
@@ -598,11 +597,6 @@ export default function OnboardingScreen() {
                         title="Save your favorites"
                       />
                       <AccountBenefitRow
-                        icon={CarFront}
-                        subtitle="Store your vehicles in your garage for quick access."
-                        title="Manage your vehicles"
-                      />
-                      <AccountBenefitRow
                         icon={Info}
                         showDivider={false}
                         subtitle="Get details like prices, regulations, and availability where available."
@@ -633,7 +627,7 @@ export default function OnboardingScreen() {
                       <Lock color="#94A3B8" size={18} strokeWidth={2.4} />
                       <Text className="ml-3 flex-1 text-[13px] font-semibold leading-5 text-slate-400">
                         Sign in with the same email and password when you want
-                        to sync favorites and vehicles.
+                        to use account features.
                       </Text>
                     </View>
                   </>

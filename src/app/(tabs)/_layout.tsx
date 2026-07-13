@@ -3,7 +3,6 @@ import { Stack, usePathname, useRouter } from 'expo-router';
 import { BackHandler, View } from 'react-native';
 import BottomNavBar from '@/components/BottomNavBar';
 import { FavoriteParkingProvider } from '@/context/FavoriteParkingContext';
-import { VehicleProvider } from '@/context/VehicleContext';
 import { PreferencesProvider } from '@/context/PreferencesContext';
 import {
   MapOverlayProvider,
@@ -58,23 +57,20 @@ function TabNavigation() {
   );
 
   const activeKey =
-    pathname.endsWith('/garage')
-      ? 'car'
-      : isAccountRoute
+    isAccountRoute
       ? 'profile'
       : activeOverlay === 'favorites'
         ? 'favorite'
         : activeOverlay === 'search'
           ? 'search'
           : activeOverlay === 'parking'
-            ? 'car'
+            ? 'parking'
             : 'parking';
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="map" />
-        <Stack.Screen name="garage" />
         <Stack.Screen name="list" />
         <Stack.Screen name="favorites" />
         <Stack.Screen name="account" />
@@ -94,15 +90,6 @@ function TabNavigation() {
           if (!isMapRoute) {
             router.replace('/map');
           }
-        }}
-        onCarPress={() => {
-          if (!account.isSignedIn) {
-            showCreateAccountSheet({ origin: 'garage-tab' });
-            return;
-          }
-
-          closeOverlay();
-          router.push('/garage');
         }}
         onFavoritePress={() => {
           if (!account.isSignedIn) {
@@ -127,13 +114,11 @@ function TabNavigation() {
 export default function TabLayout() {
   return (
     <FavoriteParkingProvider>
-      <VehicleProvider>
-        <PreferencesProvider>
-          <MapOverlayProvider>
-            <TabNavigation />
-          </MapOverlayProvider>
-        </PreferencesProvider>
-      </VehicleProvider>
+      <PreferencesProvider>
+        <MapOverlayProvider>
+          <TabNavigation />
+        </MapOverlayProvider>
+      </PreferencesProvider>
     </FavoriteParkingProvider>
   );
 }

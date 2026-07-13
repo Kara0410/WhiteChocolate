@@ -1,43 +1,44 @@
 # Account Cloud Sync
 
-Status: **Phase 4A implemented (2026-07-03)** — sync infrastructure, pure
+Status: **Phase 4A implemented (2026-07-03)** - sync infrastructure, pure
 merge helpers, and the sync decision engine. **No live upload/download
 exists yet**, and **no sync UI exists yet**; both are Phase 4B.
 
-## What exists after Phase 4A
+The saved Garage/user-vehicle feature was removed later. Migration
+`20260712000300_remove_user_vehicles.sql` drops the old `user_vehicles` table
+without rewriting the historical auth foundation migrations.
 
-Everything lives in `src/services/sync/` and is free of React and network
-I/O. The only Supabase artifact used is the generated `Database` type
-(`src/types/database.ts`, regenerated after the auth foundation migrations
-were applied — verified live on 2026-07-03).
+## What Exists After Phase 4A
+
+Everything lives in `src/services/sync/` and is free of React and network I/O.
+The generated Supabase `Database` type is in `src/types/database.ts`.
 
 | File | Purpose |
 | --- | --- |
 | `sync-types.ts` | Domains, statuses, strategies, error/result/state shapes |
-| `sync-decision.ts` | `determineSyncStrategy()` — pure decision engine |
+| `sync-decision.ts` | `determineSyncStrategy()` - pure decision engine |
 | `sync-results.ts` | Result/error/state constructors + `combineSyncResults()` |
-| `vehicle-merge.ts` | `mergeVehicles()` — pure garage merge |
-| `favorite-merge.ts` | `mergeFavorites()` — pure favorites merge |
-| `preference-merge.ts` | `mergePreferences()` — pure preferences merge |
+| `favorite-merge.ts` | `mergeFavorites()` - pure favorites merge |
+| `preference-merge.ts` | `mergePreferences()` - pure preferences merge |
 | `sync-manager.ts` | Local snapshot loader, remote snapshot placeholder, `determineAccountSyncState()` |
 | `index.ts` | Public surface of the sync layer |
 
-## Auth setup for this product phase
+## Auth Setup
 
-The app uses Supabase email + password authentication only. Do not enable
-magic links, email OTP codes, website callback URLs, or deep-link auth
-callbacks for this phase.
+The app uses Supabase email + password authentication only. Do not enable magic
+links, email OTP codes, website callback URLs, or deep-link auth callbacks for
+this phase.
 
 For immediate sign-in after registration, disable email confirmation in:
 Supabase Dashboard -> Authentication -> Providers -> Email -> Confirm email.
 
-## Sync domains
+## Sync Domains
 
-Three domains sync independently: `vehicles`, `favorites`, `preferences`
-(plus `'all'` for aggregate results). Preferences count as "1 item" for
-decision purposes when they differ from `DEFAULT_PREFERENCES`, else 0.
+Two domains sync independently: `favorites` and `preferences` (plus `'all'` for
+aggregate results). Preferences count as "1 item" for decision purposes when
+they differ from `DEFAULT_PREFERENCES`, else 0.
 
-## Decision strategies
+## Decision Strategies
 
 `determineSyncStrategy({ isAuthenticated, localCount, remoteCount, ... })`:
 
@@ -51,88 +52,68 @@ decision purposes when they differ from `DEFAULT_PREFERENCES`, else 0.
 | Empty device, account has data | `remoteRestore` |
 | Data on both sides | `merge` |
 
-`remoteOnly` is a reserved strategy no rule currently produces (Phase 4B's
-restore flow may use it transiently). Phase 4B must gate `localUpload`,
-`remoteRestore`, and `merge` behind an explicit user action on first login —
-the engine only says what a sync *would* do, never triggers one.
+`remoteOnly` is reserved; no rule currently produces it. Phase 4B must gate
+`localUpload`, `remoteRestore`, and `merge` behind an explicit user action on
+first login. The engine only says what a sync would do, never triggers one.
 
-## Merge rules (all pure, no I/O, inputs never mutated)
+## Merge Rules
 
-Common principles: **local data is never deleted by a merge**, malformed
-remote rows are dropped instead of corrupting local state, and identical
-content on both sides is not a conflict.
+Common principles: **local data is never deleted by a merge**, malformed remote
+rows are dropped instead of corrupting local state, and identical content on
+both sides is not a conflict.
 
-### Vehicles — key: normalized license plate
+### Favorites - key: favorite id (`segment_id` remotely)
 
-- Local-only plates are kept and become `uploadedCandidates`.
-- Remote-only rows are mapped to local `Vehicle` shape (`local_created_at`
-  preferred over `created_at`) and become `downloadedCandidates`.
-- Same plate, same nickname: the **local instance** is kept so local ids and
-  the active-vehicle id stay stable.
-- Same plate, different nickname: newer `updatedAt` wins if both sides have
-  one, otherwise **local wins**; local wins are re-uploaded.
-- Active vehicle: follows the local active vehicle's plate through the merge
-  (even if the remote version won and the id changed); falls back to the
-  remote `is_active` row, then the first vehicle, then null.
+- Remote rows are only usable if their `snapshot` passes the same validation as
+  locally stored favorites; the row's `segment_id` overrides the snapshot id.
+- Content comparison is key-order-insensitive because Postgres jsonb reorders
+  keys.
+- Differing content: **local wins**. Local favorites carry no timestamp, so a
+  remote timestamp alone is not proof of freshness.
 
-### Favorites — key: favorite id (`segment_id` remotely)
+### Preferences - wholesale winner, not per-key
 
-- Remote rows are only usable if their `snapshot` passes the same validation
-  as locally stored favorites; the row's `segment_id` overrides the snapshot
-  id. Unusable rows are skipped (they stay in the cloud untouched).
-- Content comparison is key-order-insensitive (Postgres jsonb reorders
-  keys). Differing content: **local wins** — local favorites carry no
-  timestamp, so a remote timestamp alone is not proof of freshness.
-
-### Preferences — wholesale winner, not per-key
-
-- The remote row is validated strictly: any corrupt field rejects the whole
-  row (field-level defaulting could otherwise let a garbage row overwrite
-  real local preferences with defaults).
-- Newest `updatedAt` wins **only when both sides have one**; local
-  preferences carry no timestamp today, so **local wins** in practice.
+- The remote row is validated strictly; any corrupt field rejects the whole row.
+- Newest `updatedAt` wins only when both sides have one. Local preferences carry
+  no timestamp today, so local wins in practice.
 - The result is always a complete `Preferences` object.
 
-## RLS assumptions (verified in migrations, applied 2026-07-03)
+## RLS Assumptions
 
-- All user tables have RLS enabled; every policy is scoped to
-  `(select auth.uid())`.
-- `anon` has zero grants on user tables — anonymous users cannot touch them,
-  and the client code never tries (`localOnly` strategy).
+The auth foundation migrations were applied and verified on 2026-07-03.
+
+- User tables have RLS enabled; every policy is scoped to `(select auth.uid())`.
+- `anon` has zero grants on user tables and the client code never tries to sync
+  anonymous data.
 - `authenticated` may select/insert/update/delete only its own rows in
-  `user_vehicles`, `user_favorites`, `user_preferences`.
-- `user_vehicles.license_plate_normalized` is a generated column mirroring
-  `normalizeLicensePlate()`, with a per-user unique constraint — uploads can
-  rely on `on conflict (user_id, license_plate_normalized)` upserts.
+  `user_favorites` and `user_preferences`.
+- A later migration, `20260712000300_remove_user_vehicles.sql`, removes the old
+  saved-vehicle table.
 
-## What sync does NOT do (current and planned)
+## What Sync Does Not Do
 
-- No live upload/download yet (Phase 4B).
-- No sync prompt/UI on the Account page yet (Phase 4B).
-- Never auto-uploads on first login — a user action is required by design.
+- No live upload/download yet.
+- No sync prompt/UI on the Account page yet.
+- Never auto-uploads on first login; a user action is required by design.
 - Never deletes local data; sign-out and sync failures leave it untouched.
-- No account deletion, no data export, no premium/RevenueCat, no
-  Apple/Google sign-in, no analytics.
+- No account deletion, no data export, no premium/RevenueCat, no Apple/Google
+  sign-in, no analytics.
 
-## Known limitations
+## Known Limitations
 
-- Local vehicles/favorites/preferences carry no reliable `updatedAt`, so
-  "newest wins" only activates for vehicles (which may have one) and
-  otherwise local wins — deliberate for the first implementation.
-- `pendingLocalCount`/`pendingRemoteCount` are raw item counts, not true
-  deltas; Phase 4B can refine once it knows what is already synced.
-- Favorites conflict resolution cannot distinguish "remote is genuinely
-  newer" until local favorites gain timestamps.
+- `pendingLocalCount`/`pendingRemoteCount` are raw item counts, not true deltas.
+- Favorites conflict resolution cannot distinguish "remote is genuinely newer"
+  until local favorites gain timestamps.
 
-## Phase 4B contract
+## Phase 4B Contract
 
 Phase 4B implements, without changing the helpers:
 
-1. `getRemoteSnapshot()` — real queries replacing
-   `getRemoteSnapshotPlaceholder()` (same `RemoteDataSnapshot` shape).
-2. Upload/upsert of `uploadedCandidates` per domain (idempotent, keyed on
-   the unique constraints above).
-3. A `useAccountSync()` coordinator observing `useAccount`, gating first
-   sync behind the prompt, applying merge results back through the context
-   `replace*`/storage helpers.
-4. Account page Cloud Sync card (statuses map 1:1 to `SyncStatus`).
+1. `getRemoteSnapshot()` - real queries replacing
+   `getRemoteSnapshotPlaceholder()` with the same `RemoteDataSnapshot` shape.
+2. Upload/upsert of merged candidates per domain, keyed on the relevant unique
+   constraints.
+3. A `useAccountSync()` coordinator observing `useAccount`, gating first sync
+   behind a prompt, and applying merge results back through context/storage
+   helpers.
+4. Account page Cloud Sync card with statuses mapping to `SyncStatus`.

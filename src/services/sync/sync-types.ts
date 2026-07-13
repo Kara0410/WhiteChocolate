@@ -7,13 +7,12 @@
  */
 
 /** Data domains that sync independently. */
-export type SyncDataDomain = 'vehicles' | 'favorites' | 'preferences';
+export type SyncDataDomain = 'favorites' | 'preferences';
 
 /** A data domain, or 'all' for aggregate results across every domain. */
 export type SyncDomain = SyncDataDomain | 'all';
 
 export const SYNC_DATA_DOMAINS: readonly SyncDataDomain[] = [
-  'vehicles',
   'favorites',
   'preferences',
 ];
@@ -60,9 +59,8 @@ export type SyncError = {
 
 /**
  * One same-key collision resolved during a merge. `key` is the merge key of
- * the domain: normalized license plate (vehicles), favorite/segment id
- * (favorites), or preference key (preferences). Identical copies on both
- * sides are not conflicts — only differing content is recorded.
+ * the domain: favorite/segment id (favorites), or preference key
+ * (preferences). Identical copies on both sides are not conflicts.
  */
 export type SyncConflict = {
   domain: SyncDataDomain;

@@ -11,13 +11,13 @@ import {
 
 test('createEmptySyncResult starts successful with zeroed counters', () => {
   const result = createEmptySyncResult(
-    'vehicles',
+    'preferences',
     'local',
     '2026-07-03T10:00:00.000Z',
   );
 
   assert.deepEqual(result, {
-    domain: 'vehicles',
+    domain: 'preferences',
     success: true,
     source: 'local',
     uploaded: 0,
@@ -72,7 +72,7 @@ test('combining no results yields an empty aggregate', () => {
 test('combining successful results sums counters and takes the newest timestamp', () => {
   const combined = combineSyncResults([
     {
-      ...createEmptySyncResult('vehicles', 'local', '2026-07-03T10:00:00.000Z'),
+      ...createEmptySyncResult('preferences', 'local', '2026-07-03T10:00:00.000Z'),
       uploaded: 2,
       conflicts: 1,
     },
@@ -98,7 +98,7 @@ test('a partial failure is reported and never counts as success', () => {
     createSyncError('UPLOAD_FAILED', 'Nope.'),
   );
   const combined = combineSyncResults([
-    createEmptySyncResult('vehicles'),
+    createEmptySyncResult('preferences'),
     failure,
   ]);
 
@@ -109,7 +109,7 @@ test('a partial failure is reported and never counts as success', () => {
 test('when everything fails the first error is surfaced', () => {
   const first = createSyncError('NETWORK_FAILED', 'Offline.');
   const combined = combineSyncResults([
-    createFailedSyncResult('vehicles', first),
+    createFailedSyncResult('preferences', first),
     createFailedSyncResult('favorites', createSyncError('UNKNOWN', 'Other.')),
   ]);
 

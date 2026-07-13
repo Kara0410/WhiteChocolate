@@ -7,7 +7,6 @@
 import type {
   UserFavoriteRow,
   UserPreferencesRow,
-  UserVehicleRow,
 } from '@/types/database';
 import type { ParkingClusterResponse } from '@/types/parking-map';
 import type { Preferences } from '@/types/preferences';
@@ -17,10 +16,6 @@ import {
   DEFAULT_PREFERENCES,
   loadPreferences,
 } from '@/utils/preferences-storage';
-import {
-  loadStoredVehicleState,
-  type StoredVehicleState,
-} from '@/utils/vehicle-storage';
 
 import { determineSyncStrategy } from './sync-decision';
 import { PREFERENCE_KEYS } from './preference-merge';
@@ -36,14 +31,12 @@ import { SYNC_DATA_DOMAINS } from './sync-types';
 export type SyncDomainCounts = Record<SyncDataDomain, number>;
 
 export type LocalDataSnapshot = {
-  vehicles: StoredVehicleState;
   favorites: ParkingClusterResponse[];
   preferences: Preferences;
   counts: SyncDomainCounts;
 };
 
 export type RemoteDataSnapshot = {
-  vehicles: UserVehicleRow[];
   favorites: UserFavoriteRow[];
   preferences: UserPreferencesRow | null;
   counts: SyncDomainCounts;
@@ -66,18 +59,15 @@ export function countLocalPreferences(preferences: Preferences): number {
 export async function getLocalSnapshot(
   storage?: KeyValueStorage,
 ): Promise<LocalDataSnapshot> {
-  const [vehicles, favorites, preferences] = await Promise.all([
-    loadStoredVehicleState(storage),
+  const [favorites, preferences] = await Promise.all([
     loadStoredFavorites(storage),
     loadPreferences(storage),
   ]);
 
   return {
-    vehicles,
     favorites,
     preferences,
     counts: {
-      vehicles: vehicles.vehicles.length,
       favorites: favorites.length,
       preferences: countLocalPreferences(preferences),
     },
@@ -85,18 +75,17 @@ export async function getLocalSnapshot(
 }
 
 /**
- * Phase 4B replaces this with real queries against user_vehicles,
- * user_favorites, and user_preferences through the shared Supabase client.
+ * Phase 4B replaces this with real queries against user_favorites and
+ * user_preferences through the shared Supabase client.
  * The shape is final; only the data source changes.
  */
 export function getRemoteSnapshotPlaceholder(
   fetchedAt: string = new Date().toISOString(),
 ): RemoteDataSnapshot {
   return {
-    vehicles: [],
     favorites: [],
     preferences: null,
-    counts: { vehicles: 0, favorites: 0, preferences: 0 },
+    counts: { favorites: 0, preferences: 0 },
     fetchedAt,
   };
 }

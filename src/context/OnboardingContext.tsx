@@ -32,10 +32,8 @@ type OnboardingContextValue = {
   completeOnboarding: () => Promise<OnboardingActionResult>;
   resetOnboardingForDev: () => void;
   markAccountSkipped: () => void;
-  markVehicleSkipped: () => void;
   markMapTipSeen: () => void;
   markFavoritesTipSeen: () => void;
-  markGarageTipSeen: () => void;
 };
 
 const OnboardingContext = createContext<OnboardingContextValue | null>(
@@ -189,14 +187,6 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
     );
   }, [updateState]);
 
-  const markVehicleSkipped = useCallback(() => {
-    updateState((current) =>
-      current.skippedVehicle
-        ? current
-        : { ...current, skippedVehicle: true },
-    );
-  }, [updateState]);
-
   const markMapTipSeen = useCallback(() => {
     updateState((current) =>
       current.hasSeenMapTip
@@ -213,14 +203,6 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
     );
   }, [updateState]);
 
-  const markGarageTipSeen = useCallback(() => {
-    updateState((current) =>
-      current.hasSeenGarageTip
-        ? current
-        : { ...current, hasSeenGarageTip: true },
-    );
-  }, [updateState]);
-
   const shouldShowOnboarding = useMemo(
     () => shouldShowOnboardingForState(onboardingState),
     [onboardingState],
@@ -234,19 +216,15 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
       completeOnboarding,
       resetOnboardingForDev,
       markAccountSkipped,
-      markVehicleSkipped,
       markMapTipSeen,
       markFavoritesTipSeen,
-      markGarageTipSeen,
     }),
     [
       completeOnboarding,
       isHydrated,
       markAccountSkipped,
       markFavoritesTipSeen,
-      markGarageTipSeen,
       markMapTipSeen,
-      markVehicleSkipped,
       onboardingState,
       resetOnboardingForDev,
       shouldShowOnboarding,

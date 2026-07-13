@@ -323,42 +323,6 @@ export type Database = {
         }
         Relationships: []
       }
-      user_vehicles: {
-        Row: {
-          created_at: string
-          id: string
-          is_active: boolean
-          license_plate: string
-          license_plate_normalized: string | null
-          local_created_at: string | null
-          nickname: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          license_plate: string
-          license_plate_normalized?: string | null
-          local_created_at?: string | null
-          nickname: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          license_plate?: string
-          license_plate_normalized?: string | null
-          local_created_at?: string | null
-          nickname?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
     }
     Views: {
       geography_columns: {
@@ -1448,12 +1412,6 @@ export type ParkingSegmentRow =
 
 export type ParkingZoneRow =
   Database['public']['Tables']['parking_zones']['Row'];
-
-export type UserVehicleRow =
-  Database['public']['Tables']['user_vehicles']['Row'];
-
-export type UserVehicleInsert =
-  Database['public']['Tables']['user_vehicles']['Insert'];
 
 export type UserFavoriteRow =
   Database['public']['Tables']['user_favorites']['Row'];

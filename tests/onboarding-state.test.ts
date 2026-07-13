@@ -36,6 +36,27 @@ test('restores supported onboarding state fields', () => {
       completedVersion: ONBOARDING_VERSION,
       completedAt: '2026-07-09T00:00:00.000Z',
       skippedAccount: true,
+      hasSeenMapTip: true,
+      hasSeenFavoritesTip: true,
+    }),
+    {
+      hasCompletedOnboarding: true,
+      completedVersion: ONBOARDING_VERSION,
+      completedAt: '2026-07-09T00:00:00.000Z',
+      skippedAccount: true,
+      hasSeenMapTip: true,
+      hasSeenFavoritesTip: true,
+    },
+  );
+});
+
+test('ignores obsolete garage onboarding fields while preserving completion', () => {
+  assert.deepEqual(
+    normalizeStoredOnboardingState({
+      hasCompletedOnboarding: true,
+      completedVersion: ONBOARDING_VERSION,
+      completedAt: '2026-07-09T00:00:00.000Z',
+      skippedAccount: true,
       skippedVehicle: true,
       hasSeenMapTip: true,
       hasSeenFavoritesTip: true,
@@ -46,10 +67,8 @@ test('restores supported onboarding state fields', () => {
       completedVersion: ONBOARDING_VERSION,
       completedAt: '2026-07-09T00:00:00.000Z',
       skippedAccount: true,
-      skippedVehicle: true,
       hasSeenMapTip: true,
       hasSeenFavoritesTip: true,
-      hasSeenGarageTip: true,
     },
   );
 });
@@ -95,10 +114,8 @@ test('creates completed onboarding state while preserving skip and tip fields', 
     {
       ...DEFAULT_ONBOARDING_STATE,
       skippedAccount: true,
-      skippedVehicle: true,
       hasSeenMapTip: true,
       hasSeenFavoritesTip: true,
-      hasSeenGarageTip: true,
     },
     completedAt,
   );
@@ -109,10 +126,8 @@ test('creates completed onboarding state while preserving skip and tip fields', 
     completedVersion: ONBOARDING_VERSION,
     completedAt,
     skippedAccount: true,
-    skippedVehicle: true,
     hasSeenMapTip: true,
     hasSeenFavoritesTip: true,
-    hasSeenGarageTip: true,
   });
 });
 

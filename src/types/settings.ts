@@ -11,8 +11,7 @@ export type AccountRoute =
   | '/account/about'
   | '/account/licenses'
   | '/account/delete'
-  | '/favorites'
-  | '/garage';
+  | '/favorites';
 
 export type SettingItemType = 'action' | 'info' | 'navigation' | 'switch';
 

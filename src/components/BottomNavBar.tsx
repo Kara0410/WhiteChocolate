@@ -19,7 +19,6 @@ import {
 } from 'react-native';
 import {
   ArrowLeft,
-  Car,
   Heart,
   MapPin,
   Search,
@@ -49,7 +48,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-export type NavItemKey = 'search' | 'profile' | 'car' | 'favorite' | 'parking';
+export type NavItemKey = 'search' | 'profile' | 'favorite' | 'parking';
 
 type BottomNavBarProps = {
   activeKey?: NavItemKey;
@@ -57,7 +56,6 @@ type BottomNavBarProps = {
   onSearchPress?: () => void;
   onSearchCancel?: () => void;
   onProfilePress?: () => void;
-  onCarPress?: () => void;
   onFavoritePress?: () => void;
   onParkingPress?: () => void;
 };
@@ -251,7 +249,6 @@ export default function BottomNavBar({
   onSearchPress,
   onSearchCancel,
   onProfilePress,
-  onCarPress,
   onFavoritePress,
   onParkingPress,
 }: BottomNavBarProps) {
@@ -296,7 +293,6 @@ export default function BottomNavBar({
   const items = useMemo<NavItem[]>(
     () => [
       { key: 'search', label: 'SEARCH', icon: Search, onPress: onSearchPress },
-      { key: 'car', label: 'GARAGE', icon: Car, onPress: onCarPress },
       {
         key: 'favorite',
         label: 'FAVORITES',
@@ -310,7 +306,7 @@ export default function BottomNavBar({
         onPress: onProfilePress,
       },
     ],
-    [onCarPress, onFavoritePress, onProfilePress, onSearchPress],
+    [onFavoritePress, onProfilePress, onSearchPress],
   );
   const toggleParkingMode = useCallback(() => {
     if (isParkingActive) {

@@ -10,10 +10,8 @@ export type OnboardingState = {
   completedVersion: number;
   completedAt: string | null;
   skippedAccount: boolean;
-  skippedVehicle: boolean;
   hasSeenMapTip: boolean;
   hasSeenFavoritesTip: boolean;
-  hasSeenGarageTip: boolean;
 };
 
 export type OnboardingCompletionResult =
@@ -25,10 +23,8 @@ export const DEFAULT_ONBOARDING_STATE: OnboardingState = {
   completedVersion: 0,
   completedAt: null,
   skippedAccount: false,
-  skippedVehicle: false,
   hasSeenMapTip: false,
   hasSeenFavoritesTip: false,
-  hasSeenGarageTip: false,
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -79,10 +75,6 @@ export function normalizeStoredOnboardingState(
       value.skippedAccount,
       DEFAULT_ONBOARDING_STATE.skippedAccount,
     ),
-    skippedVehicle: booleanOrDefault(
-      value.skippedVehicle,
-      DEFAULT_ONBOARDING_STATE.skippedVehicle,
-    ),
     hasSeenMapTip: booleanOrDefault(
       value.hasSeenMapTip,
       DEFAULT_ONBOARDING_STATE.hasSeenMapTip,
@@ -90,10 +82,6 @@ export function normalizeStoredOnboardingState(
     hasSeenFavoritesTip: booleanOrDefault(
       value.hasSeenFavoritesTip,
       DEFAULT_ONBOARDING_STATE.hasSeenFavoritesTip,
-    ),
-    hasSeenGarageTip: booleanOrDefault(
-      value.hasSeenGarageTip,
-      DEFAULT_ONBOARDING_STATE.hasSeenGarageTip,
     ),
   };
 }

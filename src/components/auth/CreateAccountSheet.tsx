@@ -12,7 +12,6 @@ import BottomSheet, {
   type BottomSheetBackdropProps,
 } from '@gorhom/bottom-sheet';
 import {
-  CarFront,
   Heart,
   Info,
   Lock,
@@ -141,8 +140,8 @@ export function CreateAccountSheet({
           Create a free account
         </Text>
         <Text className="mt-4 text-[17px] font-semibold leading-7 text-slate-500">
-          Create an account to unlock all features and keep your parking
-          setup in sync across devices.
+          Create an account to save favorites and keep parking preferences
+          ready for future sync.
         </Text>
 
         <View className="mt-6">
@@ -150,11 +149,6 @@ export function CreateAccountSheet({
             icon={Heart}
             subtitle="Keep your best parking spots in one place."
             title="Save your favorites"
-          />
-          <BenefitRow
-            icon={CarFront}
-            subtitle="Store your vehicles in your garage for quick access."
-            title="Manage your vehicles"
           />
           <BenefitRow
             icon={Info}

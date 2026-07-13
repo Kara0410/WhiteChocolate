@@ -15,7 +15,7 @@ export default function AccountProfileScreen() {
   if (account.isSignedIn || account.status === 'signingOut') {
     return (
       <AccountPlaceholderScreen
-        description="You're signed in. Cloud sync for garage and favorites arrives in a later phase."
+        description="You're signed in. Favorites and preferences are kept on this device while cloud sync is prepared."
         title="Profile"
       >
         <Text className="text-[15px] font-extrabold text-slate-900">
@@ -41,8 +41,8 @@ export default function AccountProfileScreen() {
           </Text>
         </Pressable>
         <Text className="mt-3 text-[12px] font-semibold leading-5 text-slate-400">
-          Signing out keeps your garage, favorites, and preferences on this
-          device. Nothing is deleted.
+          Signing out keeps your favorites and preferences on this device.
+          Nothing is deleted.
         </Text>
         {account.error ? (
           <Text
@@ -58,7 +58,7 @@ export default function AccountProfileScreen() {
 
   return (
     <AccountPlaceholderScreen
-      description="Sign in to enable garage and favorites sync in a later phase. The app remains anonymous-first."
+      description="Sign in to use account features. The app remains anonymous-first, and parking stays available without an account."
       title="Profile"
     >
       <EmailSignInCard

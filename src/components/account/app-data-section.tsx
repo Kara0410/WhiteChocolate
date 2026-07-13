@@ -5,12 +5,10 @@ import { SettingsErrorPanel } from '@/components/settings/settings-error-panel';
 import { SettingsSection } from '@/components/settings/settings-section';
 import { getAppDataSettings } from '@/constants/account-settings';
 import { useFavoriteParking } from '@/context/FavoriteParkingContext';
-import { useVehicles } from '@/context/VehicleContext';
 import { useLocationPermissionStatus } from '@/hooks/use-location-permission-status';
 import type { SettingAction } from '@/types/settings';
 
 export const AppDataSection = memo(function AppDataSection() {
-  const { vehicles } = useVehicles();
   const { favoriteItems } = useFavoriteParking();
   const location = useLocationPermissionStatus();
   const { openSettings } = location;
@@ -21,14 +19,12 @@ export const AppDataSection = memo(function AppDataSection() {
         locationDescription: location.description,
         locationLabel: location.label,
         locationLoading: location.loading,
-        vehicleCount: vehicles.length,
       }),
     [
       favoriteItems.length,
       location.description,
       location.label,
       location.loading,
-      vehicles.length,
     ],
   );
 

@@ -4,7 +4,6 @@ import {
   BellRing,
   BookOpen,
   Bug,
-  Car,
   CircleHelp,
   Crown,
   FileText,
@@ -36,7 +35,7 @@ export const ANONYMOUS_QUICK_ACTIONS: SettingItem[] = [
   },
   {
     id: 'account-benefits',
-    title: 'Sign in to sync garage and favorites',
+    title: 'Sign in to sync favorites',
     subtitle:
       'Email and password sign-in. Sync itself arrives in a later phase.',
     icon: Sparkles,
@@ -91,7 +90,7 @@ export const SIGNED_IN_QUICK_ACTIONS: SettingItem[] = [
   {
     id: 'logout',
     title: 'Sign out',
-    subtitle: 'Your garage, favorites, and preferences stay on this device.',
+    subtitle: 'Your favorites and preferences stay on this device.',
     icon: LogOut,
     type: 'action',
     action: 'logout',
@@ -239,31 +238,13 @@ export function getAppDataSettings({
   locationDescription,
   locationLabel,
   locationLoading,
-  vehicleCount,
 }: {
   favoriteCount: number;
   locationDescription: string;
   locationLabel: string;
   locationLoading: boolean;
-  vehicleCount: number;
 }): SettingItem[] {
   return [
-    {
-      id: 'garage',
-      title: 'Manage garage',
-      subtitle: countLabel(vehicleCount, 'saved car', 'saved cars'),
-      icon: Car,
-      type: 'navigation',
-      navigationTarget: '/garage',
-      rightText: vehicleCount.toLocaleString(),
-      group: 'app-data',
-      accessibilityLabel: `Manage garage, ${countLabel(
-        vehicleCount,
-        'saved car',
-        'saved cars',
-      )}`,
-      accessibilityHint: 'Opens My Garage',
-    },
     {
       id: 'favorites',
       title: 'View favorites',
@@ -306,7 +287,7 @@ export function getDangerSettings(isSignedIn: boolean): SettingItem[] {
       title: 'Data controls',
       subtitle: isSignedIn
         ? 'Delete local device data. Account deletion is coming later.'
-        : 'Delete garage, favorites, and preferences from this device.',
+        : 'Delete favorites and preferences from this device.',
       icon: Trash2,
       type: 'navigation',
       navigationTarget: '/account/delete',
