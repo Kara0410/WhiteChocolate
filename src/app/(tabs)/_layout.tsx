@@ -63,9 +63,7 @@ function TabNavigation() {
         ? 'favorite'
         : activeOverlay === 'search'
           ? 'search'
-          : activeOverlay === 'parking'
-            ? 'parking'
-            : 'parking';
+          : undefined;
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
@@ -98,13 +96,6 @@ function TabNavigation() {
           }
 
           showOverlay('favorites');
-        }}
-        onParkingPress={() => {
-          closeOverlay();
-          router.replace({
-            pathname: '/map',
-            params: { locate: Date.now().toString() },
-          });
         }}
       />
     </View>

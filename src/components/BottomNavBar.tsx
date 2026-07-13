@@ -4,7 +4,6 @@ import {
   useEffect,
   useMemo,
   useRef,
-  useState,
 } from 'react';
 import {
   ActivityIndicator,
@@ -36,7 +35,6 @@ import {
   type PlaceSearchSuggestion,
   useGooglePlaceSearch,
 } from '@/hooks/use-google-place-search';
-import { useStopwatch } from '@/hooks/use-stopwatch';
 import Animated, {
   Easing,
   Extrapolation,
@@ -48,7 +46,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-export type NavItemKey = 'search' | 'profile' | 'favorite' | 'parking';
+export type NavItemKey = 'search' | 'favorite' | 'profile';
 
 type BottomNavBarProps = {
   activeKey?: NavItemKey;
@@ -57,11 +55,10 @@ type BottomNavBarProps = {
   onSearchCancel?: () => void;
   onProfilePress?: () => void;
   onFavoritePress?: () => void;
-  onParkingPress?: () => void;
 };
 
 type NavItem = {
-  key: Exclude<NavItemKey, 'parking'>;
+  key: NavItemKey;
   label: string;
   icon: LucideIcon;
   onPress?: () => void;
@@ -168,77 +165,6 @@ const NavigationItem = memo(function NavigationItem({
   );
 });
 
-const ParkingAction = memo(function ParkingAction({
-  expandedWidth,
-  formattedTime,
-  isActive,
-  onPress,
-}: {
-  expandedWidth: number;
-  formattedTime: string;
-  isActive: boolean;
-  onPress: () => void;
-}) {
-  const pressedScale = useSharedValue(1);
-  const activeProgress = useSharedValue(isActive ? 1 : 0);
-  const actionWidth = useSharedValue(isActive ? expandedWidth : 60);
-
-  useEffect(() => {
-    activeProgress.value = withTiming(isActive ? 1 : 0, { duration: 200 });
-    actionWidth.value = withSpring(isActive ? expandedWidth : 60, {
-      damping: 20,
-      stiffness: 240,
-    });
-  }, [actionWidth, activeProgress, expandedWidth, isActive]);
-
-  const buttonStyle = useAnimatedStyle(() => ({
-    width: actionWidth.value,
-    backgroundColor: interpolateColor(
-      activeProgress.value,
-      [0, 1],
-      ['#2563EB', '#172554'],
-    ),
-    transform: [{ scale: pressedScale.value }],
-  }));
-  const parkingMarkStyle = useAnimatedStyle(() => ({
-    opacity: 1 - activeProgress.value,
-    transform: [{ scale: 1 - activeProgress.value * 0.08 }],
-  }));
-  const stopwatchStyle = useAnimatedStyle(() => ({
-    opacity: activeProgress.value,
-    transform: [{ scale: 0.94 + activeProgress.value * 0.06 }],
-  }));
-
-  return (
-    <Animated.View style={[styles.actionContainer, buttonStyle]}>
-      <Pressable
-        accessibilityLabel={isActive ? `Stop parking timer at ${formattedTime}` : 'Start parking timer'}
-        accessibilityRole="button"
-        accessibilityState={{ selected: isActive }}
-        hitSlop={4}
-        onPress={onPress}
-        onPressIn={() => {
-          pressedScale.value = withTiming(0.95, { duration: 90 });
-        }}
-        onPressOut={() => {
-          pressedScale.value = withSpring(1, { damping: 14, stiffness: 260 });
-        }}
-        style={styles.actionPressable}
-      >
-        <View style={styles.actionButton}>
-          <Animated.View pointerEvents="none" style={[styles.actionContent, parkingMarkStyle]}>
-            <Text style={styles.parkingMark}>P</Text>
-          </Animated.View>
-          <Animated.View pointerEvents="none" style={[styles.actionContent, stopwatchStyle]}>
-            <Text style={styles.stopwatchLabel}>PARKING</Text>
-            <Text style={styles.stopwatchTime}>{formattedTime}</Text>
-          </Animated.View>
-        </View>
-      </Pressable>
-    </Animated.View>
-  );
-});
-
 function searchSuggestionKeyExtractor(item: PlaceSearchSuggestion) {
   return item.id;
 }
@@ -250,18 +176,11 @@ export default function BottomNavBar({
   onSearchCancel,
   onProfilePress,
   onFavoritePress,
-  onParkingPress,
 }: BottomNavBarProps) {
   const insets = useSafeAreaInsets();
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const inputRef = useRef<TextInput>(null);
   const focusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [isParkingActive, setIsParkingActive] = useState(false);
-  const {
-    formattedTime,
-    start: startStopwatch,
-    stop: stopStopwatch,
-  } = useStopwatch();
   const morphProgress = useSharedValue(isSearchActive ? 1 : 0);
   const { selectPlace } = useMapOverlay();
   const {
@@ -278,10 +197,6 @@ export default function BottomNavBar({
   } = useGooglePlaceSearch();
   const normalWidth = Math.min(windowWidth - 24, 420);
   const searchWidth = Math.min(windowWidth - 32, 420);
-  const expandedActionWidth = Math.max(
-    96,
-    Math.min(124, normalWidth - 220),
-  );
   const bottomOffset = Math.max(insets.bottom, 10) + 10;
   const normalTop = windowHeight - bottomOffset - NAVBAR_HEIGHT;
   const searchTop = insets.top + 12;
@@ -308,22 +223,6 @@ export default function BottomNavBar({
     ],
     [onFavoritePress, onProfilePress, onSearchPress],
   );
-  const toggleParkingMode = useCallback(() => {
-    if (isParkingActive) {
-      stopStopwatch();
-      setIsParkingActive(false);
-      return;
-    }
-
-    startStopwatch(true);
-    setIsParkingActive(true);
-    onParkingPress?.();
-  }, [
-    isParkingActive,
-    onParkingPress,
-    startStopwatch,
-    stopStopwatch,
-  ]);
 
   useEffect(() => {
     if (focusTimerRef.current) {
@@ -529,13 +428,6 @@ export default function BottomNavBar({
                 />
               ))}
             </View>
-
-            <ParkingAction
-              expandedWidth={expandedActionWidth}
-              formattedTime={formattedTime}
-              isActive={isParkingActive}
-              onPress={toggleParkingMode}
-            />
           </Animated.View>
 
           <Animated.View
@@ -700,7 +592,6 @@ const styles = StyleSheet.create({
     height: '100%',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingRight: 6,
   },
   navigationItem: {
     flex: 1,
@@ -739,59 +630,5 @@ const styles = StyleSheet.create({
     height: 4,
     borderRadius: 2,
     backgroundColor: '#60A5FA',
-  },
-  actionContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    borderCurve: 'continuous',
-    alignItems: 'center',
-    justifyContent: 'center',
-    boxShadow: '0 5px 14px rgba(37,99,235,0.3)',
-  },
-  actionButton: {
-    width: '100%',
-    height: 60,
-    borderRadius: 30,
-    borderCurve: 'continuous',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.24)',
-    boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.28)',
-    overflow: 'hidden',
-  },
-  actionPressable: {
-    width: '100%',
-    height: '100%',
-  },
-  actionContent: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  parkingMark: {
-    color: '#FFFFFF',
-    fontSize: 27,
-    lineHeight: 31,
-    fontWeight: '900',
-    letterSpacing: -1,
-    includeFontPadding: false,
-  },
-  stopwatchLabel: {
-    color: 'rgba(255,255,255,0.65)',
-    fontSize: 8,
-    lineHeight: 10,
-    fontWeight: '800',
-    letterSpacing: 1.05,
-  },
-  stopwatchTime: {
-    color: '#FFFFFF',
-    fontFamily: process.env.EXPO_OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 18,
-    lineHeight: 23,
-    fontWeight: '700',
-    fontVariant: ['tabular-nums'],
-    letterSpacing: -0.5,
   },
 });
