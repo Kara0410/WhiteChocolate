@@ -167,23 +167,12 @@ const NavigationItem = memo(function NavigationItem({
           animatedStyle,
         ]}
       >
-        <View
-          style={[
-            styles.navigationIcon,
-            active ? styles.navigationIconActive : null,
-          ]}
-        >
+        <View style={styles.navigationIcon}>
           <Icon color={color} size={19} strokeWidth={active ? 2.45 : 2.05} />
         </View>
         <Text numberOfLines={1} style={[styles.navigationLabel, { color }]}>
           {item.label}
         </Text>
-        <View
-          style={[
-            styles.activeDot,
-            { opacity: active ? 1 : 0 },
-          ]}
-        />
       </Animated.View>
     </Pressable>
   );
@@ -666,21 +655,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'transparent',
   },
-  navigationIconActive: {
-    backgroundColor: 'rgba(96,165,250,0.22)',
-    borderWidth: 1,
-    borderColor: 'rgba(191,219,254,0.22)',
-  },
   navigationLabel: {
     fontSize: 8.5,
     lineHeight: 10,
     fontWeight: '800',
     letterSpacing: 0.35,
-  },
-  activeDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#60A5FA',
   },
 });
