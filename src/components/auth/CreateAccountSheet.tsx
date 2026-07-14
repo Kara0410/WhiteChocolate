@@ -22,6 +22,11 @@ import {
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { EmailSeparator } from '@/components/auth/EmailSeparator';
+import { GoogleAuthButton } from '@/components/auth/GoogleAuthButton';
+import { useAccount } from '@/hooks/use-account';
+import { getGoogleAuthCopy } from '@/utils/onboarding-flow';
+
 type CreateAccountSheetProps = {
   isVisible: boolean;
   onClose: () => void;
@@ -67,6 +72,7 @@ export function CreateAccountSheet({
   onClose,
   onCreateAccount,
 }: CreateAccountSheetProps) {
+  const account = useAccount();
   const sheetRef = useRef<ComponentRef<typeof BottomSheet>>(null);
   const insets = useSafeAreaInsets();
   const snapPoints = useMemo(() => ['88%'], []);
@@ -76,6 +82,8 @@ export function CreateAccountSheet({
     overshootClamping: false,
     stiffness: 280,
   });
+  const isGoogleSubmitting = account.status === 'signingIn';
+  const googleAuthCopy = getGoogleAuthCopy('benefit');
 
   useEffect(() => {
     if (isVisible) {
@@ -158,22 +166,41 @@ export function CreateAccountSheet({
           />
         </View>
 
+        <GoogleAuthButton
+          disabled={account.loading || isGoogleSubmitting}
+          isLoading={isGoogleSubmitting}
+          mode="benefit"
+          onPress={() => {
+            void account.continueWithGoogle();
+          }}
+        />
+        <EmailSeparator label={googleAuthCopy.separatorLabel} />
         <Pressable
-          accessibilityLabel="Create an account"
+          accessibilityLabel="Sign in or sign up with email"
           accessibilityRole="button"
-          className="mt-6 min-h-14 items-center justify-center rounded-2xl bg-blue-600 px-5 active:bg-blue-700"
+          className={`mt-6 min-h-14 items-center justify-center rounded-2xl px-5 ${
+            isGoogleSubmitting
+              ? 'bg-blue-300'
+              : 'bg-blue-600 active:bg-blue-700'
+          }`}
+          disabled={isGoogleSubmitting}
           onPress={onCreateAccount}
           style={{ borderCurve: 'continuous' }}
         >
           <Text className="text-[16px] font-extrabold text-white">
-            Create an account
+            Sign In / Sign Up with email
           </Text>
         </Pressable>
 
         <Pressable
           accessibilityLabel="Continue as guest"
           accessibilityRole="button"
-          className="mt-3 min-h-14 items-center justify-center rounded-2xl bg-slate-100 px-5 active:bg-slate-200"
+          className={`mt-3 min-h-14 items-center justify-center rounded-2xl px-5 ${
+            isGoogleSubmitting
+              ? 'bg-slate-200 opacity-60'
+              : 'bg-slate-100 active:bg-slate-200'
+          }`}
+          disabled={isGoogleSubmitting}
           onPress={onClose}
           style={{ borderCurve: 'continuous' }}
         >
@@ -181,6 +208,15 @@ export function CreateAccountSheet({
             Continue as guest
           </Text>
         </Pressable>
+
+        {account.error ? (
+          <Text
+            accessibilityRole="alert"
+            className="mt-3 text-[13px] font-semibold leading-5 text-red-700"
+          >
+            {account.error.message}
+          </Text>
+        ) : null}
 
         <View className="mt-6 flex-row gap-3">
           <Lock color="#94A3B8" size={22} strokeWidth={2.4} />

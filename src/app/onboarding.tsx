@@ -9,7 +9,6 @@ import { useRouter } from 'expo-router';
 import {
   ActivityIndicator,
   BackHandler,
-  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -32,6 +31,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { APP_DISPLAY_NAME } from '@/constants/app';
+import { EmailSeparator } from '@/components/auth/EmailSeparator';
+import { GoogleAuthButton } from '@/components/auth/GoogleAuthButton';
 import { useOnboarding } from '@/context/OnboardingContext';
 import { useAccount } from '@/hooks/use-account';
 import { useMapLocation } from '@/hooks/use-map-location';
@@ -86,7 +87,6 @@ const STEPS: OnboardingStep[] = [
 const SIGNED_IN_STEPS = STEPS.filter((step) => step.id !== 'account');
 const INPUT_CLASS =
   'mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-[15px] font-semibold text-slate-900';
-const GOOGLE_G_LOGO = require('../../assets/images/google-g-logo.png');
 
 function StepIndicator({
   activeIndex,
@@ -186,66 +186,6 @@ function SecondaryButton({
         {label}
       </Text>
     </Pressable>
-  );
-}
-
-function GoogleAuthButton({
-  disabled,
-  isLoading,
-  mode,
-  onPress,
-}: {
-  disabled: boolean;
-  isLoading: boolean;
-  mode: AccountMode;
-  onPress: () => void;
-}) {
-  const copy = getGoogleAuthCopy(mode);
-
-  return (
-    <Pressable
-      accessibilityLabel={copy.actionLabel}
-      accessibilityState={{ busy: isLoading, disabled }}
-      accessibilityRole="button"
-      className={`mt-6 min-h-14 flex-row items-center justify-center rounded-2xl border px-5 ${
-        disabled
-          ? 'border-slate-200 bg-slate-100 opacity-60'
-          : 'border-[#747775] bg-white active:bg-slate-50'
-      }`}
-      disabled={disabled}
-      onPress={onPress}
-      style={{ borderCurve: 'continuous' }}
-    >
-      <View className="absolute left-4 h-[18px] w-[18px] items-center justify-center">
-        {isLoading ? (
-          <ActivityIndicator color="#334155" size="small" />
-        ) : (
-          <Image
-            accessibilityIgnoresInvertColors
-            className="h-[18px] w-[18px]"
-            resizeMode="contain"
-            source={GOOGLE_G_LOGO}
-          />
-        )}
-      </View>
-      <Text
-        className={`px-7 text-center text-[15px] font-extrabold ${
-          disabled ? 'text-[#747775]' : 'text-[#1F1F1F]'
-        }`}
-      >
-        {isLoading ? copy.loadingLabel : copy.actionLabel}
-      </Text>
-    </Pressable>
-  );
-}
-
-function EmailSeparator({ label }: { label: string }) {
-  return (
-    <View className="mt-6 flex-row items-center gap-3">
-      <View className="h-px flex-1 bg-slate-200" />
-      <Text className="text-[12px] font-bold text-slate-400">{label}</Text>
-      <View className="h-px flex-1 bg-slate-200" />
-    </View>
   );
 }
 

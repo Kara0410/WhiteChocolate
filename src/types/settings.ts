@@ -20,6 +20,7 @@ export type SettingAction =
   | 'delete-account'
   | 'delete-local-data'
   | 'logout'
+  | 'open-auth-sheet'
   | 'open-system-settings'
   | 'restore-purchases'
   | 'upgrade';

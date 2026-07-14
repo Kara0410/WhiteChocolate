@@ -3,6 +3,7 @@ import { memo, useCallback, useMemo } from 'react';
 import { SettingItemList } from '@/components/settings/setting-item-list';
 import { SettingsSection } from '@/components/settings/settings-section';
 import { SubscriptionCard } from '@/components/account/subscription-card';
+import { useAuthSheet } from '@/context/AuthSheetContext';
 import {
   ANONYMOUS_QUICK_ACTIONS,
   SIGNED_IN_QUICK_ACTIONS,
@@ -24,6 +25,7 @@ export const QuickActionsSection = memo(function QuickActionsSection({
   subscriptionStatus,
   logout,
 }: QuickActionsSectionProps) {
+  const { showCreateAccountSheet } = useAuthSheet();
   const items = useMemo(
     () =>
       (isAnonymous
@@ -35,11 +37,16 @@ export const QuickActionsSection = memo(function QuickActionsSection({
 
   const handleAction = useCallback(
     (action: SettingAction) => {
+      if (action === 'open-auth-sheet') {
+        showCreateAccountSheet({ origin: 'account-quick-actions' });
+        return;
+      }
+
       if (action === 'logout') {
         void logout();
       }
     },
-    [logout],
+    [logout, showCreateAccountSheet],
   );
 
   return (

@@ -35,14 +35,14 @@ export const ANONYMOUS_QUICK_ACTIONS: SettingItem[] = [
   },
   {
     id: 'account-benefits',
-    title: 'Sign in to sync favorites',
-    subtitle:
-      'Email and password sign-in. Sync itself arrives in a later phase.',
+    title: 'Sign In / Sign Up',
+    subtitle: 'Create an account or sign in to access account features.',
     icon: Sparkles,
-    type: 'navigation',
-    navigationTarget: '/account/profile',
+    type: 'action',
+    action: 'open-auth-sheet',
     group: 'quick-actions',
-    accessibilityHint: 'Opens email and password sign-in',
+    accessibilityLabel: 'Sign in or sign up',
+    accessibilityHint: 'Opens account creation and sign-in options',
   },
   {
     id: 'restore',

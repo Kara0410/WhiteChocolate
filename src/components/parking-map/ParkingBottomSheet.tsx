@@ -656,7 +656,7 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
   }, []);
 
   return (
-    <>
+    <View style={styles.detailContent}>
       <ParkingDetailHeader
         distanceLabel={distanceLabel}
         isFavorite={itemIsFavorite}
@@ -670,40 +670,46 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
         title={title}
       />
 
-      {hasFreeDetailsAccess ? (
-        <FreeParkingDetails
-          dailyPrice={dailyPrice}
-          distanceLabel={distanceLabel}
-          price={price}
-        />
-      ) : (
-        <LockedDetailGate
-          accessibilityHint={freeGateCopy.accessibilityHint}
-          accessibilityLabel={freeGateCopy.accessibilityLabel}
-          actionLabel={freeGateCopy.actionLabel}
-          description={freeGateCopy.description}
-          onAction={handleCreateFreeAccount}
-          title={freeGateCopy.title}
-        >
-          <LockedFreeDetailsPreview />
-        </LockedDetailGate>
-      )}
+      <BottomSheetScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        style={styles.detailScrollView}
+      >
+        {hasFreeDetailsAccess ? (
+          <FreeParkingDetails
+            dailyPrice={dailyPrice}
+            distanceLabel={distanceLabel}
+            price={price}
+          />
+        ) : (
+          <LockedDetailGate
+            accessibilityHint={freeGateCopy.accessibilityHint}
+            accessibilityLabel={freeGateCopy.accessibilityLabel}
+            actionLabel={freeGateCopy.actionLabel}
+            description={freeGateCopy.description}
+            onAction={handleCreateFreeAccount}
+            title={freeGateCopy.title}
+          >
+            <LockedFreeDetailsPreview />
+          </LockedDetailGate>
+        )}
 
-      {hasPremiumDetailsAccess ? (
-        <PremiumParkingDetails item={item} />
-      ) : hasFreeDetailsAccess ? (
-        <LockedDetailGate
-          accessibilityHint={premiumGateCopy.accessibilityHint}
-          accessibilityLabel={premiumGateCopy.accessibilityLabel}
-          actionLabel={premiumGateCopy.actionLabel}
-          description={premiumGateCopy.description}
-          onAction={handleExplorePremium}
-          title={premiumGateCopy.title}
-        >
-          <LockedPremiumDetailsPreview />
-        </LockedDetailGate>
-      ) : null}
-    </>
+        {hasPremiumDetailsAccess ? (
+          <PremiumParkingDetails item={item} />
+        ) : hasFreeDetailsAccess ? (
+          <LockedDetailGate
+            accessibilityHint={premiumGateCopy.accessibilityHint}
+            accessibilityLabel={premiumGateCopy.accessibilityLabel}
+            actionLabel={premiumGateCopy.actionLabel}
+            description={premiumGateCopy.description}
+            onAction={handleExplorePremium}
+            title={premiumGateCopy.title}
+          >
+            <LockedPremiumDetailsPreview />
+          </LockedDetailGate>
+        ) : null}
+      </BottomSheetScrollView>
+    </View>
   );
 });
 
@@ -822,17 +828,12 @@ const ParkingBottomSheetComponent = forwardRef<
       snapPoints={snapPoints}
       style={styles.sheet}
     >
-      <BottomSheetScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {item ?? displayedItemRef.current ? (
-          <ParkingDetailContent
-            item={(item ?? displayedItemRef.current)!}
-            onClose={onClose}
-          />
-        ) : null}
-      </BottomSheetScrollView>
+      {item ?? displayedItemRef.current ? (
+        <ParkingDetailContent
+          item={(item ?? displayedItemRef.current)!}
+          onClose={onClose}
+        />
+      ) : null}
     </BottomSheet>
   );
 });
@@ -878,6 +879,12 @@ const styles = StyleSheet.create({
     boxShadow: '0 -4px 14px rgba(0,0,0,0.1)',
     elevation: MAP_ELEVATIONS.bottomSheet,
     zIndex: MAP_LAYERS.bottomSheet,
+  },
+  detailContent: {
+    flex: 1,
+  },
+  detailScrollView: {
+    flex: 1,
   },
   scrollContent: {
     paddingBottom: 120,
