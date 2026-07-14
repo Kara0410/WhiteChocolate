@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 
 import type { AccountActionResult } from '@/types/account';
 import {
+  completeGoogleOAuthCallback,
   performGoogleOAuth,
   type GoogleOAuthAuthClient,
 } from '@/services/account-google-auth-core';
@@ -18,6 +19,20 @@ export { parseGoogleOAuthCallback } from '@/services/account-google-auth-core';
 
 export function getGoogleOAuthRedirectUrl() {
   return Linking.createURL(CALLBACK_PATH, { scheme: APP_SCHEME });
+}
+
+export async function completeGoogleOAuthCallbackService({
+  auth,
+  callbackUrl,
+}: {
+  auth: GoogleOAuthAuthClient;
+  callbackUrl: string;
+}): Promise<AccountActionResult> {
+  return completeGoogleOAuthCallback({
+    auth,
+    callbackUrl,
+    expectedRedirectTo: getGoogleOAuthRedirectUrl(),
+  });
 }
 
 export async function continueWithGoogleService({

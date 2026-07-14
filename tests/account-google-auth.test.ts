@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  completeGoogleOAuthCallback,
   performGoogleOAuth,
   parseGoogleOAuthCallback,
   type GoogleOAuthAuthClient,
@@ -116,6 +117,42 @@ test('successful callbacks create a Supabase session', async () => {
     access_token: 'fake-access',
     refresh_token: 'fake-refresh',
   });
+});
+
+test('callback completion creates a Supabase session exactly once', async () => {
+  let sessionCalls = 0;
+  const result = await completeGoogleOAuthCallback({
+    auth: authClient({
+      setSession: async () => {
+        sessionCalls += 1;
+        return { data: { session: {} }, error: null };
+      },
+    }),
+    callbackUrl: `${redirectTo}#access_token=callback-access&refresh_token=callback-refresh`,
+  });
+
+  assert.deepEqual(result, { ok: true });
+  assert.equal(sessionCalls, 1);
+});
+
+test('callback completion rejects an invalid path before creating a session', async () => {
+  let sessionCalls = 0;
+  const result = await completeGoogleOAuthCallback({
+    auth: authClient({
+      setSession: async () => {
+        sessionCalls += 1;
+        return { data: { session: {} }, error: null };
+      },
+    }),
+    callbackUrl:
+      'whitechoclate://wrong/callback#access_token=a&refresh_token=b',
+  });
+
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(result.error.code, 'GOOGLE_AUTH_CALLBACK_INVALID');
+  }
+  assert.equal(sessionCalls, 0);
 });
 
 test('web returns an unavailable result without starting OAuth', async () => {

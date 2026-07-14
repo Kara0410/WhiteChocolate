@@ -9,6 +9,10 @@ import {
   getRequestedLocationDecision,
   type OnboardingFlowStep,
 } from '../src/utils/onboarding-flow';
+import {
+  getGoogleCallbackNavigation,
+  getGoogleCallbackProcessingDecision,
+} from '../src/utils/google-auth-callback';
 
 const signedOutSteps: OnboardingFlowStep[] = [
   { id: 'welcome' },
@@ -64,6 +68,82 @@ test('Google authentication copy matches the current account mode', () => {
     loadingLabel: 'Signing up with Google',
     separatorLabel: 'or sign up with email',
   });
+});
+
+test('Google callback navigation prefers history and otherwise follows onboarding state', () => {
+  assert.equal(
+    getGoogleCallbackNavigation({
+      canGoBack: true,
+      shouldShowOnboarding: false,
+    }),
+    'back',
+  );
+  assert.equal(
+    getGoogleCallbackNavigation({
+      canGoBack: false,
+      shouldShowOnboarding: true,
+    }),
+    'onboarding',
+  );
+  assert.equal(
+    getGoogleCallbackNavigation({
+      canGoBack: false,
+      shouldShowOnboarding: false,
+    }),
+    'map',
+  );
+});
+
+test('Google callback processing waits for hydration and active OAuth operations', () => {
+  const base = {
+    accountLoading: false,
+    accountStatus: 'anonymous' as const,
+    callbackUrl: 'whitechoclate://auth/callback#access_token=a',
+    hasObservedOAuthOperation: false,
+    hasProcessedCallback: false,
+    isSignedIn: false,
+    onboardingHydrated: true,
+  };
+
+  assert.equal(
+    getGoogleCallbackProcessingDecision({
+      ...base,
+      accountLoading: true,
+    }),
+    'wait',
+  );
+  assert.equal(
+    getGoogleCallbackProcessingDecision({
+      ...base,
+      accountStatus: 'signingIn',
+    }),
+    'wait',
+  );
+  assert.equal(
+    getGoogleCallbackProcessingDecision({
+      ...base,
+      hasObservedOAuthOperation: true,
+    }),
+    'error',
+  );
+  assert.equal(
+    getGoogleCallbackProcessingDecision({
+      ...base,
+      isSignedIn: true,
+    }),
+    'navigate',
+  );
+  assert.equal(
+    getGoogleCallbackProcessingDecision({
+      ...base,
+      callbackUrl: null,
+    }),
+    'error',
+  );
+  assert.equal(
+    getGoogleCallbackProcessingDecision(base),
+    'process',
+  );
 });
 
 test('back navigation stays on welcome', () => {

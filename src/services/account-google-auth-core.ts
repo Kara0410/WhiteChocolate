@@ -153,6 +153,47 @@ export function parseGoogleOAuthCallback(
   return { ok: true, accessToken, refreshToken };
 }
 
+export async function completeGoogleOAuthCallback({
+  auth,
+  callbackUrl,
+  expectedRedirectTo = APP_CALLBACK_URL,
+}: {
+  auth: GoogleOAuthAuthClient;
+  callbackUrl: string;
+  expectedRedirectTo?: string;
+}): Promise<AccountActionResult> {
+  const callback = parseGoogleOAuthCallback(
+    callbackUrl,
+    expectedRedirectTo,
+  );
+
+  if (!callback.ok) {
+    return callback;
+  }
+
+  try {
+    const { data: sessionData, error: sessionError } = await auth.setSession({
+      access_token: callback.accessToken,
+      refresh_token: callback.refreshToken,
+    });
+
+    if (sessionError || !sessionData?.session) {
+      return {
+        ok: false,
+        error: googleOAuthError(
+          'GOOGLE_AUTH_SESSION_FAILED',
+          'Google sign-in could not finish. Please try again.',
+          sessionError ?? new Error('Supabase returned no OAuth session.'),
+        ),
+      };
+    }
+
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: googleAuthFailedError(error) };
+  }
+}
+
 export async function performGoogleOAuth({
   auth,
   openAuthSessionAsync,
@@ -225,32 +266,11 @@ export async function performGoogleOAuth({
       };
     }
 
-    const callback = parseGoogleOAuthCallback(
-      browserResult.url,
-      redirectTo,
-    );
-
-    if (!callback.ok) {
-      return callback;
-    }
-
-    const { data: sessionData, error: sessionError } = await auth.setSession({
-      access_token: callback.accessToken,
-      refresh_token: callback.refreshToken,
+    return completeGoogleOAuthCallback({
+      auth,
+      callbackUrl: browserResult.url,
+      expectedRedirectTo: redirectTo,
     });
-
-    if (sessionError || !sessionData?.session) {
-      return {
-        ok: false,
-        error: googleOAuthError(
-          'GOOGLE_AUTH_SESSION_FAILED',
-          'Google sign-in could not finish. Please try again.',
-          sessionError ?? new Error('Supabase returned no OAuth session.'),
-        ),
-      };
-    }
-
-    return { ok: true };
   } catch (error) {
     return { ok: false, error: googleAuthFailedError(error) };
   }

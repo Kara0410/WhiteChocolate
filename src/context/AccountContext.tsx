@@ -15,6 +15,7 @@ import {
   type AccountAuthClient,
 } from '@/services/account-auth';
 import {
+  completeGoogleOAuthCallbackService,
   continueWithGoogleService,
   type GoogleOAuthAuthClient,
 } from '@/services/account-google-auth';
@@ -50,6 +51,9 @@ type AccountContextValue = ReturnType<typeof getCurrentAccountSnapshot> & {
     password: string,
   ) => Promise<AccountActionResult>;
   continueWithGoogle: () => Promise<AccountActionResult>;
+  completeWithGoogleCallback: (
+    callbackUrl: string,
+  ) => Promise<AccountActionResult>;
   registerWithEmailPassword: (
     email: string,
     password: string,
@@ -80,6 +84,9 @@ export function AccountProvider({ children }: PropsWithChildren) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<AccountError | null>(null);
   const accountIdentityRef = useRef<string | null>(null);
+  const googleCallbackInFlightRef = useRef<Promise<AccountActionResult> | null>(
+    null,
+  );
 
   const applyAccountUser = useCallback((nextUser: AccountUser | null) => {
     const nextIdentity = nextUser?.id ?? null;
@@ -181,6 +188,55 @@ export function AccountProvider({ children }: PropsWithChildren) {
       } finally {
         setSigningIn(false);
       }
+    },
+    [],
+  );
+
+  const completeWithGoogleCallback = useCallback(
+    (callbackUrl: string): Promise<AccountActionResult> => {
+      if (googleCallbackInFlightRef.current) {
+        return googleCallbackInFlightRef.current;
+      }
+
+      const operation = (async (): Promise<AccountActionResult> => {
+        setError(null);
+        setSigningIn(true);
+
+        try {
+          const result = await completeGoogleOAuthCallbackService({
+            auth: googleOAuthAuthClient,
+            callbackUrl,
+          });
+
+          if (!result.ok && result.error.code !== 'GOOGLE_AUTH_CANCELLED') {
+            setError(result.error);
+          }
+
+          return result;
+        } catch (googleError) {
+          const failedError = googleAuthFailedError(googleError);
+          setError(failedError);
+          return { ok: false, error: failedError };
+        } finally {
+          setSigningIn(false);
+        }
+      })();
+
+      googleCallbackInFlightRef.current = operation;
+      void operation.then(
+        () => {
+          if (googleCallbackInFlightRef.current === operation) {
+            googleCallbackInFlightRef.current = null;
+          }
+        },
+        () => {
+          if (googleCallbackInFlightRef.current === operation) {
+            googleCallbackInFlightRef.current = null;
+          }
+        },
+      );
+
+      return operation;
     },
     [],
   );
@@ -292,6 +348,7 @@ export function AccountProvider({ children }: PropsWithChildren) {
       refresh,
       loginWithEmailPassword,
       continueWithGoogle,
+      completeWithGoogleCallback,
       registerWithEmailPassword,
       logout,
       deleteAccount,
@@ -303,6 +360,7 @@ export function AccountProvider({ children }: PropsWithChildren) {
       error,
       loading,
       continueWithGoogle,
+      completeWithGoogleCallback,
       loginWithEmailPassword,
       logout,
       registerWithEmailPassword,

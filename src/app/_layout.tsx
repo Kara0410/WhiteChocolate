@@ -5,7 +5,7 @@ import '../../global.css';
 
 import { cssInterop } from 'nativewind';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Stack } from 'expo-router';
+import { Stack, usePathname } from 'expo-router';
 
 import {
   OnboardingLoadingScreen,
@@ -22,13 +22,20 @@ cssInterop(SafeAreaView, { className: 'style' });
 
 function RootStack() {
   const { isHydrated, shouldShowOnboarding } = useOnboarding();
+  const pathname = usePathname();
 
-  if (!isHydrated) {
+  // A native callback can arrive before hydration; keep its unprotected route
+  // mounted so the browser handoff can finish instead of showing not-found.
+  if (!isHydrated && pathname !== '/auth/callback') {
     return <OnboardingLoadingScreen />;
   }
 
   return (
     <Stack>
+      <Stack.Screen
+        name="auth/callback"
+        options={{ headerShown: false }}
+      />
       <Stack.Protected guard={shouldShowOnboarding}>
         <Stack.Screen
           name="onboarding"
