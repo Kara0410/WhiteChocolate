@@ -3,6 +3,34 @@ import type { ParkingCoordinates } from '@/types/parking-map';
 export type OnboardingStepId = 'welcome' | 'location' | 'account' | 'ready';
 export type AccountMode = 'benefit' | 'login' | 'register';
 
+export type GoogleAuthCopy = {
+  actionLabel: string;
+  loadingLabel: string;
+  separatorLabel: string;
+};
+
+const GOOGLE_AUTH_COPY: Record<AccountMode, GoogleAuthCopy> = {
+  benefit: {
+    actionLabel: 'Continue with Google',
+    loadingLabel: 'Connecting to Google',
+    separatorLabel: 'or continue with email',
+  },
+  login: {
+    actionLabel: 'Sign in with Google',
+    loadingLabel: 'Signing in with Google',
+    separatorLabel: 'or sign in with email',
+  },
+  register: {
+    actionLabel: 'Sign up with Google',
+    loadingLabel: 'Signing up with Google',
+    separatorLabel: 'or sign up with email',
+  },
+};
+
+export function getGoogleAuthCopy(accountMode: AccountMode): GoogleAuthCopy {
+  return GOOGLE_AUTH_COPY[accountMode];
+}
+
 export type OnboardingFlowStep = {
   id: OnboardingStepId;
 };

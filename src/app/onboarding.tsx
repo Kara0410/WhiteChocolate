@@ -9,6 +9,7 @@ import { useRouter } from 'expo-router';
 import {
   ActivityIndicator,
   BackHandler,
+  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -38,6 +39,7 @@ import {
   clampOnboardingIndex,
   getBackNavigationDecision,
   getContinueWithoutLocationDecision,
+  getGoogleAuthCopy,
   getRequestedLocationDecision,
   type AccountMode,
   type OnboardingStepId,
@@ -84,6 +86,7 @@ const STEPS: OnboardingStep[] = [
 const SIGNED_IN_STEPS = STEPS.filter((step) => step.id !== 'account');
 const INPUT_CLASS =
   'mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-[15px] font-semibold text-slate-900';
+const GOOGLE_G_LOGO = require('../../assets/images/google-g-logo.png');
 
 function StepIndicator({
   activeIndex,
@@ -189,50 +192,58 @@ function SecondaryButton({
 function GoogleAuthButton({
   disabled,
   isLoading,
+  mode,
   onPress,
 }: {
   disabled: boolean;
   isLoading: boolean;
+  mode: AccountMode;
   onPress: () => void;
 }) {
+  const copy = getGoogleAuthCopy(mode);
+
   return (
     <Pressable
-      accessibilityLabel="Continue with Google"
+      accessibilityLabel={copy.actionLabel}
+      accessibilityState={{ busy: isLoading, disabled }}
       accessibilityRole="button"
-      className={`mt-8 min-h-14 flex-row items-center justify-center rounded-2xl border px-5 ${
+      className={`mt-6 min-h-14 flex-row items-center justify-center rounded-2xl border px-5 ${
         disabled
-          ? 'border-slate-200 bg-slate-100'
-          : 'border-slate-300 bg-white active:bg-slate-100'
+          ? 'border-slate-200 bg-slate-100 opacity-60'
+          : 'border-[#747775] bg-white active:bg-slate-50'
       }`}
       disabled={disabled}
       onPress={onPress}
       style={{ borderCurve: 'continuous' }}
     >
-      {isLoading ? (
-        <ActivityIndicator color="#334155" size="small" />
-      ) : (
-        <View className="h-7 w-7 items-center justify-center rounded-full bg-white">
-          <Text className="text-[18px] font-black text-slate-800">G</Text>
-        </View>
-      )}
+      <View className="absolute left-4 h-[18px] w-[18px] items-center justify-center">
+        {isLoading ? (
+          <ActivityIndicator color="#334155" size="small" />
+        ) : (
+          <Image
+            accessibilityIgnoresInvertColors
+            className="h-[18px] w-[18px]"
+            resizeMode="contain"
+            source={GOOGLE_G_LOGO}
+          />
+        )}
+      </View>
       <Text
-        className={`ml-3 text-[16px] font-extrabold ${
-          disabled ? 'text-slate-400' : 'text-slate-900'
+        className={`px-7 text-center text-[15px] font-extrabold ${
+          disabled ? 'text-[#747775]' : 'text-[#1F1F1F]'
         }`}
       >
-        {isLoading ? 'Connecting to Google' : 'Continue with Google'}
+        {isLoading ? copy.loadingLabel : copy.actionLabel}
       </Text>
     </Pressable>
   );
 }
 
-function EmailSeparator() {
+function EmailSeparator({ label }: { label: string }) {
   return (
     <View className="mt-6 flex-row items-center gap-3">
       <View className="h-px flex-1 bg-slate-200" />
-      <Text className="text-[12px] font-bold text-slate-400">
-        or continue with email
-      </Text>
+      <Text className="text-[12px] font-bold text-slate-400">{label}</Text>
       <View className="h-px flex-1 bg-slate-200" />
     </View>
   );
@@ -263,14 +274,14 @@ function AccountBenefitRow({
         showDivider ? 'border-b border-slate-200' : ''
       }`}
     >
-      <View className="h-14 w-14 items-center justify-center rounded-2xl bg-blue-50">
-        <Icon color="#2563EB" size={27} strokeWidth={2.4} />
+      <View className="h-11 w-11 items-center justify-center rounded-2xl bg-blue-50">
+        <Icon color="#2563EB" size={22} strokeWidth={2.4} />
       </View>
       <View className="ml-4 flex-1">
-        <Text className="text-[16px] font-extrabold text-slate-950">
+        <Text className="text-[15px] font-extrabold text-slate-950">
           {title}
         </Text>
-        <Text className="mt-1 text-[14px] font-semibold leading-5 text-slate-500">
+        <Text className="mt-1 text-[13px] font-semibold leading-5 text-slate-500">
           {subtitle}
         </Text>
       </View>
@@ -323,6 +334,19 @@ export default function OnboardingScreen() {
   const isLocationStep = step.id === 'location';
   const isAccountStep = step.id === 'account';
   const isReadyStep = step.id === 'ready';
+  const googleAuthCopy = getGoogleAuthCopy(accountMode);
+  const accountTitle =
+    accountMode === 'register'
+      ? 'Create your account'
+      : accountMode === 'login'
+        ? 'Welcome back'
+        : 'Create a free account';
+  const accountSubtitle =
+    accountMode === 'register'
+      ? 'Sign up with Google or use your email and password to save your favorites.'
+      : accountMode === 'login'
+        ? 'Sign in with Google or use your email and password to access your saved parking.'
+        : 'Continue with Google, use your email and password, or keep exploring as a guest.';
 
   useEffect(() => {
     setActiveIndex((current) => clampOnboardingIndex(current, steps.length));
@@ -601,6 +625,8 @@ export default function OnboardingScreen() {
           paddingHorizontal: 20,
           paddingTop: Math.max(insets.top, 16) + 16,
         }}
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
         <View className="w-full max-w-[520px] self-center">
@@ -641,12 +667,12 @@ export default function OnboardingScreen() {
             <View
               className={
                 isAccountStep && accountMode === 'benefit'
-                  ? 'h-20 w-20 items-center justify-center self-start rounded-[28px] bg-blue-50'
+                  ? 'h-16 w-16 items-center justify-center self-start rounded-[24px] bg-blue-50'
                   : 'self-start rounded-[26px] bg-blue-50 p-4'
               }
             >
               {isAccountStep && accountMode === 'benefit' ? (
-                <User color="#2563EB" size={39} strokeWidth={2.4} />
+                <User color="#2563EB" size={32} strokeWidth={2.4} />
               ) : (
                 <StepIcon color="#2563EB" size={32} strokeWidth={2.4} />
               )}
@@ -657,13 +683,11 @@ export default function OnboardingScreen() {
             <Text
               className={
                 isAccountStep && accountMode === 'benefit'
-                  ? 'mt-8 text-[38px] font-black leading-[42px] tracking-[-1px] text-slate-950'
+                  ? 'mt-6 text-[36px] font-black leading-[40px] tracking-[-1px] text-slate-950'
                   : 'mt-8 text-[31px] font-black leading-[36px] text-slate-950'
               }
             >
-              {isAccountStep && accountMode === 'benefit'
-                ? 'Create a free account'
-                : step.title}
+              {isAccountStep ? accountTitle : step.title}
             </Text>
             <Text
               className={
@@ -672,9 +696,7 @@ export default function OnboardingScreen() {
                   : 'mt-3 text-[15px] font-semibold leading-6 text-slate-500'
               }
             >
-              {isAccountStep && accountMode === 'benefit'
-                ? 'Continue with Google, use your email and password, or keep exploring as a guest.'
-                : step.subtitle}
+              {isAccountStep ? accountSubtitle : step.subtitle}
             </Text>
 
             {isAccountStep ? (
@@ -690,23 +712,11 @@ export default function OnboardingScreen() {
 
                 {!account.loading && accountMode === 'benefit' ? (
                   <>
-                    <View className="mt-8">
-                      <AccountBenefitRow
-                        icon={Heart}
-                        subtitle="Keep your best parking areas in one place."
-                        title="Save your favorites"
-                      />
-                      <AccountBenefitRow
-                        icon={Info}
-                        showDivider={false}
-                        subtitle="Get details like prices, regulations, and availability where available."
-                        title="See more parking info"
-                      />
-                    </View>
                     {isGoogleAuthAvailable ? (
                       <GoogleAuthButton
                         disabled={isAccountOperationRunning}
                         isLoading={isSubmittingGoogle}
+                        mode={accountMode}
                         onPress={() => {
                           void continueWithGoogle();
                         }}
@@ -714,10 +724,10 @@ export default function OnboardingScreen() {
                     ) : (
                       <GoogleAuthWebNotice />
                     )}
-                    <EmailSeparator />
+                    <EmailSeparator label={googleAuthCopy.separatorLabel} />
                     <Pressable
                       accessibilityRole="button"
-                      className={`mt-6 h-16 items-center justify-center rounded-2xl ${
+                      className={`mt-6 min-h-14 items-center justify-center rounded-2xl px-4 ${
                         isAccountOperationRunning
                           ? 'bg-blue-300'
                           : 'bg-blue-600 active:bg-blue-700'
@@ -732,7 +742,7 @@ export default function OnboardingScreen() {
                     </Pressable>
                     <Pressable
                       accessibilityRole="button"
-                      className="mt-3 h-14 items-center justify-center rounded-2xl bg-slate-100 active:bg-slate-200 disabled:opacity-50"
+                      className="mt-3 min-h-14 items-center justify-center rounded-2xl bg-slate-100 px-4 active:bg-slate-200 disabled:opacity-50"
                       disabled={isAccountOperationRunning}
                       onPress={() => switchAccountMode('login')}
                       style={{ borderCurve: 'continuous' }}
@@ -743,20 +753,33 @@ export default function OnboardingScreen() {
                     </Pressable>
                     <Pressable
                       accessibilityRole="button"
-                      className="mt-3 h-14 items-center justify-center rounded-2xl bg-slate-100 active:bg-slate-200 disabled:opacity-50"
+                      className="mt-3 min-h-11 items-center justify-center rounded-full px-4 active:bg-slate-100 disabled:opacity-50"
                       disabled={isAccountOperationRunning}
                       onPress={skipAccount}
                       style={{ borderCurve: 'continuous' }}
                     >
-                      <Text className="text-[16px] font-extrabold text-slate-900">
+                      <Text className="text-[14px] font-extrabold text-slate-600">
                         Continue as guest
                       </Text>
                     </Pressable>
+                    <View className="mt-4 rounded-2xl bg-slate-50 px-4">
+                      <AccountBenefitRow
+                        icon={Heart}
+                        subtitle="Keep your best parking areas in one place."
+                        title="Save your favorites"
+                      />
+                      <AccountBenefitRow
+                        icon={Info}
+                        showDivider={false}
+                        subtitle="Get prices, regulations, and availability where available."
+                        title="See more parking info"
+                      />
+                    </View>
                     <View className="mt-5 flex-row items-start">
                       <Lock color="#94A3B8" size={18} strokeWidth={2.4} />
                       <Text className="ml-3 flex-1 text-[13px] font-semibold leading-5 text-slate-400">
-                        Sign in with the same email and password when you want
-                        to use account features.
+                        Your account keeps saved parking preferences ready
+                        whenever you return.
                       </Text>
                     </View>
                   </>
@@ -764,15 +787,11 @@ export default function OnboardingScreen() {
 
                 {!account.loading && isPasswordMode ? (
                   <>
-                    <Text className="mt-6 text-[13px] font-extrabold text-slate-700">
-                      {accountMode === 'register'
-                        ? 'Create account'
-                        : 'Sign in'}
-                    </Text>
                     {isGoogleAuthAvailable ? (
                       <GoogleAuthButton
                         disabled={isAccountOperationRunning}
                         isLoading={isSubmittingGoogle}
+                        mode={accountMode}
                         onPress={() => {
                           void continueWithGoogle();
                         }}
@@ -780,7 +799,7 @@ export default function OnboardingScreen() {
                     ) : (
                       <GoogleAuthWebNotice />
                     )}
-                    <EmailSeparator />
+                    <EmailSeparator label={googleAuthCopy.separatorLabel} />
                     <TextInput
                       accessibilityLabel="Email address"
                       autoCapitalize="none"

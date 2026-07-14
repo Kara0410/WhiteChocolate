@@ -5,6 +5,7 @@ import {
   clampOnboardingIndex,
   getBackNavigationDecision,
   getContinueWithoutLocationDecision,
+  getGoogleAuthCopy,
   getRequestedLocationDecision,
   type OnboardingFlowStep,
 } from '../src/utils/onboarding-flow';
@@ -44,6 +45,24 @@ test('continue without location advances explicitly without locating on entry', 
   assert.deepEqual(getContinueWithoutLocationDecision(), {
     shouldAdvance: true,
     shouldLocateOnEntry: false,
+  });
+});
+
+test('Google authentication copy matches the current account mode', () => {
+  assert.deepEqual(getGoogleAuthCopy('benefit'), {
+    actionLabel: 'Continue with Google',
+    loadingLabel: 'Connecting to Google',
+    separatorLabel: 'or continue with email',
+  });
+  assert.deepEqual(getGoogleAuthCopy('login'), {
+    actionLabel: 'Sign in with Google',
+    loadingLabel: 'Signing in with Google',
+    separatorLabel: 'or sign in with email',
+  });
+  assert.deepEqual(getGoogleAuthCopy('register'), {
+    actionLabel: 'Sign up with Google',
+    loadingLabel: 'Signing up with Google',
+    separatorLabel: 'or sign up with email',
   });
 });
 
