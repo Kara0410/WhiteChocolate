@@ -13,7 +13,6 @@ import {
 } from '@/context/MapOverlayContext';
 import { useAuthSheet } from '@/context/AuthSheetContext';
 import { useAccount } from '@/hooks/use-account';
-import { C } from '@/constants/theme';
 
 function TabNavigation() {
   const account = useAccount();
@@ -68,7 +67,7 @@ function TabNavigation() {
           : 'search';
 
   return (
-    <View style={{ flex: 1, backgroundColor: C.bg }}>
+    <View className="flex-1 bg-warm-bg">
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="map" />
         <Stack.Screen name="list" />

@@ -28,37 +28,14 @@ export const UserLocationMarker = memo(function UserLocationMarker() {
   return (
     <View
       accessibilityLabel="Your current location"
+      className="h-7 w-7 items-center justify-center"
       pointerEvents="none"
-      style={{
-        alignItems: 'center',
-        height: 28,
-        justifyContent: 'center',
-        width: 28,
-      }}
     >
       <Animated.View
-        style={[
-          {
-            backgroundColor: 'rgba(37, 99, 235, 0.28)',
-            borderRadius: 10,
-            height: 20,
-            position: 'absolute',
-            width: 20,
-          },
-          pulseStyle,
-        ]}
+        className="absolute h-5 w-5 rounded-[10px] bg-brand-500/30"
+        style={pulseStyle}
       />
-      <View
-        style={{
-          backgroundColor: '#2563EB',
-          borderColor: '#FFFFFF',
-          borderRadius: 9,
-          borderWidth: 3,
-          boxShadow: '0 1px 4px rgba(15,23,42,0.35)',
-          height: 18,
-          width: 18,
-        }}
-      />
+      <View className="h-[18px] w-[18px] rounded-[9px] border-[3px] border-white bg-brand-600 shadow-location-marker" />
     </View>
   );
 });

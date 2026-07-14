@@ -44,10 +44,9 @@ export function OnboardingLoadingScreen() {
   return (
     <View className="flex-1 items-center justify-center bg-slate-100 px-6">
       <View
-        className="w-full max-w-[320px] items-center rounded-[28px] border border-white/80 bg-white p-6"
+        className="w-full max-w-[320px] items-center rounded-[28px] border border-white/80 bg-white p-6 shadow-card"
         style={{
           borderCurve: 'continuous',
-          boxShadow: '0 4px 12px rgba(15,23,42,0.06)',
         }}
       >
         <ActivityIndicator color="#2563EB" size="large" />

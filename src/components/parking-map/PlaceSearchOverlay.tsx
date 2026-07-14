@@ -141,11 +141,10 @@ export function PlaceSearchOverlay({
       />
 
       <View
-        className="mx-4 overflow-hidden rounded-[28px] border border-white/80 bg-white shadow-lg"
+        className="mx-4 overflow-hidden rounded-[28px] border border-white/80 bg-white shadow-overlay"
         style={{
           marginTop: insets.top + 12,
           borderCurve: 'continuous',
-          boxShadow: '0 10px 24px rgba(15,23,42,0.14)',
         }}
       >
         <View className="flex-row items-center px-4 py-3">
@@ -211,7 +210,7 @@ export function PlaceSearchOverlay({
           }
           maxToRenderPerBatch={6}
           renderItem={renderSearchResult}
-          style={{ maxHeight: 360 }}
+          className="max-h-[360px]"
           updateCellsBatchingPeriod={50}
           windowSize={5}
         />

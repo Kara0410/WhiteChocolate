@@ -59,9 +59,9 @@ const ParkingListRow = memo(function ParkingListRow({
     <Pressable
       accessibilityLabel={`Open ${item.bestSpot.zoneName || 'parking area'}`}
       accessibilityRole="button"
-      className="mb-3 flex-row items-center rounded-3xl border border-white/80 bg-white px-4 py-4 active:bg-slate-50"
+      className="mb-3 flex-row items-center rounded-3xl border border-white/80 bg-white px-4 py-4 shadow-floating active:bg-slate-50"
       onPress={() => onPress(item)}
-      style={styles.row}
+      style={{ borderCurve: 'continuous' }}
     >
       <View className="h-12 w-12 items-center justify-center rounded-2xl bg-blue-50">
         <MapPin color="#2563EB" size={21} strokeWidth={2.3} />
@@ -177,7 +177,7 @@ export function ParkingListBottomSheet({
               className="h-11 w-11 items-center justify-center rounded-full bg-white active:bg-slate-100"
               hitSlop={8}
               onPress={closeSheet}
-              style={styles.closeButton}
+              style={{ borderCurve: 'continuous' }}
             >
               <X color="#475569" size={19} strokeWidth={2.5} />
             </Pressable>
@@ -216,10 +216,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
   },
-  closeButton: {
-    borderCurve: 'continuous',
-    boxShadow: '0 4px 12px rgba(15,23,42,0.07)',
-  },
   content: {
     paddingHorizontal: 20,
     paddingTop: 4,
@@ -233,10 +229,6 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     height: 5,
     width: 42,
-  },
-  row: {
-    borderCurve: 'continuous',
-    boxShadow: '0 4px 12px rgba(15,23,42,0.07)',
   },
   sheet: {
     borderTopLeftRadius: 32,

@@ -1,5 +1,5 @@
 import { memo, useCallback } from 'react';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, Text } from 'react-native';
 import Animated, {
   FadeOut,
   ReduceMotion,
@@ -58,9 +58,13 @@ export const ZoneSummaryMarker = memo(function ZoneSummaryMarker({
 
   return (
     <Animated.View
+      className="items-center justify-center"
       entering={ENTERING_TRANSITION}
       exiting={EXITING_TRANSITION}
-      style={styles.canvas}
+      style={{
+        height: ZONE_SUMMARY_MARKER_SIZE.height,
+        width: ZONE_SUMMARY_MARKER_SIZE.width,
+      }}
     >
       <Animated.View style={animatedPressStyle}>
         <Pressable
@@ -71,51 +75,26 @@ export const ZoneSummaryMarker = memo(function ZoneSummaryMarker({
           onPress={handlePress}
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
-          style={({ pressed }) => [
-            styles.pill,
-            pressed && styles.pillPressed,
-          ]}
+          className="h-9 min-w-[92px] items-center justify-center rounded-full border border-brand-100 bg-white px-3.5 shadow-marker-zone"
+          style={({ pressed }) =>
+            pressed
+              ? {
+                  borderColor: '#2563EB',
+                  boxShadow: '0 9px 20px rgba(37,99,235,0.24)',
+                  elevation: 7,
+                }
+              : undefined
+          }
         >
-          <Text numberOfLines={1} style={styles.label}>
+          <Text
+            className="text-[13px] font-extrabold leading-4 text-ink-900"
+            numberOfLines={1}
+            style={{ fontVariant: ['tabular-nums'] }}
+          >
             {label}
           </Text>
         </Pressable>
       </Animated.View>
     </Animated.View>
   );
-});
-
-const styles = StyleSheet.create({
-  canvas: {
-    alignItems: 'center',
-    height: ZONE_SUMMARY_MARKER_SIZE.height,
-    justifyContent: 'center',
-    width: ZONE_SUMMARY_MARKER_SIZE.width,
-  },
-  label: {
-    color: '#0F172A',
-    fontSize: 13,
-    fontVariant: ['tabular-nums'],
-    fontWeight: '800',
-    letterSpacing: 0,
-    lineHeight: 16,
-  },
-  pill: {
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderColor: '#DBEAFE',
-    borderRadius: 999,
-    borderWidth: 1,
-    boxShadow: '0 8px 18px rgba(15, 23, 42, 0.2)',
-    elevation: 5,
-    height: 36,
-    justifyContent: 'center',
-    minWidth: 92,
-    paddingHorizontal: 14,
-  },
-  pillPressed: {
-    borderColor: '#2563EB',
-    boxShadow: '0 9px 20px rgba(37, 99, 235, 0.24)',
-    elevation: 7,
-  },
 });

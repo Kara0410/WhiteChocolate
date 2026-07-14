@@ -329,7 +329,7 @@ const FavoriteSpotRow = memo(function FavoriteSpotRow({
           <Pressable
             accessibilityLabel={`Open ${title}`}
             accessibilityRole="button"
-            className="flex-row items-center rounded-3xl border border-white/80 bg-white px-4 py-4 active:bg-slate-50"
+            className="flex-row items-center rounded-3xl border border-white/80 bg-white px-4 py-4 shadow-floating active:bg-slate-50"
             onPress={handlePress}
             onPressIn={() => {
               pressedScale.value = withTiming(0.985, { duration: 90 });
@@ -340,7 +340,7 @@ const FavoriteSpotRow = memo(function FavoriteSpotRow({
                 stiffness: 260,
               });
             }}
-            style={styles.row}
+            style={{ borderCurve: 'continuous' }}
           >
             <FavoriteProgressRing percentage={percentage} />
             <View className="ml-4 flex-1">
@@ -516,7 +516,7 @@ export function FavoriteParkingBottomSheet({
               className="h-11 w-11 items-center justify-center rounded-full bg-white active:bg-slate-100"
               hitSlop={8}
               onPress={closeSheet}
-              style={styles.closeButton}
+              style={{ borderCurve: 'continuous' }}
             >
               <X color="#475569" size={19} strokeWidth={2.5} />
             </Pressable>
@@ -551,14 +551,6 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     height: 5,
     width: 42,
-  },
-  closeButton: {
-    borderCurve: 'continuous',
-    boxShadow: '0 4px 12px rgba(15,23,42,0.07)',
-  },
-  row: {
-    borderCurve: 'continuous',
-    boxShadow: '0 4px 12px rgba(15,23,42,0.07)',
   },
   sheet: {
     borderTopLeftRadius: 32,

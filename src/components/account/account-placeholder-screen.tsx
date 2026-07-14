@@ -42,13 +42,10 @@ export const AccountPlaceholderScreen = memo(
             accessibilityHint="Returns to the account page"
             accessibilityLabel="Back to account"
             accessibilityRole="button"
-            className="mb-5 min-h-11 flex-row items-center self-start rounded-full bg-white px-3 active:bg-slate-200"
+            className="mb-5 min-h-11 flex-row items-center self-start rounded-full bg-white px-3 shadow-floating active:bg-slate-200"
             hitSlop={8}
             onPress={goBack}
-            style={{
-              borderCurve: 'continuous',
-              boxShadow: '0 3px 10px rgba(15,23,42,0.07)',
-            }}
+            style={{ borderCurve: 'continuous' }}
           >
             <ChevronLeft color="#334155" size={20} strokeWidth={2.6} />
             <Text className="mr-1 text-[14px] font-extrabold text-slate-700">
@@ -64,11 +61,8 @@ export const AccountPlaceholderScreen = memo(
           </Text>
 
           <View
-            className="mt-6 rounded-[28px] border border-white/80 bg-white p-5"
-            style={{
-              borderCurve: 'continuous',
-              boxShadow: '0 4px 12px rgba(15,23,42,0.06)',
-            }}
+            className="mt-6 rounded-card border border-white/80 bg-white p-5 shadow-card"
+            style={{ borderCurve: 'continuous' }}
           >
             {children ?? (
               <>

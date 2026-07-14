@@ -5,7 +5,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import Animated, {
   cancelAnimation,
@@ -14,8 +14,6 @@ import Animated, {
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
-
-import { C, FONT_DISPLAY, R } from '@/constants/theme';
 
 const CHECK_SECONDS = 75;
 
@@ -46,8 +44,8 @@ export default function FreshCheckScreen() {
         intervalRef.current = null;
       }
 
-      const t = setTimeout(() => router.back(), 600);
-      return () => clearTimeout(t);
+      const timer = setTimeout(() => router.back(), 600);
+      return () => clearTimeout(timer);
     }
   }, [elapsed]);
 
@@ -61,73 +59,50 @@ export default function FreshCheckScreen() {
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-      <View style={styles.screen}>
-        <View style={styles.panel}>
-          <Animated.View style={[styles.pulseRing, ringStyle]}>
-            <View style={styles.pulseCore} />
+      <View className="flex-1 justify-end bg-warm-map-tint">
+        <View className="m-[18px] mb-8 rounded-sheet border border-warm-panel-border bg-warm-panel p-5 shadow-warm-panel">
+          <Animated.View
+            className="mb-3.5 h-[82px] w-[82px] items-center justify-center rounded-full bg-warm-accent/20"
+            style={ringStyle}
+          >
+            <View className="h-[46px] w-[46px] rounded-full bg-warm-accent" />
           </Animated.View>
 
-          <Text style={styles.micro}>Fresh occupancy check</Text>
-          <Text style={styles.heading}>Checking nearby drivers…</Text>
-          <Text style={styles.body}>
+          <Text className="mb-1.5 text-[12px] font-extrabold uppercase tracking-overline text-warm-accent-text">
+            Fresh occupancy check
+          </Text>
+          <Text className="mb-2 font-display text-[24px] font-bold tracking-[-0.4px] text-warm-text">
+            Checking nearby drivers…
+          </Text>
+          <Text className="mb-4 text-[14px] leading-5 text-warm-body-muted">
             We’ll wait up to {CHECK_SECONDS} seconds for a fresh report near your selected zone,
             then fall back to the best standing prediction.
           </Text>
 
-          <View style={styles.progressWrap} accessibilityLabel={`${remaining} seconds remaining`}>
-            <View style={[styles.progressFill, { width: `${progressPct}%` }]} />
+          <View
+            accessibilityLabel={`${remaining} seconds remaining`}
+            className="mb-2.5 h-2.5 overflow-hidden rounded-full bg-warm-progress-track"
+          >
+            <View
+              className="h-full rounded-full bg-warm-accent"
+              style={{ width: `${progressPct}%` }}
+            />
           </View>
-          <View style={styles.timerRow}>
-            <Text style={styles.timerStrong}>{elapsed}s elapsed</Text>
-            <Text style={styles.timerMuted}>
+          <View className="mb-4 flex-row justify-between">
+            <Text className="text-[13px] font-bold text-warm-text">{elapsed}s elapsed</Text>
+            <Text className="text-[13px] text-warm-muted">
               {elapsed >= CHECK_SECONDS ? 'Fallback estimate ready' : `${remaining}s remaining`}
             </Text>
           </View>
 
-          <Pressable style={styles.cancelBtn} onPress={() => router.back()}>
-            <Text style={styles.cancelBtnText}>Cancel check</Text>
+          <Pressable
+            className="min-h-12 items-center justify-center rounded-control border border-warm-border bg-warm-cancel-surface"
+            onPress={() => router.back()}
+          >
+            <Text className="text-[15px] font-black text-warm-deep">Cancel check</Text>
           </Pressable>
         </View>
       </View>
     </>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: C.mapTint, justifyContent: 'flex-end' },
-  panel: {
-    margin: 18,
-    marginBottom: 32,
-    borderRadius: R.xl,
-    padding: 20,
-    backgroundColor: 'rgba(255,252,245,0.97)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.7)',
-    boxShadow: '0 12px 28px rgba(25,42,47,0.16)',
-  },
-  pulseRing: {
-    width: 82,
-    height: 82,
-    borderRadius: 41,
-    backgroundColor: 'rgba(223,165,54,0.18)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 14,
-  },
-  pulseCore: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: C.accent,
-  },
-  micro: { color: '#7C5F1E', fontSize: 12, fontWeight: '800', letterSpacing: 1.4, textTransform: 'uppercase', marginBottom: 6 },
-  heading: { fontFamily: FONT_DISPLAY, color: C.text, fontSize: 24, fontWeight: '700', letterSpacing: -0.4, marginBottom: 8 },
-  body: { color: '#536368', lineHeight: 20, fontSize: 14, marginBottom: 16 },
-  progressWrap: { height: 10, borderRadius: 99, overflow: 'hidden', backgroundColor: 'rgba(32,56,66,0.14)', marginBottom: 9 },
-  progressFill: { height: '100%', borderRadius: 99, backgroundColor: C.accent },
-  timerRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
-  timerStrong: { color: C.text, fontSize: 13, fontWeight: '700' },
-  timerMuted: { color: C.muted, fontSize: 13 },
-  cancelBtn: { minHeight: 48, borderRadius: R.md, borderWidth: 1, borderColor: C.border, backgroundColor: '#FFFAF0', alignItems: 'center', justifyContent: 'center' },
-  cancelBtnText: { color: C.deep, fontWeight: '900', fontSize: 15 },
-});

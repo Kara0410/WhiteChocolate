@@ -1,5 +1,5 @@
 import { memo, useCallback } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import Animated, {
   ReduceMotion,
   useAnimatedStyle,
@@ -27,7 +27,10 @@ export const CellSummaryMarker = memo(function CellSummaryMarker({
   const handlePress = useCallback(() => onPress(summary), [onPress, summary]);
 
   return (
-    <Animated.View style={[styles.canvas, animatedStyle]}>
+    <Animated.View
+      className="items-center justify-center"
+      style={[{ height: CELL_SUMMARY_MARKER_SIZE.height, width: CELL_SUMMARY_MARKER_SIZE.width }, animatedStyle]}
+    >
       <Pressable
         accessibilityHint="Zooms into parking areas in this map cell"
         accessibilityLabel={label}
@@ -48,50 +51,17 @@ export const CellSummaryMarker = memo(function CellSummaryMarker({
             reduceMotion: ReduceMotion.System,
           });
         }}
-        style={styles.pill}
+        className="h-[38px] max-w-[112px] flex-row items-center justify-center rounded-full border border-brand-300 bg-brand-50 px-3 shadow-marker-cell"
       >
-        <View style={styles.accent} />
-        <Text numberOfLines={1} style={styles.label}>
+        <View className="mr-[7px] h-[7px] w-[7px] rounded-full bg-brand-500" />
+        <Text
+          className="text-[12px] font-extrabold leading-[15px] text-brand-950"
+          numberOfLines={1}
+          style={{ fontVariant: ['tabular-nums'] }}
+        >
           {label}
         </Text>
       </Pressable>
     </Animated.View>
   );
-});
-
-const styles = StyleSheet.create({
-  accent: {
-    backgroundColor: '#3B82F6',
-    borderRadius: 999,
-    height: 7,
-    marginRight: 7,
-    width: 7,
-  },
-  canvas: {
-    alignItems: 'center',
-    height: CELL_SUMMARY_MARKER_SIZE.height,
-    justifyContent: 'center',
-    width: CELL_SUMMARY_MARKER_SIZE.width,
-  },
-  label: {
-    color: '#172554',
-    fontSize: 12,
-    fontVariant: ['tabular-nums'],
-    fontWeight: '800',
-    lineHeight: 15,
-  },
-  pill: {
-    alignItems: 'center',
-    backgroundColor: '#EFF6FF',
-    borderColor: '#93C5FD',
-    borderRadius: 999,
-    borderWidth: 1,
-    boxShadow: '0 7px 16px rgba(30, 64, 175, 0.18)',
-    elevation: 5,
-    flexDirection: 'row',
-    height: 38,
-    justifyContent: 'center',
-    maxWidth: CELL_SUMMARY_MARKER_SIZE.width,
-    paddingHorizontal: 12,
-  },
 });

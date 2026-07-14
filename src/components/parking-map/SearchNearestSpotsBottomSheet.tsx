@@ -123,9 +123,9 @@ const NearestSpotRow = memo(function NearestSpotRow({
     <Pressable
       accessibilityLabel={`Open ${title}`}
       accessibilityRole="button"
-      className="mb-3 flex-row items-center rounded-3xl border border-white/80 bg-white px-4 py-4 active:bg-slate-50"
+      className="mb-3 flex-row items-center rounded-3xl border border-white/80 bg-white px-4 py-4 shadow-floating active:bg-slate-50"
       onPress={() => onPress(item)}
-      style={styles.row}
+      style={{ borderCurve: 'continuous' }}
     >
       <AvailabilityRing percentage={percentage} />
       <View className="ml-4 flex-1">
@@ -260,7 +260,7 @@ function SearchNearestSpotsBottomSheetComponent({
             className="h-10 w-10 items-center justify-center rounded-full bg-white active:bg-slate-100"
             hitSlop={8}
             onPress={closeSheet}
-            style={styles.closeButton}
+             style={{ borderCurve: 'continuous' }}
           >
             <X color="#475569" size={18} strokeWidth={2.5} />
           </Pressable>
@@ -287,7 +287,7 @@ function SearchNearestSpotsBottomSheetComponent({
               accessibilityRole="button"
               className="mt-1 flex-row items-center justify-center rounded-3xl border border-slate-200 bg-white px-4 py-3.5 active:bg-slate-50"
               onPress={toggleExpandedResults}
-              style={styles.row}
+              style={{ borderCurve: 'continuous' }}
             >
               <Text className="text-[14px] font-bold text-blue-700">
                 {isExpandedNearbyList
@@ -299,14 +299,14 @@ function SearchNearestSpotsBottomSheetComponent({
                   color="#1D4ED8"
                   size={16}
                   strokeWidth={2.6}
-                  style={styles.toggleIcon}
+                  className="ml-1.5"
                 />
               ) : (
                 <ChevronDown
                   color="#1D4ED8"
                   size={16}
                   strokeWidth={2.6}
-                  style={styles.toggleIcon}
+                  className="ml-1.5"
                 />
               )}
             </Pressable>
@@ -353,10 +353,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
   },
-  closeButton: {
-    borderCurve: 'continuous',
-    boxShadow: '0 4px 12px rgba(15,23,42,0.07)',
-  },
   handle: {
     paddingBottom: 10,
     paddingTop: 12,
@@ -371,18 +367,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 2,
   },
-  row: {
-    borderCurve: 'continuous',
-    boxShadow: '0 4px 12px rgba(15,23,42,0.07)',
-  },
   sheet: {
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
     boxShadow: '0 -4px 14px rgba(0,0,0,0.1)',
     elevation: MAP_ELEVATIONS.bottomSheet,
     zIndex: MAP_LAYERS.bottomSheet,
-  },
-  toggleIcon: {
-    marginLeft: 6,
   },
 });

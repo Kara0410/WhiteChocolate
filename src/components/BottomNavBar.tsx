@@ -10,7 +10,6 @@ import {
   FlatList,
   Keyboard,
   Pressable,
-  StyleSheet,
   Text,
   TextInput,
   useWindowDimensions,
@@ -158,19 +157,23 @@ const NavigationItem = memo(function NavigationItem({
       onPressOut={() => {
         pressedScale.value = withSpring(1, { damping: 14, stiffness: 260 });
       }}
-      style={styles.navigationItem}
+      className="h-full min-w-11 flex-1 items-center justify-center"
     >
       <Animated.View
+        className="min-h-[54px] min-w-[72px] items-center justify-center gap-[3px] rounded-[24px] border border-transparent"
         style={[
-          styles.navigationItemContent,
           activeStyle,
           animatedStyle,
         ]}
       >
-        <View style={styles.navigationIcon}>
+        <View className="h-[29px] w-[29px] items-center justify-center rounded-[15px]">
           <Icon color={color} size={19} strokeWidth={active ? 2.45 : 2.05} />
         </View>
-        <Text numberOfLines={1} style={[styles.navigationLabel, { color }]}>
+        <Text
+          className="text-[8.5px] font-extrabold leading-[10px] tracking-[0.35px]"
+          numberOfLines={1}
+          style={{ color }}
+        >
           {item.label}
         </Text>
       </Animated.View>
@@ -427,30 +430,37 @@ export default function BottomNavBar({
     <>
       <AnimatedPressable
         accessibilityLabel="Close search"
+        className="absolute inset-0 z-20 bg-slate-900/20"
         onPress={closeSearch}
         pointerEvents={isSearchActive ? 'auto' : 'none'}
-        style={[styles.searchBackdrop, backdropStyle]}
+        style={[{ elevation: MAP_ELEVATIONS.navBackdrop, zIndex: MAP_LAYERS.navBackdrop }, backdropStyle]}
       />
       <Animated.View
+        className="absolute left-0 right-0 h-[84px] items-center"
         pointerEvents="box-none"
-        style={[styles.wrapper, { bottom: bottomOffset }, wrapperStyle]}
+        style={[{ bottom: bottomOffset, elevation: MAP_ELEVATIONS.navBar, zIndex: MAP_LAYERS.navBar }, wrapperStyle]}
       >
-        <Animated.View style={[styles.morphSurface, surfaceStyle]}>
+        <Animated.View
+          className="overflow-hidden rounded-[30px] border border-white/10 shadow-nav"
+          style={[{ borderCurve: 'continuous' }, surfaceStyle]}
+        >
           <BlurView
             intensity={34}
             pointerEvents="none"
-            style={styles.surfaceBlur}
+            className="absolute inset-0"
             tint="dark"
           />
           <Animated.View
+            className="absolute inset-0 bg-slate-900/10"
             pointerEvents="none"
-            style={[styles.surfaceShade, surfaceShadeStyle]}
+            style={surfaceShadeStyle}
           />
           <Animated.View
+            className="absolute inset-0 flex-row items-center px-1.5"
             pointerEvents={isSearchActive ? 'none' : 'auto'}
-            style={[styles.normalContent, navStyle]}
+            style={navStyle}
           >
-            <View style={styles.navigationGroup}>
+            <View className="h-full flex-1 flex-row items-center">
               {items.map((item) => (
                 <NavigationItem
                   active={activeKey === item.key}
@@ -462,8 +472,9 @@ export default function BottomNavBar({
           </Animated.View>
 
           <Animated.View
+            className="absolute inset-0 flex-row items-center px-2"
             pointerEvents={isSearchActive ? 'auto' : 'none'}
-            style={[styles.searchContent, searchContentStyle]}
+            style={searchContentStyle}
           >
             <Pressable
               accessibilityLabel="Cancel search"
@@ -512,10 +523,10 @@ export default function BottomNavBar({
         </Animated.View>
 
         <Animated.View
+          className="absolute top-[56px] overflow-hidden rounded-[24px] border border-white/80 bg-white/98 shadow-overlay"
           pointerEvents={isSearchActive ? 'auto' : 'none'}
           style={[
-            styles.suggestionsCard,
-            { maxHeight: suggestionMaxHeight, width: searchWidth },
+            { maxHeight: suggestionMaxHeight, width: searchWidth, borderCurve: 'continuous' },
             suggestionsStyle,
           ]}
         >
@@ -569,96 +580,3 @@ export default function BottomNavBar({
     </>
   );
 }
-
-const styles = StyleSheet.create({
-  searchBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(15,23,42,0.2)',
-    elevation: MAP_ELEVATIONS.navBackdrop,
-    zIndex: MAP_LAYERS.navBackdrop,
-  },
-  wrapper: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    elevation: MAP_ELEVATIONS.navBar,
-    zIndex: MAP_LAYERS.navBar,
-    height: NAVBAR_HEIGHT,
-    alignItems: 'center',
-  },
-  morphSurface: {
-    borderRadius: 30,
-    borderCurve: 'continuous',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    boxShadow: '0 14px 32px rgba(2,6,23,0.28)',
-    overflow: 'hidden',
-  },
-  surfaceBlur: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  surfaceShade: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(15,23,42,0.12)',
-  },
-  normalContent: {
-    ...StyleSheet.absoluteFillObject,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-  },
-  searchContent: {
-    ...StyleSheet.absoluteFillObject,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-  },
-  suggestionsCard: {
-    position: 'absolute',
-    top: SEARCH_BAR_HEIGHT + 8,
-    overflow: 'hidden',
-    borderRadius: 24,
-    borderCurve: 'continuous',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.82)',
-    backgroundColor: 'rgba(255,255,255,0.98)',
-    boxShadow: '0 10px 24px rgba(15,23,42,0.14)',
-  },
-  navigationGroup: {
-    flex: 1,
-    height: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  navigationItem: {
-    flex: 1,
-    minWidth: 44,
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  navigationItemContent: {
-    minWidth: 72,
-    minHeight: 54,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0)',
-    gap: 3,
-  },
-  navigationIcon: {
-    width: 29,
-    height: 29,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'transparent',
-  },
-  navigationLabel: {
-    fontSize: 8.5,
-    lineHeight: 10,
-    fontWeight: '800',
-    letterSpacing: 0.35,
-  },
-});

@@ -1435,7 +1435,7 @@ export function ParkingMap({
   );
 
   return (
-    <View onLayout={handleLayout} style={{ flex: 1, overflow: 'hidden' }}>
+    <View className="flex-1 overflow-hidden" onLayout={handleLayout}>
       {Platform.OS === 'ios' ? (
         <AppleMaps.View
           ref={appleMapRef}
@@ -1461,7 +1461,7 @@ export function ParkingMap({
           uiSettings={GOOGLE_MAP_UI_SETTINGS}
         />
       ) : (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <View className="flex-1 items-center justify-center">
           <Text selectable>Maps are only available on Android and iOS.</Text>
         </View>
       )}
@@ -1551,10 +1551,9 @@ export function ParkingMap({
               accessibilityHint="Finds parking recommendations in the visible map area"
               accessibilityLabel="Search this area"
               accessibilityRole="button"
-              className="flex-row items-center rounded-full border border-slate-200 bg-white px-4 py-2.5 active:bg-slate-100"
+              className="flex-row items-center rounded-full border border-slate-200 bg-white px-4 py-2.5 shadow-floating-strong active:bg-slate-100"
               disabled={isSearchAreaRefreshing}
               onPress={handleSearchThisAreaPress}
-              style={{ boxShadow: '0 4px 14px rgba(15,23,42,0.16)' }}
             >
               {isSearchAreaRefreshing ? (
                 <ActivityIndicator color="#2563EB" size="small" />
@@ -1587,8 +1586,7 @@ export function ParkingMap({
         >
           {locationMessage ? (
             <View
-              className="max-w-64 rounded-2xl bg-slate-950/90 px-3 py-2"
-              style={{ boxShadow: '0 5px 16px rgba(15,23,42,0.18)' }}
+              className="max-w-64 rounded-2xl bg-slate-950/90 px-3 py-2 shadow-floating-message"
             >
               <Text className="text-right text-xs font-semibold leading-4 text-white">
                 {locationMessage}
@@ -1601,10 +1599,9 @@ export function ParkingMap({
             accessibilityState={{
               selected: mapMode === 'userLocation',
             }}
-            className="h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white active:bg-slate-100"
+            className="h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white shadow-floating-deep active:bg-slate-100"
             disabled={isLocationLoading}
             onPress={handleCurrentLocationPress}
-            style={{ boxShadow: '0 4px 14px rgba(15,23,42,0.2)' }}
           >
             {isLocationLoading ? (
               <ActivityIndicator color="#2563EB" size="small" />
@@ -1619,9 +1616,8 @@ export function ParkingMap({
             accessibilityState={{
               selected: mapMode === 'munichOverview',
             }}
-            className="h-12 w-12 items-center justify-center rounded-full border border-blue-200 bg-blue-50 active:bg-blue-100"
+            className="h-12 w-12 items-center justify-center rounded-full border border-blue-200 bg-blue-50 shadow-floating-strong active:bg-blue-100"
             onPress={handleMunichOverviewPress}
-            style={{ boxShadow: '0 4px 14px rgba(15,23,42,0.16)' }}
           >
             <MapPinned color="#1D4ED8" size={21} strokeWidth={2.3} />
           </Pressable>

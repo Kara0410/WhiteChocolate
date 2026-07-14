@@ -25,11 +25,8 @@ export const SettingsSection = memo(function SettingsSection({
         ) : null}
       </View>
       <View
-        className="overflow-hidden rounded-[28px] border border-white/80 bg-white"
-        style={{
-          borderCurve: 'continuous',
-          boxShadow: '0 4px 12px rgba(15,23,42,0.06)',
-        }}
+        className="overflow-hidden rounded-card border border-white/80 bg-white shadow-card"
+        style={{ borderCurve: 'continuous' }}
       >
         {children}
       </View>

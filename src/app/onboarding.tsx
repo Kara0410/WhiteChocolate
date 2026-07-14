@@ -574,13 +574,10 @@ export default function OnboardingScreen() {
             key={step.id}
             className={`border border-white/80 bg-white ${
               isAccountStep && accountMode === 'benefit'
-                ? 'rounded-[36px] px-7 py-8'
-                : 'rounded-[32px] px-6 py-7'
+                ? 'rounded-[36px] px-7 py-8 shadow-overlay'
+                : 'rounded-[32px] px-6 py-7 shadow-overlay'
             }`}
-            style={{
-              borderCurve: 'continuous',
-              boxShadow: '0 12px 30px rgba(15,23,42,0.09)',
-            }}
+            style={{ borderCurve: 'continuous' }}
           >
             <View className="min-h-11 flex-row items-center">
               {showBackButton ? (

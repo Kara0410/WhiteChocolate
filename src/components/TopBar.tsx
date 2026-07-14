@@ -1,6 +1,5 @@
 import { Text, View } from 'react-native';
 import type { ReactNode } from 'react';
-import { C, FONT_DISPLAY } from '@/constants/theme';
 
 type Props = {
   title: string;
@@ -10,30 +9,12 @@ type Props = {
 
 export default function TopBar({ title, subtitle, action }: Props) {
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
-      <View style={{ flex: 1 }}>
-        <Text
-          style={{
-            color: '#7C5F1E',
-            fontSize: 12,
-            fontWeight: '800',
-            letterSpacing: 1.4,
-            textTransform: 'uppercase',
-            marginBottom: 5,
-          }}
-        >
+    <View className="mb-3.5 flex-row items-center justify-between gap-3">
+      <View className="flex-1">
+        <Text className="mb-1 text-[12px] font-extrabold uppercase tracking-overline text-warm-accent-text">
           {subtitle}
         </Text>
-        <Text
-          style={{
-            fontFamily: FONT_DISPLAY,
-            color: C.text,
-            fontSize: 27,
-            fontWeight: '700',
-            letterSpacing: -0.6,
-            lineHeight: 30,
-          }}
-        >
+        <Text className="font-display text-[27px] font-bold leading-[30px] tracking-[-0.6px] text-warm-text">
           {title}
         </Text>
       </View>

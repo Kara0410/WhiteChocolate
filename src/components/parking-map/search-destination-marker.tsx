@@ -17,7 +17,7 @@ export const SearchDestinationMarker = memo(
       >
         <Animated.View
           entering={DESTINATION_ENTERING_TRANSITION}
-          style={{ boxShadow: '0 4px 10px rgba(127,29,29,0.28)' }}
+          className="shadow-search-marker"
         >
           <MapPin
             color="#FFFFFF"

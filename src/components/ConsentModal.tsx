@@ -1,6 +1,5 @@
 import { Modal, Pressable, Text, View } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { C, FONT_DISPLAY, R } from '@/constants/theme';
 
 type Props = {
   visible: boolean;
@@ -17,55 +16,40 @@ const BULLETS = [
 export default function ConsentModal({ visible, onContinue, onDismiss }: Props) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onDismiss}>
-      <View style={{ flex: 1, backgroundColor: 'rgba(23,33,38,0.32)', justifyContent: 'flex-end' }}>
-        <Pressable style={{ flex: 1 }} onPress={onDismiss} />
+      <View className="flex-1 justify-end bg-warm-overlay-ink">
+        <Pressable className="flex-1" onPress={onDismiss} />
         <BlurView
           intensity={60}
           tint="light"
-          style={{
-            margin: 18,
-            marginBottom: 28,
-            borderRadius: R.xl,
-            padding: 20,
-            borderWidth: 1,
-            borderColor: 'rgba(255,255,255,0.7)',
-            overflow: 'hidden',
-          }}
+          className="m-[18px] mb-7 overflow-hidden rounded-sheet border border-warm-panel-border bg-warm-panel p-5"
         >
-          <Text style={{ color: '#7C5F1E', fontSize: 12, fontWeight: '800', letterSpacing: 1.4, textTransform: 'uppercase', marginBottom: 8 }}>
+          <Text className="mb-2 text-[12px] font-extrabold uppercase tracking-overline text-warm-accent-text">
             Before location access
           </Text>
-          <Text style={{ fontFamily: FONT_DISPLAY, color: C.text, fontSize: 22, fontWeight: '700', letterSpacing: -0.4, marginBottom: 10 }}>
+          <Text className="mb-2.5 font-display text-[22px] font-bold tracking-[-0.4px] text-warm-text">
             Use your location only to rank nearby zones.
           </Text>
-          <Text style={{ color: '#46575C', fontSize: 15, lineHeight: 21, marginBottom: 12 }}>
+          <Text className="mb-3 text-[15px] leading-[21px] text-warm-body">
             Munich Parking can show the map without your location. If you allow it, we use coarse
             position for nearby predictions and fresh-check requests.
           </Text>
-          {BULLETS.map((b) => (
-            <View key={b} style={{ flexDirection: 'row', gap: 8, marginBottom: 6 }}>
-              <Text style={{ color: '#46575C', fontSize: 15, lineHeight: 21 }}>·</Text>
-              <Text style={{ flex: 1, color: '#46575C', fontSize: 14, lineHeight: 20 }}>{b}</Text>
+          {BULLETS.map((bullet) => (
+            <View key={bullet} className="mb-1.5 flex-row gap-2">
+              <Text className="text-[15px] leading-[21px] text-warm-body">·</Text>
+              <Text className="flex-1 text-[14px] leading-5 text-warm-body">{bullet}</Text>
             </View>
           ))}
           <Pressable
             onPress={onContinue}
-            style={{
-              marginTop: 14,
-              minHeight: 48,
-              borderRadius: R.md,
-              backgroundColor: C.deep,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
+            className="mt-3.5 min-h-12 items-center justify-center rounded-control bg-warm-deep"
           >
-            <Text style={{ color: '#fff', fontWeight: '900', fontSize: 15 }}>Continue to OS prompt</Text>
+            <Text className="text-[15px] font-black text-white">Continue to OS prompt</Text>
           </Pressable>
           <Pressable
             onPress={onDismiss}
-            style={{ marginTop: 8, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
+            className="mt-2 min-h-11 items-center justify-center"
           >
-            <Text style={{ color: C.deep, fontWeight: '900', fontSize: 15 }}>Not now</Text>
+            <Text className="text-[15px] font-black text-warm-deep">Not now</Text>
           </Pressable>
         </BlurView>
       </View>

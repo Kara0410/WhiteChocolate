@@ -18,15 +18,12 @@ function DevelopmentOnboardingReset({ top }: { top: number }) {
     <Pressable
       accessibilityLabel="Reset onboarding"
       accessibilityRole="button"
-      className="absolute right-4 min-h-10 items-center justify-center rounded-full bg-slate-950/85 px-4 active:bg-slate-800"
+      className="absolute right-4 z-50 min-h-10 items-center justify-center rounded-full bg-slate-950/85 px-4 active:bg-slate-800"
       onPress={() => {
         resetOnboardingForDev();
         router.replace('/onboarding');
       }}
-      style={{
-        top,
-        zIndex: 50,
-      }}
+      style={{ top }}
     >
       <Text className="text-[12px] font-black text-white">
         Reset onboarding

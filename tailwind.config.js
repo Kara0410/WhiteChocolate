@@ -1,4 +1,36 @@
 /** @type {import('tailwindcss').Config} */
+
+// These palettes intentionally define the utility names already used in the
+// source (`bg-blue-600`, `text-slate-500`, etc.). NativeWind reads them while
+// compiling className strings; application components should not import this
+// Node-oriented config file at runtime.
+const BRAND = {
+  50: '#EFF6FF',
+  100: '#DBEAFE',
+  200: '#BFDBFE',
+  300: '#93C5FD',
+  500: '#3B82F6',
+  600: '#2563EB',
+  700: '#1D4ED8',
+  800: '#1E40AF',
+  900: '#1E3A8A',
+  950: '#172554',
+};
+
+const INK = {
+  50: '#F8FAFC',
+  100: '#F1F5F9',
+  200: '#E2E8F0',
+  300: '#CBD5E1',
+  400: '#94A3B8',
+  500: '#64748B',
+  600: '#475569',
+  700: '#334155',
+  800: '#1E293B',
+  900: '#0F172A',
+  950: '#020617',
+};
+
 module.exports = {
   // Scan every source file so Tailwind only ships the classes that are actually used.
   content: ['./src/**/*.{js,jsx,ts,tsx}'],
@@ -38,14 +70,23 @@ module.exports = {
           bg: '#E9E1D3',
           surface: '#FFFCF5',
           'surface-warm': '#F7F0E4',
+          panel: '#FFFCF5F7',
           text: '#172126',
           muted: '#69767A',
+          body: '#46575C',
+          'body-muted': '#536368',
+          'deep-text': '#31454C',
           border: '#D9CFC0',
           accent: '#DFA536',
+          'accent-text': '#7C5F1E',
           deep: '#203842',
           'map-tint': '#D7E6E9',
           'danger-soft': '#F1D9CA',
           'danger-text': '#69462E',
+          'overlay-ink': '#17212652',
+          'panel-border': '#FFFFFFB3',
+          'progress-track': '#20384224',
+          'cancel-surface': '#FFFAF0',
         },
 
         // Primary action family for the current light UI.
@@ -53,34 +94,57 @@ module.exports = {
         // parking headers/list rows, search overlays, and navigation controls.
         // Examples: bg-blue-600 (primary), active:bg-blue-700 (pressed),
         // bg-blue-50 (icon tile), bg-blue-100 (soft pressed/selected state).
-        brand: {
-          50: '#EFF6FF',
-          100: '#DBEAFE',
-          200: '#BFDBFE',
-          300: '#93C5FD',
-          500: '#3B82F6',
-          600: '#2563EB',
-          700: '#1D4ED8',
-          800: '#1E40AF',
-          900: '#1E3A8A',
-        },
+        brand: BRAND,
+
+        // Explicit utility aliases. These are the names existing components
+        // already use, so changing a token here updates the app consistently.
+        blue: BRAND,
 
         // Neutral text/surface aliases used throughout account, settings,
         // bottom-sheet, and map components. These mirror Tailwind's built-in
         // slate values already used by classes such as text-slate-950,
         // text-slate-500, border-slate-200, and bg-slate-100.
-        ink: {
-          950: '#020617',
-          900: '#0F172A',
-          700: '#334155',
-          600: '#475569',
-          500: '#64748B',
-          400: '#94A3B8',
-          300: '#CBD5E1',
-          200: '#E2E8F0',
-          100: '#F1F5F9',
-          50: '#F8FAFC',
+        ink: INK,
+        slate: INK,
+
+        // Supporting utility families used by parking status rows, warnings,
+        // restrictions, validation messages, and the legacy detail screen.
+        emerald: {
+          100: '#D1FAE5',
+          500: '#10B981',
+          700: '#047857',
         },
+        orange: {
+          100: '#FFEDD5',
+          500: '#F97316',
+          600: '#EA580C',
+          700: '#C2410C',
+        },
+        red: {
+          50: '#FEF2F2',
+          100: '#FEE2E2',
+          200: '#FECACA',
+          600: '#DC2626',
+          700: '#B91C1C',
+          800: '#991B1B',
+        },
+        purple: {
+          100: '#F3E8FF',
+          700: '#7E22CE',
+        },
+        amber: {
+          50: '#FFFBEB',
+          100: '#FEF3C7',
+          600: '#D97706',
+        },
+        gray: {
+          200: '#E5E7EB',
+          500: '#6B7280',
+          600: '#4B5563',
+          700: '#374151',
+        },
+        white: '#FFFFFF',
+        black: '#000000',
 
         // Semantic light surfaces. Use these aliases for new screens when the
         // intent is clearer than a raw slate utility. Existing screens mostly
@@ -232,6 +296,16 @@ module.exports = {
         overlay: '0 10px 24px rgba(15,23,42,0.14)',
         sheet: '0 -4px 14px rgba(0,0,0,0.1)',
         nav: '0 14px 32px rgba(2,6,23,0.28)',
+        'warm-panel': '0 12px 28px rgba(25,42,47,0.16)',
+        'marker-cell': '0 7px 16px rgba(30,64,175,0.18)',
+        'marker-zone': '0 8px 18px rgba(15,23,42,0.2)',
+        'marker-zone-pressed': '0 9px 20px rgba(37,99,235,0.24)',
+        // Map floating controls use these stronger elevations than the base floating recipe.
+        'floating-strong': '0 4px 14px rgba(15,23,42,0.16)',
+        'floating-deep': '0 4px 14px rgba(15,23,42,0.2)',
+        'floating-message': '0 5px 16px rgba(15,23,42,0.18)',
+        'search-marker': '0 4px 10px rgba(127,29,29,0.28)',
+        'location-marker': '0 1px 4px rgba(15,23,42,0.35)',
       },
 
       /*
