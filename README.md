@@ -57,6 +57,21 @@ src/
 | `npm run build:dev:android`  | EAS development build (Android)          |
 | `npm run build:dev:ios`      | EAS development build (iOS)              |
 
+## Google authentication callback
+
+Google sign-in uses Supabase OAuth in the system browser and returns to the
+native app at:
+
+```
+whitechoclate://auth/callback
+```
+
+Add that exact URL to **Supabase Dashboard > Authentication > URL
+Configuration > Redirect URLs**. A broader `whitechoclate://**` allow-list
+entry also works, but permits every callback path under the app scheme. This
+dashboard setting cannot be configured from application code. Google first
+returns to Supabase; Supabase then redirects to the app callback above.
+
 ## Maps & secrets
 
 Google Maps keys are embedded into the **native build** by the `expo-maps`

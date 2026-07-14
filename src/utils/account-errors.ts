@@ -12,7 +12,12 @@ import type {
 } from '@/types/account';
 import type { PreferencesError } from '@/types/preferences';
 
-type AuthFailureOperation = 'login' | 'signup' | 'session' | 'logout';
+type AuthFailureOperation =
+  | 'login'
+  | 'signup'
+  | 'oauth'
+  | 'session'
+  | 'logout';
 
 type NormalizedAuthFailure = {
   category: AccountErrorCategory;
@@ -290,6 +295,8 @@ export function normalizeAuthFailure(
         ? 'LOGIN_FAILED'
         : operation === 'signup'
           ? 'UNKNOWN_AUTH_ERROR'
+          : operation === 'oauth'
+            ? 'GOOGLE_AUTH_FAILED'
           : operation === 'logout'
             ? 'LOGOUT_FAILED'
             : 'LOAD_FAILED',
@@ -297,6 +304,8 @@ export function normalizeAuthFailure(
     message:
       operation === 'signup'
         ? 'Account creation is temporarily unavailable. Please try again later.'
+        : operation === 'oauth'
+          ? 'Google sign-in did not complete. Please try again.'
         : operation === 'login'
           ? 'Sign in did not complete. Check your email and password, then try again.'
           : operation === 'logout'
@@ -367,6 +376,10 @@ export function loginFailedError(cause: unknown): AccountError {
 
 export function registerFailedError(cause: unknown): AccountError {
   return accountAuthError('signup', cause);
+}
+
+export function googleAuthFailedError(cause: unknown): AccountError {
+  return accountAuthError('oauth', cause);
 }
 
 export function logoutFailedError(cause: unknown): AccountError {

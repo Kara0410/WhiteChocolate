@@ -9,6 +9,7 @@ import { useRouter } from 'expo-router';
 import {
   ActivityIndicator,
   BackHandler,
+  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -185,6 +186,66 @@ function SecondaryButton({
   );
 }
 
+function GoogleAuthButton({
+  disabled,
+  isLoading,
+  onPress,
+}: {
+  disabled: boolean;
+  isLoading: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityLabel="Continue with Google"
+      accessibilityRole="button"
+      className={`mt-8 min-h-14 flex-row items-center justify-center rounded-2xl border px-5 ${
+        disabled
+          ? 'border-slate-200 bg-slate-100'
+          : 'border-slate-300 bg-white active:bg-slate-100'
+      }`}
+      disabled={disabled}
+      onPress={onPress}
+      style={{ borderCurve: 'continuous' }}
+    >
+      {isLoading ? (
+        <ActivityIndicator color="#334155" size="small" />
+      ) : (
+        <View className="h-7 w-7 items-center justify-center rounded-full bg-white">
+          <Text className="text-[18px] font-black text-slate-800">G</Text>
+        </View>
+      )}
+      <Text
+        className={`ml-3 text-[16px] font-extrabold ${
+          disabled ? 'text-slate-400' : 'text-slate-900'
+        }`}
+      >
+        {isLoading ? 'Connecting to Google' : 'Continue with Google'}
+      </Text>
+    </Pressable>
+  );
+}
+
+function EmailSeparator() {
+  return (
+    <View className="mt-6 flex-row items-center gap-3">
+      <View className="h-px flex-1 bg-slate-200" />
+      <Text className="text-[12px] font-bold text-slate-400">
+        or continue with email
+      </Text>
+      <View className="h-px flex-1 bg-slate-200" />
+    </View>
+  );
+}
+
+function GoogleAuthWebNotice() {
+  return (
+    <Text className="mt-6 rounded-2xl bg-slate-100 px-4 py-3 text-center text-[13px] font-semibold leading-5 text-slate-600">
+      Google sign-in is available in the iOS and Android app.
+    </Text>
+  );
+}
+
 function AccountBenefitRow({
   icon: Icon,
   showDivider = true,
@@ -245,6 +306,7 @@ export default function OnboardingScreen() {
     null,
   );
   const [isSubmittingAccount, setIsSubmittingAccount] = useState(false);
+  const [isSubmittingGoogle, setIsSubmittingGoogle] = useState(false);
   const [isCompletingOnboarding, setIsCompletingOnboarding] =
     useState(false);
   const [completionError, setCompletionError] = useState<string | null>(
@@ -334,6 +396,37 @@ export default function OnboardingScreen() {
     goNext();
   }, [goNext, markAccountSkipped]);
 
+  const continueWithGoogle = useCallback(async () => {
+    if (
+      isSubmittingAccount ||
+      isSubmittingGoogle ||
+      account.status === 'signingIn'
+    ) {
+      return;
+    }
+
+    setIsSubmittingGoogle(true);
+    setLocalAccountError(null);
+    setRegistrationNotice(null);
+
+    try {
+      const result = await account.continueWithGoogle();
+
+      if (!result.ok) {
+        if (result.error.code !== 'GOOGLE_AUTH_CANCELLED') {
+          setLocalAccountError(result.error.message);
+        }
+        return;
+      }
+
+      // setSession emits through AccountContext's existing auth listener.
+      // Removing the account step leaves this index pointing at "ready".
+      setLocalAccountError(null);
+    } finally {
+      setIsSubmittingGoogle(false);
+    }
+  }, [account, isSubmittingAccount, isSubmittingGoogle]);
+
   const submitAccount = useCallback(async () => {
     if (isSubmittingAccount) {
       return;
@@ -408,8 +501,15 @@ export default function OnboardingScreen() {
 
   const isPasswordMode =
     accountMode === 'login' || accountMode === 'register';
+  const isAccountOperationRunning =
+    isSubmittingAccount ||
+    isSubmittingGoogle ||
+    account.status === 'signingIn';
+  const isGoogleAuthAvailable = Platform.OS !== 'web';
   const isBackDisabled =
-    isLocationLoading || isSubmittingAccount || isCompletingOnboarding;
+    isLocationLoading ||
+    isAccountOperationRunning ||
+    isCompletingOnboarding;
   const showBackButton = stepIndex > 0 || isPasswordMode;
 
   const goBack = useCallback(() => {
@@ -485,7 +585,7 @@ export default function OnboardingScreen() {
 
   const passwordsMatch = password === confirmPassword;
   const canSubmitAccount =
-    !isSubmittingAccount &&
+    !isAccountOperationRunning &&
     email.trim().length > 0 &&
     password.length > 0 &&
     (accountMode !== 'register' ||
@@ -573,7 +673,7 @@ export default function OnboardingScreen() {
               }
             >
               {isAccountStep && accountMode === 'benefit'
-                ? 'Create an account with your email and password, or continue as a guest and sign up later.'
+                ? 'Continue with Google, use your email and password, or keep exploring as a guest.'
                 : step.subtitle}
             </Text>
 
@@ -603,19 +703,48 @@ export default function OnboardingScreen() {
                         title="See more parking info"
                       />
                     </View>
+                    {isGoogleAuthAvailable ? (
+                      <GoogleAuthButton
+                        disabled={isAccountOperationRunning}
+                        isLoading={isSubmittingGoogle}
+                        onPress={() => {
+                          void continueWithGoogle();
+                        }}
+                      />
+                    ) : (
+                      <GoogleAuthWebNotice />
+                    )}
+                    <EmailSeparator />
                     <Pressable
                       accessibilityRole="button"
-                      className="mt-8 h-16 items-center justify-center rounded-2xl bg-blue-600 active:bg-blue-700"
+                      className={`mt-6 h-16 items-center justify-center rounded-2xl ${
+                        isAccountOperationRunning
+                          ? 'bg-blue-300'
+                          : 'bg-blue-600 active:bg-blue-700'
+                      }`}
+                      disabled={isAccountOperationRunning}
                       onPress={() => switchAccountMode('register')}
                       style={{ borderCurve: 'continuous' }}
                     >
                       <Text className="text-[17px] font-extrabold text-white">
-                        Create an account
+                        Create account with email/password
                       </Text>
                     </Pressable>
                     <Pressable
                       accessibilityRole="button"
-                      className="mt-3 h-14 items-center justify-center rounded-2xl bg-slate-100 active:bg-slate-200"
+                      className="mt-3 h-14 items-center justify-center rounded-2xl bg-slate-100 active:bg-slate-200 disabled:opacity-50"
+                      disabled={isAccountOperationRunning}
+                      onPress={() => switchAccountMode('login')}
+                      style={{ borderCurve: 'continuous' }}
+                    >
+                      <Text className="text-[16px] font-extrabold text-slate-900">
+                        Sign in with email/password
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      className="mt-3 h-14 items-center justify-center rounded-2xl bg-slate-100 active:bg-slate-200 disabled:opacity-50"
+                      disabled={isAccountOperationRunning}
                       onPress={skipAccount}
                       style={{ borderCurve: 'continuous' }}
                     >
@@ -640,13 +769,25 @@ export default function OnboardingScreen() {
                         ? 'Create account'
                         : 'Sign in'}
                     </Text>
+                    {isGoogleAuthAvailable ? (
+                      <GoogleAuthButton
+                        disabled={isAccountOperationRunning}
+                        isLoading={isSubmittingGoogle}
+                        onPress={() => {
+                          void continueWithGoogle();
+                        }}
+                      />
+                    ) : (
+                      <GoogleAuthWebNotice />
+                    )}
+                    <EmailSeparator />
                     <TextInput
                       accessibilityLabel="Email address"
                       autoCapitalize="none"
                       autoComplete="email"
                       autoCorrect={false}
                       className={INPUT_CLASS}
-                      editable={!isSubmittingAccount}
+                      editable={!isAccountOperationRunning}
                       inputMode="email"
                       keyboardType="email-address"
                       onChangeText={setEmail}
@@ -665,7 +806,7 @@ export default function OnboardingScreen() {
                       }
                       autoCorrect={false}
                       className={INPUT_CLASS}
-                      editable={!isSubmittingAccount}
+                      editable={!isAccountOperationRunning}
                       onChangeText={setPassword}
                       placeholder="Password"
                       placeholderTextColor="#94A3B8"
@@ -684,7 +825,7 @@ export default function OnboardingScreen() {
                         autoComplete="new-password"
                         autoCorrect={false}
                         className={INPUT_CLASS}
-                        editable={!isSubmittingAccount}
+                        editable={!isAccountOperationRunning}
                         onChangeText={setConfirmPassword}
                         placeholder="Confirm password"
                         placeholderTextColor="#94A3B8"
@@ -720,7 +861,7 @@ export default function OnboardingScreen() {
                       }}
                     />
                     <SecondaryButton
-                      disabled={isSubmittingAccount}
+                      disabled={isAccountOperationRunning}
                       label={
                         accountMode === 'register'
                           ? 'Already have an account? Sign in'
@@ -733,7 +874,7 @@ export default function OnboardingScreen() {
                       }
                     />
                     <SecondaryButton
-                      disabled={isSubmittingAccount}
+                      disabled={isAccountOperationRunning}
                       label="Continue as guest"
                       onPress={skipAccount}
                     />

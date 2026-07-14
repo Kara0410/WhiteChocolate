@@ -15,6 +15,10 @@ import {
   type AccountAuthClient,
 } from '@/services/account-auth';
 import {
+  continueWithGoogleService,
+  type GoogleOAuthAuthClient,
+} from '@/services/account-google-auth';
+import {
   hydrateAccountSession,
   subscribeToAccountAuthChanges,
 } from '@/services/account-session';
@@ -28,6 +32,7 @@ import type {
 } from '@/types/account';
 import {
   createAccountError,
+  googleAuthFailedError,
   logAccountAuthFailure,
   logoutFailedError,
 } from '@/utils/account-errors';
@@ -44,6 +49,7 @@ type AccountContextValue = ReturnType<typeof getCurrentAccountSnapshot> & {
     email: string,
     password: string,
   ) => Promise<AccountActionResult>;
+  continueWithGoogle: () => Promise<AccountActionResult>;
   registerWithEmailPassword: (
     email: string,
     password: string,
@@ -59,6 +65,12 @@ const authClient: AccountAuthClient = {
   signInWithPassword: (credentials) =>
     supabase.auth.signInWithPassword(credentials),
   signUp: (credentials) => supabase.auth.signUp(credentials),
+};
+
+const googleOAuthAuthClient: GoogleOAuthAuthClient = {
+  signInWithOAuth: (credentials) =>
+    supabase.auth.signInWithOAuth(credentials),
+  setSession: (credentials) => supabase.auth.setSession(credentials),
 };
 
 export function AccountProvider({ children }: PropsWithChildren) {
@@ -140,6 +152,32 @@ export function AccountProvider({ children }: PropsWithChildren) {
         }
 
         return result;
+      } finally {
+        setSigningIn(false);
+      }
+    },
+    [],
+  );
+
+  const continueWithGoogle = useCallback(
+    async (): Promise<AccountActionResult> => {
+      setError(null);
+      setSigningIn(true);
+
+      try {
+        const result = await continueWithGoogleService({
+          auth: googleOAuthAuthClient,
+        });
+
+        if (!result.ok && result.error.code !== 'GOOGLE_AUTH_CANCELLED') {
+          setError(result.error);
+        }
+
+        return result;
+      } catch (googleError) {
+        const failedError = googleAuthFailedError(googleError);
+        setError(failedError);
+        return { ok: false, error: failedError };
       } finally {
         setSigningIn(false);
       }
@@ -253,6 +291,7 @@ export function AccountProvider({ children }: PropsWithChildren) {
       error,
       refresh,
       loginWithEmailPassword,
+      continueWithGoogle,
       registerWithEmailPassword,
       logout,
       deleteAccount,
@@ -263,6 +302,7 @@ export function AccountProvider({ children }: PropsWithChildren) {
       deleteAccount,
       error,
       loading,
+      continueWithGoogle,
       loginWithEmailPassword,
       logout,
       registerWithEmailPassword,

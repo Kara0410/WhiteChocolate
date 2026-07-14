@@ -55,6 +55,27 @@ test('login service catches thrown network exceptions', async () => {
   }
 });
 
+test('email/password login still delegates normalized credentials unchanged', async () => {
+  let receivedCredentials: { email: string; password: string } | null = null;
+
+  const result = await loginWithEmailPasswordService({
+    auth: authClient({
+      signInWithPassword: async (credentials) => {
+        receivedCredentials = credentials;
+        return { data: {}, error: null };
+      },
+    }),
+    email: ' DRIVER@Example.COM ',
+    password: 'password123',
+  });
+
+  assert.deepEqual(result, { ok: true });
+  assert.deepEqual(receivedCredentials, {
+    email: 'driver@example.com',
+    password: 'password123',
+  });
+});
+
 test('signup with a session returns authenticated status', async () => {
   const result = await registerWithEmailPasswordService({
     auth: authClient({

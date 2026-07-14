@@ -151,3 +151,14 @@ test('active onboarding index is clamped when the steps array changes', () => {
   assert.equal(clampOnboardingIndex(-1, signedInSteps.length), 0);
   assert.equal(clampOnboardingIndex(0, 0), 0);
 });
+
+test('removing the account step advances its index to ready without another navigation', () => {
+  const accountStepIndex = 2;
+  const nextIndex = clampOnboardingIndex(
+    accountStepIndex,
+    signedInSteps.length,
+  );
+
+  assert.equal(nextIndex, 2);
+  assert.equal(signedInSteps[nextIndex]?.id, 'ready');
+});
