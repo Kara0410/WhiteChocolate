@@ -15,9 +15,9 @@ import {
 } from '../src/utils/google-auth-callback';
 
 const signedOutSteps: OnboardingFlowStep[] = [
+  { id: 'account' },
   { id: 'welcome' },
   { id: 'location' },
-  { id: 'account' },
   { id: 'ready' },
 ];
 
@@ -53,7 +53,7 @@ test('continue without location advances explicitly without locating on entry', 
 });
 
 test('Google authentication copy matches the current account mode', () => {
-  assert.deepEqual(getGoogleAuthCopy('benefit'), {
+  assert.deepEqual(getGoogleAuthCopy('choice'), {
     actionLabel: 'Continue with Google',
     loadingLabel: 'Connecting to Google',
     separatorLabel: 'or continue with email',
@@ -146,17 +146,17 @@ test('Google callback processing waits for hydration and active OAuth operations
   );
 });
 
-test('back navigation stays on welcome', () => {
+test('back navigation stays on account choice', () => {
   assert.deepEqual(
     getBackNavigationDecision({
-      accountMode: 'benefit',
+      accountMode: 'choice',
       activeIndex: 0,
       steps: signedOutSteps,
     }),
     {
       action: 'stay',
       activeIndex: 0,
-      accountMode: 'benefit',
+      accountMode: 'choice',
     },
   );
 });
@@ -164,83 +164,72 @@ test('back navigation stays on welcome', () => {
 test('back navigation follows signed-out onboarding steps', () => {
   assert.deepEqual(
     getBackNavigationDecision({
-      accountMode: 'benefit',
+      accountMode: 'choice',
       activeIndex: 1,
       steps: signedOutSteps,
     }),
     {
       action: 'previous-step',
       activeIndex: 0,
-      accountMode: 'benefit',
+      accountMode: 'choice',
     },
   );
 
   assert.deepEqual(
     getBackNavigationDecision({
-      accountMode: 'benefit',
+      accountMode: 'choice',
       activeIndex: 2,
       steps: signedOutSteps,
     }),
     {
       action: 'previous-step',
       activeIndex: 1,
-      accountMode: 'benefit',
+      accountMode: 'choice',
     },
   );
 
   assert.deepEqual(
     getBackNavigationDecision({
-      accountMode: 'benefit',
+      accountMode: 'choice',
       activeIndex: 3,
       steps: signedOutSteps,
     }),
     {
       action: 'previous-step',
       activeIndex: 2,
-      accountMode: 'benefit',
+      accountMode: 'choice',
     },
   );
 });
 
-test('back navigation returns login and register modes to account benefits first', () => {
-  assert.deepEqual(
-    getBackNavigationDecision({
-      accountMode: 'login',
-      activeIndex: 2,
-      steps: signedOutSteps,
-    }),
-    {
-      action: 'account-benefit',
-      activeIndex: 2,
-      accountMode: 'benefit',
-    },
-  );
-
-  assert.deepEqual(
-    getBackNavigationDecision({
-      accountMode: 'register',
-      activeIndex: 2,
-      steps: signedOutSteps,
-    }),
-    {
-      action: 'account-benefit',
-      activeIndex: 2,
-      accountMode: 'benefit',
-    },
-  );
+test('back navigation returns auth and guest modes to account choice first', () => {
+  for (const accountMode of ['login', 'register', 'guest'] as const) {
+    assert.deepEqual(
+      getBackNavigationDecision({
+        accountMode,
+        activeIndex: 0,
+        steps: signedOutSteps,
+      }),
+      {
+        action: 'account-choice',
+        activeIndex: 0,
+        accountMode: 'choice',
+      },
+    );
+  }
 });
 
 test('signed-in back navigation does not assume the account step exists', () => {
   assert.deepEqual(
     getBackNavigationDecision({
-      accountMode: 'benefit',
+      accountMode: 'choice',
       activeIndex: 2,
       steps: signedInSteps,
     }),
     {
       action: 'previous-step',
       activeIndex: 1,
-      accountMode: 'benefit',
+      accountMode: 'choice',
     },
   );
 });
@@ -251,13 +240,7 @@ test('active onboarding index is clamped when the steps array changes', () => {
   assert.equal(clampOnboardingIndex(0, 0), 0);
 });
 
-test('removing the account step advances its index to ready without another navigation', () => {
-  const accountStepIndex = 2;
-  const nextIndex = clampOnboardingIndex(
-    accountStepIndex,
-    signedInSteps.length,
-  );
-
-  assert.equal(nextIndex, 2);
-  assert.equal(signedInSteps[nextIndex]?.id, 'ready');
+test('signed-in onboarding starts with the first real onboarding step', () => {
+  assert.equal(signedInSteps[0]?.id, 'welcome');
+  assert.equal(clampOnboardingIndex(0, signedInSteps.length), 0);
 });

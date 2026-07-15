@@ -1,7 +1,8 @@
 import type { ParkingCoordinates } from '@/types/parking-map';
 
 export type OnboardingStepId = 'welcome' | 'location' | 'account' | 'ready';
-export type AccountMode = 'benefit' | 'login' | 'register';
+export type AccountMode = 'choice' | 'login' | 'register' | 'guest';
+export type GoogleAuthMode = Exclude<AccountMode, 'guest'>;
 
 export type GoogleAuthCopy = {
   actionLabel: string;
@@ -9,8 +10,8 @@ export type GoogleAuthCopy = {
   separatorLabel: string;
 };
 
-const GOOGLE_AUTH_COPY: Record<AccountMode, GoogleAuthCopy> = {
-  benefit: {
+const GOOGLE_AUTH_COPY: Record<GoogleAuthMode, GoogleAuthCopy> = {
+  choice: {
     actionLabel: 'Continue with Google',
     loadingLabel: 'Connecting to Google',
     separatorLabel: 'or continue with email',
@@ -27,7 +28,7 @@ const GOOGLE_AUTH_COPY: Record<AccountMode, GoogleAuthCopy> = {
   },
 };
 
-export function getGoogleAuthCopy(accountMode: AccountMode): GoogleAuthCopy {
+export function getGoogleAuthCopy(accountMode: GoogleAuthMode): GoogleAuthCopy {
   return GOOGLE_AUTH_COPY[accountMode];
 }
 
@@ -52,7 +53,7 @@ export type BackNavigationDecision =
       accountMode: AccountMode;
     }
   | {
-      action: 'account-benefit';
+      action: 'account-choice';
       activeIndex: number;
       accountMode: AccountMode;
     };
@@ -98,12 +99,14 @@ export function getBackNavigationDecision({
 
   if (
     currentStep?.id === 'account' &&
-    (accountMode === 'login' || accountMode === 'register')
+    (accountMode === 'login' ||
+      accountMode === 'register' ||
+      accountMode === 'guest')
   ) {
     return {
-      action: 'account-benefit',
+      action: 'account-choice',
       activeIndex: currentIndex,
-      accountMode: 'benefit',
+      accountMode: 'choice',
     };
   }
 
@@ -118,6 +121,6 @@ export function getBackNavigationDecision({
   return {
     action: 'previous-step',
     activeIndex: currentIndex - 1,
-    accountMode: 'benefit',
+    accountMode: 'choice',
   };
 }

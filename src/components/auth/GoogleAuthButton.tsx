@@ -1,14 +1,14 @@
 import { ActivityIndicator, Image, Pressable, Text, View } from 'react-native';
 
 import { getGoogleAuthCopy } from '@/utils/onboarding-flow';
-import type { AccountMode } from '@/utils/onboarding-flow';
+import type { GoogleAuthMode } from '@/utils/onboarding-flow';
 
 const GOOGLE_G_LOGO = require('../../../assets/images/google-g-logo.png');
 
 type GoogleAuthButtonProps = {
   disabled: boolean;
   isLoading: boolean;
-  mode: AccountMode;
+  mode: GoogleAuthMode;
   onPress: () => void;
 };
 

@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ComponentType,
 } from 'react';
@@ -18,14 +19,17 @@ import {
 } from 'react-native';
 import {
   ArrowLeft,
+  Check,
+  ChevronRight,
   Heart,
   Info,
   LocateFixed,
-  Lock,
+  LogIn,
   MapPin,
   MapPinned,
   Navigation,
   User,
+  UserPlus,
   type LucideProps,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -40,7 +44,6 @@ import {
   clampOnboardingIndex,
   getBackNavigationDecision,
   getContinueWithoutLocationDecision,
-  getGoogleAuthCopy,
   getRequestedLocationDecision,
   type AccountMode,
   type OnboardingStepId,
@@ -55,6 +58,12 @@ type OnboardingStep = {
 
 const STEPS: OnboardingStep[] = [
   {
+    id: 'account',
+    title: 'Choose how to continue',
+    subtitle: 'Select an option to begin your onboarding.',
+    icon: User,
+  },
+  {
     id: 'welcome',
     title: 'Find parking faster in Munich',
     subtitle:
@@ -67,13 +76,6 @@ const STEPS: OnboardingStep[] = [
     subtitle:
       `Allow location while using the app so ${APP_DISPLAY_NAME} can center the map and show nearby parking. You can still search manually.`,
     icon: LocateFixed,
-  },
-  {
-    id: 'account',
-    title: 'Create a free account',
-    subtitle:
-      'Create an account to save favorites and keep parking preferences ready for future sync.',
-    icon: User,
   },
   {
     id: 'ready',
@@ -189,6 +191,84 @@ function SecondaryButton({
   );
 }
 
+function AccountPathOption({
+  disabled = false,
+  icon: Icon,
+  label,
+  onPress,
+  variant = 'secondary',
+}: {
+  disabled?: boolean;
+  icon: ComponentType<LucideProps>;
+  label: string;
+  onPress: () => void;
+  variant?: 'primary' | 'secondary' | 'guest';
+}) {
+  const isPrimary = variant === 'primary';
+  const isGuest = variant === 'guest';
+
+  return (
+    <Pressable
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      className={`min-h-[72px] flex-row items-center rounded-2xl border px-5 active:opacity-90 ${
+        isPrimary
+          ? 'border-blue-600 bg-blue-600 active:bg-blue-700'
+          : isGuest
+            ? 'border-slate-200 bg-slate-100 active:bg-slate-200'
+            : 'border-slate-200 bg-white active:bg-slate-50'
+      } ${disabled ? 'opacity-50' : ''}`}
+      disabled={disabled}
+      onPress={onPress}
+      style={{ borderCurve: 'continuous' }}
+    >
+      <Icon
+        color={isPrimary ? '#FFFFFF' : '#2563EB'}
+        size={21}
+        strokeWidth={2.5}
+      />
+      <Text
+        className={`ml-4 flex-1 text-[16px] font-extrabold ${
+          isPrimary ? 'text-white' : 'text-slate-900'
+        }`}
+      >
+        {label}
+      </Text>
+      <ChevronRight
+        color={isPrimary ? '#FFFFFF' : '#64748B'}
+        size={21}
+        strokeWidth={2.5}
+      />
+    </Pressable>
+  );
+}
+
+type EmailAuthMode = Extract<AccountMode, 'login' | 'register'>;
+
+type EmailAuthViewProps = {
+  accountErrorMessage: string | null;
+  authMode: EmailAuthMode;
+  canSubmit: boolean;
+  confirmPassword: string;
+  email: string;
+  hasAttemptedSubmit: boolean;
+  isAccountOperationRunning: boolean;
+  isGoogleAuthAvailable: boolean;
+  isSubmittingAccount: boolean;
+  isSubmittingGoogle: boolean;
+  localAccountError: string | null;
+  onChangeEmail: (value: string) => void;
+  onChangePassword: (value: string) => void;
+  onChangeConfirmPassword: (value: string) => void;
+  onContinueWithGoogle: () => void;
+  onSubmit: () => void;
+  onSwitchMode: (mode: EmailAuthMode) => void;
+  password: string;
+  passwordsMatch: boolean;
+  registrationNotice: string | null;
+};
+
 function GoogleAuthWebNotice() {
   return (
     <Text className="mt-6 rounded-2xl bg-slate-100 px-4 py-3 text-center text-[13px] font-semibold leading-5 text-slate-600">
@@ -197,34 +277,231 @@ function GoogleAuthWebNotice() {
   );
 }
 
-function AccountBenefitRow({
-  icon: Icon,
-  showDivider = true,
-  subtitle,
-  title,
+function EmailAuthView({
+  accountErrorMessage,
+  authMode,
+  canSubmit,
+  confirmPassword,
+  email,
+  hasAttemptedSubmit,
+  isAccountOperationRunning,
+  isGoogleAuthAvailable,
+  isSubmittingAccount,
+  isSubmittingGoogle,
+  localAccountError,
+  onChangeConfirmPassword,
+  onChangeEmail,
+  onChangePassword,
+  onContinueWithGoogle,
+  onSubmit,
+  onSwitchMode,
+  password,
+  passwordsMatch,
+  registrationNotice,
+}: EmailAuthViewProps) {
+  const isRegister = authMode === 'register';
+  const visibleError =
+    localAccountError ??
+    (hasAttemptedSubmit ? accountErrorMessage : null);
+
+  return (
+    <>
+      {isGoogleAuthAvailable ? (
+        <GoogleAuthButton
+          disabled={isAccountOperationRunning}
+          isLoading={isSubmittingGoogle}
+          mode={authMode}
+          onPress={onContinueWithGoogle}
+        />
+      ) : (
+        <GoogleAuthWebNotice />
+      )}
+      <EmailSeparator label="or continue with email" />
+      <TextInput
+        accessibilityLabel="Email address"
+        autoCapitalize="none"
+        autoComplete="email"
+        autoCorrect={false}
+        className={INPUT_CLASS}
+        editable={!isAccountOperationRunning}
+        inputMode="email"
+        keyboardType="email-address"
+        onChangeText={onChangeEmail}
+        placeholder="you@example.com"
+        placeholderTextColor="#94A3B8"
+        textContentType="emailAddress"
+        value={email}
+      />
+      <TextInput
+        accessibilityLabel="Password"
+        autoCapitalize="none"
+        autoComplete={isRegister ? 'new-password' : 'current-password'}
+        autoCorrect={false}
+        className={INPUT_CLASS}
+        editable={!isAccountOperationRunning}
+        onChangeText={onChangePassword}
+        placeholder="Password"
+        placeholderTextColor="#94A3B8"
+        secureTextEntry
+        textContentType={isRegister ? 'newPassword' : 'password'}
+        value={password}
+      />
+      {isRegister ? (
+        <TextInput
+          accessibilityLabel="Confirm password"
+          autoCapitalize="none"
+          autoComplete="new-password"
+          autoCorrect={false}
+          className={INPUT_CLASS}
+          editable={!isAccountOperationRunning}
+          onChangeText={onChangeConfirmPassword}
+          placeholder="Confirm password"
+          placeholderTextColor="#94A3B8"
+          secureTextEntry
+          textContentType="newPassword"
+          value={confirmPassword}
+        />
+      ) : null}
+      {isRegister && confirmPassword.length > 0 && !passwordsMatch ? (
+        <Text
+          accessibilityRole="alert"
+          className="mt-3 text-[13px] font-semibold leading-5 text-red-700"
+        >
+          Passwords do not match.
+        </Text>
+      ) : null}
+      <PrimaryButton
+        disabled={!canSubmit}
+        isLoading={isSubmittingAccount}
+        label={
+          isSubmittingAccount
+            ? isRegister
+              ? 'Creating account'
+              : 'Signing in'
+            : isRegister
+              ? 'Create account'
+              : 'Log in'
+        }
+        onPress={onSubmit}
+      />
+      <SecondaryButton
+        disabled={isAccountOperationRunning}
+        label={
+          isRegister
+            ? 'Already have an account? Log in'
+            : 'Don’t have an account? Register'
+        }
+        onPress={() => onSwitchMode(isRegister ? 'login' : 'register')}
+      />
+      {visibleError ? (
+        <Text
+          accessibilityRole="alert"
+          className="mt-3 text-[13px] font-semibold leading-5 text-red-700"
+        >
+          {visibleError}
+        </Text>
+      ) : null}
+      {registrationNotice ? (
+        <Text
+          accessibilityRole="alert"
+          className="mt-3 rounded-2xl bg-blue-50 px-4 py-3 text-[13px] font-semibold leading-5 text-blue-800"
+        >
+          {registrationNotice}
+        </Text>
+      ) : null}
+    </>
+  );
+}
+
+function LoginView(props: Omit<EmailAuthViewProps, 'authMode'>) {
+  return <EmailAuthView {...props} authMode="login" />;
+}
+
+function RegisterView(props: Omit<EmailAuthViewProps, 'authMode'>) {
+  return <EmailAuthView {...props} authMode="register" />;
+}
+
+function AccountChoiceView({
+  disabled,
+  onLogin,
+  onRegister,
+  onGuest,
 }: {
-  icon: ComponentType<LucideProps>;
-  showDivider?: boolean;
-  subtitle: string;
-  title: string;
+  disabled: boolean;
+  onGuest: () => void;
+  onLogin: () => void;
+  onRegister: () => void;
 }) {
   return (
-    <View
-      className={`flex-row items-center py-4 ${
-        showDivider ? 'border-b border-slate-200' : ''
-      }`}
-    >
-      <View className="h-11 w-11 items-center justify-center rounded-2xl bg-blue-50">
-        <Icon color="#2563EB" size={22} strokeWidth={2.4} />
+    <View className="mt-8 gap-3">
+      <AccountPathOption
+        disabled={disabled}
+        icon={LogIn}
+        label="Log in"
+        onPress={onLogin}
+      />
+      <AccountPathOption
+        disabled={disabled}
+        icon={UserPlus}
+        label="Register"
+        onPress={onRegister}
+        variant="primary"
+      />
+      <AccountPathOption
+        disabled={disabled}
+        icon={User}
+        label="Continue as guest"
+        onPress={onGuest}
+        variant="guest"
+      />
+    </View>
+  );
+}
+
+const GUEST_CAPABILITIES = [
+  'Search destinations and nearby parking',
+  'View parking information',
+  'Open navigation in your maps app',
+] as const;
+
+function GuestConfirmationView({
+  isConfirming,
+  onBackToChoices,
+  onConfirm,
+}: {
+  isConfirming: boolean;
+  onBackToChoices: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <View className="mt-7">
+      <View className="gap-3 rounded-2xl bg-slate-50 px-4 py-4">
+        {GUEST_CAPABILITIES.map((capability) => (
+          <View key={capability} className="flex-row items-start gap-3">
+            <Check color="#2563EB" size={19} strokeWidth={2.7} />
+            <Text className="flex-1 text-[14px] font-semibold leading-5 text-slate-700">
+              {capability}
+            </Text>
+          </View>
+        ))}
       </View>
-      <View className="ml-4 flex-1">
-        <Text className="text-[15px] font-extrabold text-slate-950">
-          {title}
-        </Text>
-        <Text className="mt-1 text-[13px] font-semibold leading-5 text-slate-500">
-          {subtitle}
-        </Text>
-      </View>
+      <Text className="mt-4 text-[13px] font-semibold leading-5 text-slate-500">
+        Favorites and synced preferences require an account. You can register
+        later from the app.
+      </Text>
+      <PrimaryButton
+        disabled={isConfirming}
+        isLoading={isConfirming}
+        label={
+          isConfirming ? 'Starting onboarding' : 'Start onboarding as guest'
+        }
+        onPress={onConfirm}
+      />
+      <SecondaryButton
+        disabled={isConfirming}
+        label="Choose another option"
+        onPress={onBackToChoices}
+      />
     </View>
   );
 }
@@ -246,23 +523,27 @@ export default function OnboardingScreen() {
   const [activeIndex, setActiveIndex] = useState(0);
   const [shouldLocateOnEntry, setShouldLocateOnEntry] = useState(false);
   const [accountMode, setAccountMode] =
-    useState<AccountMode>('benefit');
+    useState<AccountMode>('choice');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [localAccountError, setLocalAccountError] = useState<string | null>(
     null,
   );
+  const [hasAttemptedAccountSubmit, setHasAttemptedAccountSubmit] =
+    useState(false);
   const [registrationNotice, setRegistrationNotice] = useState<string | null>(
     null,
   );
   const [isSubmittingAccount, setIsSubmittingAccount] = useState(false);
   const [isSubmittingGoogle, setIsSubmittingGoogle] = useState(false);
+  const [isConfirmingGuest, setIsConfirmingGuest] = useState(false);
   const [isCompletingOnboarding, setIsCompletingOnboarding] =
     useState(false);
   const [completionError, setCompletionError] = useState<string | null>(
     null,
   );
+  const accountPathSelectionRef = useRef(false);
 
   const steps = useMemo(
     () => (account.isSignedIn ? SIGNED_IN_STEPS : STEPS),
@@ -274,23 +555,33 @@ export default function OnboardingScreen() {
   const isLocationStep = step.id === 'location';
   const isAccountStep = step.id === 'account';
   const isReadyStep = step.id === 'ready';
-  const googleAuthCopy = getGoogleAuthCopy(accountMode);
   const accountTitle =
     accountMode === 'register'
       ? 'Create your account'
       : accountMode === 'login'
         ? 'Welcome back'
-        : 'Create a free account';
+        : accountMode === 'guest'
+          ? 'Continue as guest'
+        : step.title;
   const accountSubtitle =
     accountMode === 'register'
-      ? 'Sign up with Google or use your email and password to save your favorites.'
+      ? 'Create your account with your email and password.'
       : accountMode === 'login'
-        ? 'Sign in with Google or use your email and password to access your saved parking.'
-        : 'Continue with Google, use your email and password, or keep exploring as a guest.';
+        ? 'Sign in with your email and password to continue.'
+        : accountMode === 'guest'
+          ? 'Explore the app without creating an account.'
+        : step.subtitle;
+
+  const isPasswordMode =
+    accountMode === 'login' || accountMode === 'register';
+  const isAccountOperationRunning =
+    isSubmittingAccount ||
+    isSubmittingGoogle ||
+    account.status === 'signingIn';
 
   useEffect(() => {
     setActiveIndex((current) => clampOnboardingIndex(current, steps.length));
-    setAccountMode('benefit');
+    setAccountMode('choice');
   }, [steps.length]);
 
   const enterApp = useCallback(async () => {
@@ -354,22 +645,116 @@ export default function OnboardingScreen() {
     }
   }, [goNext]);
 
-  const skipAccount = useCallback(() => {
+  const confirmGuest = useCallback(() => {
+    if (
+      isAccountOperationRunning ||
+      isConfirmingGuest ||
+      accountPathSelectionRef.current
+    ) {
+      return;
+    }
+
+    accountPathSelectionRef.current = true;
+    setIsConfirmingGuest(true);
     setLocalAccountError(null);
+    setPassword('');
+    setConfirmPassword('');
     markAccountSkipped();
     goNext();
-  }, [goNext, markAccountSkipped]);
+  }, [
+    goNext,
+    isAccountOperationRunning,
+    isConfirmingGuest,
+    markAccountSkipped,
+  ]);
+
+  const continueToOnboarding = useCallback(() => {
+    setPassword('');
+    setConfirmPassword('');
+    setLocalAccountError(null);
+    setHasAttemptedAccountSubmit(false);
+    setRegistrationNotice(null);
+    setAccountMode('choice');
+    setActiveIndex(0);
+  }, []);
+
+  const submitAccount = useCallback(async () => {
+    if (isSubmittingAccount || !isPasswordMode) {
+      return;
+    }
+
+    if (accountMode === 'register' && password !== confirmPassword) {
+      setLocalAccountError('Passwords do not match.');
+      return;
+    }
+
+    setIsSubmittingAccount(true);
+    setHasAttemptedAccountSubmit(true);
+    setLocalAccountError(null);
+    setRegistrationNotice(null);
+
+    try {
+      if (accountMode === 'register') {
+        const result = await account.registerWithEmailPassword(
+          email.trim(),
+          password,
+        );
+
+        if (!result.ok) {
+          setLocalAccountError(result.error.message);
+          return;
+        }
+
+        if (result.status === 'confirmation-required') {
+          setPassword('');
+          setConfirmPassword('');
+          setRegistrationNotice(
+            `Account created for ${result.email}. Confirm your email before signing in.`,
+          );
+          setAccountMode('register');
+          return;
+        }
+
+        continueToOnboarding();
+        return;
+      }
+
+      const result = await account.loginWithEmailPassword(
+        email.trim(),
+        password,
+      );
+
+      if (!result.ok) {
+        setLocalAccountError(result.error.message);
+        return;
+      }
+
+      continueToOnboarding();
+    } finally {
+      setIsSubmittingAccount(false);
+    }
+  }, [
+    account,
+    accountMode,
+    confirmPassword,
+    continueToOnboarding,
+    email,
+    isPasswordMode,
+    isSubmittingAccount,
+    password,
+  ]);
 
   const continueWithGoogle = useCallback(async () => {
     if (
-      isSubmittingAccount ||
-      isSubmittingGoogle ||
-      account.status === 'signingIn'
+      !isPasswordMode ||
+      isAccountOperationRunning ||
+      isSubmittingGoogle
     ) {
       return;
     }
 
     setIsSubmittingGoogle(true);
+    setHasAttemptedAccountSubmit(false);
     setLocalAccountError(null);
     setRegistrationNotice(null);
 
@@ -383,98 +768,52 @@ export default function OnboardingScreen() {
         return;
       }
 
-      // setSession emits through AccountContext's existing auth listener.
-      // Removing the account step leaves this index pointing at "ready".
-      setLocalAccountError(null);
+      continueToOnboarding();
     } finally {
       setIsSubmittingGoogle(false);
     }
-  }, [account, isSubmittingAccount, isSubmittingGoogle]);
-
-  const submitAccount = useCallback(async () => {
-    if (isSubmittingAccount) {
-      return;
-    }
-
-    if (accountMode === 'register' && password !== confirmPassword) {
-      setLocalAccountError('Passwords do not match.');
-      return;
-    }
-
-    setIsSubmittingAccount(true);
-    setLocalAccountError(null);
-    setRegistrationNotice(null);
-
-    try {
-      if (accountMode === 'register') {
-        const result = await account.registerWithEmailPassword(
-          email,
-          password,
-        );
-
-        if (!result.ok) {
-          setLocalAccountError(result.error.message);
-          return;
-        }
-
-        if (result.status === 'confirmation-required') {
-          setPassword('');
-          setConfirmPassword('');
-          setRegistrationNotice(
-            `Account created for ${result.email}. Confirm your email before signing in, or continue as a guest for now.`,
-          );
-          setAccountMode('benefit');
-          return;
-        }
-
-        setPassword('');
-        setConfirmPassword('');
-        goNext();
-        return;
-      }
-
-      const result = await account.loginWithEmailPassword(email, password);
-
-      if (!result.ok) {
-        setLocalAccountError(result.error.message);
-        return;
-      }
-
-      setPassword('');
-      setConfirmPassword('');
-      goNext();
-    } finally {
-      setIsSubmittingAccount(false);
-    }
   }, [
     account,
-    accountMode,
-    confirmPassword,
-    email,
-    goNext,
-    isSubmittingAccount,
-    password,
+    continueToOnboarding,
+    isAccountOperationRunning,
+    isPasswordMode,
+    isSubmittingGoogle,
   ]);
 
   const switchAccountMode = useCallback((nextMode: AccountMode) => {
     setAccountMode(nextMode);
+    setPassword('');
     setConfirmPassword('');
     setLocalAccountError(null);
+    setHasAttemptedAccountSubmit(false);
     setRegistrationNotice(null);
+    setIsConfirmingGuest(false);
+    setCompletionError(null);
   }, []);
 
-  const isPasswordMode =
-    accountMode === 'login' || accountMode === 'register';
-  const isAccountOperationRunning =
-    isSubmittingAccount ||
-    isSubmittingGoogle ||
-    account.status === 'signingIn';
-  const isGoogleAuthAvailable = Platform.OS !== 'web';
+  const selectAccountPath = useCallback(
+    (nextMode: AccountMode | 'guest') => {
+      if (isAccountOperationRunning || accountPathSelectionRef.current) {
+        return;
+      }
+
+      if (nextMode === 'login' || nextMode === 'register') {
+        switchAccountMode(nextMode);
+        return;
+      }
+
+      if (nextMode === 'guest') {
+        switchAccountMode('guest');
+      }
+    },
+    [isAccountOperationRunning, switchAccountMode],
+  );
   const isBackDisabled =
     isLocationLoading ||
     isAccountOperationRunning ||
     isCompletingOnboarding;
-  const showBackButton = stepIndex > 0 || isPasswordMode;
+  const showBackButton =
+    stepIndex > 0 || (isAccountStep && accountMode !== 'choice');
 
   const goBack = useCallback(() => {
     if (isBackDisabled) {
@@ -491,13 +830,19 @@ export default function OnboardingScreen() {
       return false;
     }
 
-    setAccountMode(decision.accountMode);
-    setLocalAccountError(null);
-    setRegistrationNotice(null);
+    accountPathSelectionRef.current = false;
+    switchAccountMode(decision.accountMode);
+    setIsConfirmingGuest(false);
     setCompletionError(null);
     setActiveIndex(decision.activeIndex);
     return true;
-  }, [accountMode, isBackDisabled, stepIndex, steps]);
+  }, [
+    accountMode,
+    isBackDisabled,
+    stepIndex,
+    steps,
+    switchAccountMode,
+  ]);
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener(
@@ -554,6 +899,31 @@ export default function OnboardingScreen() {
     password.length > 0 &&
     (accountMode !== 'register' ||
       (confirmPassword.length > 0 && passwordsMatch));
+  const emailAuthViewProps: Omit<EmailAuthViewProps, 'authMode'> = {
+    accountErrorMessage: account.error?.message ?? null,
+    canSubmit: canSubmitAccount,
+    confirmPassword,
+    email,
+    hasAttemptedSubmit: hasAttemptedAccountSubmit,
+    isAccountOperationRunning,
+    isGoogleAuthAvailable: Platform.OS !== 'web',
+    isSubmittingAccount,
+    isSubmittingGoogle,
+    localAccountError,
+    onChangeConfirmPassword: setConfirmPassword,
+    onChangeEmail: setEmail,
+    onChangePassword: setPassword,
+    onContinueWithGoogle: () => {
+      void continueWithGoogle();
+    },
+    onSubmit: () => {
+      void submitAccount();
+    },
+    onSwitchMode: (mode) => switchAccountMode(mode),
+    password,
+    passwordsMatch,
+    registrationNotice,
+  };
 
   return (
     <View className="flex-1 bg-slate-100">
@@ -573,7 +943,7 @@ export default function OnboardingScreen() {
           <View
             key={step.id}
             className={`border border-white/80 bg-white ${
-              isAccountStep && accountMode === 'benefit'
+              isAccountStep && accountMode === 'choice'
                 ? 'rounded-[36px] px-7 py-8 shadow-overlay'
                 : 'rounded-[32px] px-6 py-7 shadow-overlay'
             }`}
@@ -603,12 +973,12 @@ export default function OnboardingScreen() {
 
             <View
               className={
-                isAccountStep && accountMode === 'benefit'
+                isAccountStep && accountMode === 'choice'
                   ? 'h-16 w-16 items-center justify-center self-start rounded-[24px] bg-blue-50'
                   : 'self-start rounded-[26px] bg-blue-50 p-4'
               }
             >
-              {isAccountStep && accountMode === 'benefit' ? (
+              {isAccountStep && accountMode === 'choice' ? (
                 <User color="#2563EB" size={32} strokeWidth={2.4} />
               ) : (
                 <StepIcon color="#2563EB" size={32} strokeWidth={2.4} />
@@ -619,7 +989,7 @@ export default function OnboardingScreen() {
 
             <Text
               className={
-                isAccountStep && accountMode === 'benefit'
+                isAccountStep && accountMode === 'choice'
                   ? 'mt-6 text-[36px] font-black leading-[40px] tracking-[-1px] text-slate-950'
                   : 'mt-8 text-[31px] font-black leading-[36px] text-slate-950'
               }
@@ -628,7 +998,7 @@ export default function OnboardingScreen() {
             </Text>
             <Text
               className={
-                isAccountStep && accountMode === 'benefit'
+                isAccountStep && accountMode === 'choice'
                   ? 'mt-4 text-[17px] font-semibold leading-7 text-slate-500'
                   : 'mt-3 text-[15px] font-semibold leading-6 text-slate-500'
               }
@@ -647,211 +1017,29 @@ export default function OnboardingScreen() {
                   </View>
                 ) : null}
 
-                {!account.loading && accountMode === 'benefit' ? (
-                  <>
-                    {isGoogleAuthAvailable ? (
-                      <GoogleAuthButton
-                        disabled={isAccountOperationRunning}
-                        isLoading={isSubmittingGoogle}
-                        mode={accountMode}
-                        onPress={() => {
-                          void continueWithGoogle();
-                        }}
-                      />
-                    ) : (
-                      <GoogleAuthWebNotice />
-                    )}
-                    <EmailSeparator label={googleAuthCopy.separatorLabel} />
-                    <Pressable
-                      accessibilityRole="button"
-                      className={`mt-6 min-h-14 items-center justify-center rounded-2xl px-4 ${
-                        isAccountOperationRunning
-                          ? 'bg-blue-300'
-                          : 'bg-blue-600 active:bg-blue-700'
-                      }`}
-                      disabled={isAccountOperationRunning}
-                      onPress={() => switchAccountMode('register')}
-                      style={{ borderCurve: 'continuous' }}
-                    >
-                      <Text className="text-[17px] font-extrabold text-white">
-                        Create account with email/password
-                      </Text>
-                    </Pressable>
-                    <Pressable
-                      accessibilityRole="button"
-                      className="mt-3 min-h-14 items-center justify-center rounded-2xl bg-slate-100 px-4 active:bg-slate-200 disabled:opacity-50"
-                      disabled={isAccountOperationRunning}
-                      onPress={() => switchAccountMode('login')}
-                      style={{ borderCurve: 'continuous' }}
-                    >
-                      <Text className="text-[16px] font-extrabold text-slate-900">
-                        Sign in with email/password
-                      </Text>
-                    </Pressable>
-                    <Pressable
-                      accessibilityRole="button"
-                      className="mt-3 min-h-11 items-center justify-center rounded-full px-4 active:bg-slate-100 disabled:opacity-50"
-                      disabled={isAccountOperationRunning}
-                      onPress={skipAccount}
-                      style={{ borderCurve: 'continuous' }}
-                    >
-                      <Text className="text-[14px] font-extrabold text-slate-600">
-                        Continue as guest
-                      </Text>
-                    </Pressable>
-                    <View className="mt-4 rounded-2xl bg-slate-50 px-4">
-                      <AccountBenefitRow
-                        icon={Heart}
-                        subtitle="Keep your best parking areas in one place."
-                        title="Save your favorites"
-                      />
-                      <AccountBenefitRow
-                        icon={Info}
-                        showDivider={false}
-                        subtitle="Get prices, regulations, and availability where available."
-                        title="See more parking info"
-                      />
-                    </View>
-                    <View className="mt-5 flex-row items-start">
-                      <Lock color="#94A3B8" size={18} strokeWidth={2.4} />
-                      <Text className="ml-3 flex-1 text-[13px] font-semibold leading-5 text-slate-400">
-                        Your account keeps saved parking preferences ready
-                        whenever you return.
-                      </Text>
-                    </View>
-                  </>
+                {!account.loading && accountMode === 'choice' ? (
+                  <AccountChoiceView
+                    disabled={isAccountOperationRunning}
+                    onGuest={() => selectAccountPath('guest')}
+                    onLogin={() => selectAccountPath('login')}
+                    onRegister={() => selectAccountPath('register')}
+                  />
                 ) : null}
 
-                {!account.loading && isPasswordMode ? (
-                  <>
-                    {isGoogleAuthAvailable ? (
-                      <GoogleAuthButton
-                        disabled={isAccountOperationRunning}
-                        isLoading={isSubmittingGoogle}
-                        mode={accountMode}
-                        onPress={() => {
-                          void continueWithGoogle();
-                        }}
-                      />
-                    ) : (
-                      <GoogleAuthWebNotice />
-                    )}
-                    <EmailSeparator label={googleAuthCopy.separatorLabel} />
-                    <TextInput
-                      accessibilityLabel="Email address"
-                      autoCapitalize="none"
-                      autoComplete="email"
-                      autoCorrect={false}
-                      className={INPUT_CLASS}
-                      editable={!isAccountOperationRunning}
-                      inputMode="email"
-                      keyboardType="email-address"
-                      onChangeText={setEmail}
-                      placeholder="you@example.com"
-                      placeholderTextColor="#94A3B8"
-                      textContentType="emailAddress"
-                      value={email}
-                    />
-                    <TextInput
-                      accessibilityLabel="Password"
-                      autoCapitalize="none"
-                      autoComplete={
-                        accountMode === 'register'
-                          ? 'new-password'
-                          : 'current-password'
-                      }
-                      autoCorrect={false}
-                      className={INPUT_CLASS}
-                      editable={!isAccountOperationRunning}
-                      onChangeText={setPassword}
-                      placeholder="Password"
-                      placeholderTextColor="#94A3B8"
-                      secureTextEntry
-                      textContentType={
-                        accountMode === 'register'
-                          ? 'newPassword'
-                          : 'password'
-                      }
-                      value={password}
-                    />
-                    {accountMode === 'register' ? (
-                      <TextInput
-                        accessibilityLabel="Confirm password"
-                        autoCapitalize="none"
-                        autoComplete="new-password"
-                        autoCorrect={false}
-                        className={INPUT_CLASS}
-                        editable={!isAccountOperationRunning}
-                        onChangeText={setConfirmPassword}
-                        placeholder="Confirm password"
-                        placeholderTextColor="#94A3B8"
-                        secureTextEntry
-                        textContentType="newPassword"
-                        value={confirmPassword}
-                      />
-                    ) : null}
-                    {accountMode === 'register' &&
-                    confirmPassword.length > 0 &&
-                    !passwordsMatch ? (
-                      <Text
-                        accessibilityRole="alert"
-                        className="mt-3 text-[13px] font-semibold leading-5 text-red-700"
-                      >
-                        Passwords do not match.
-                      </Text>
-                    ) : null}
-                    <PrimaryButton
-                      disabled={!canSubmitAccount}
-                      isLoading={isSubmittingAccount}
-                      label={
-                        isSubmittingAccount
-                          ? accountMode === 'register'
-                            ? 'Creating account'
-                            : 'Signing in'
-                          : accountMode === 'register'
-                            ? 'Create account'
-                            : 'Sign in'
-                      }
-                      onPress={() => {
-                        void submitAccount();
-                      }}
-                    />
-                    <SecondaryButton
-                      disabled={isAccountOperationRunning}
-                      label={
-                        accountMode === 'register'
-                          ? 'Already have an account? Sign in'
-                          : 'New here? Create an account'
-                      }
-                      onPress={() =>
-                        switchAccountMode(
-                          accountMode === 'register' ? 'login' : 'register',
-                        )
-                      }
-                    />
-                    <SecondaryButton
-                      disabled={isAccountOperationRunning}
-                      label="Continue as guest"
-                      onPress={skipAccount}
-                    />
-                  </>
+                {!account.loading && accountMode === 'login' ? (
+                  <LoginView {...emailAuthViewProps} />
                 ) : null}
 
-                {localAccountError || account.error ? (
-                  <Text
-                    accessibilityRole="alert"
-                    className="mt-3 text-[13px] font-semibold leading-5 text-red-700"
-                  >
-                    {localAccountError ?? account.error?.message}
-                  </Text>
+                {!account.loading && accountMode === 'register' ? (
+                  <RegisterView {...emailAuthViewProps} />
                 ) : null}
-                {registrationNotice ? (
-                  <Text
-                    accessibilityRole="alert"
-                    className="mt-3 rounded-2xl bg-blue-50 px-4 py-3 text-[13px] font-semibold leading-5 text-blue-800"
-                  >
-                    {registrationNotice}
-                  </Text>
+
+                {!account.loading && accountMode === 'guest' ? (
+                  <GuestConfirmationView
+                    isConfirming={isConfirmingGuest}
+                    onBackToChoices={() => switchAccountMode('choice')}
+                    onConfirm={confirmGuest}
+                  />
                 ) : null}
               </>
             ) : null}
@@ -898,9 +1086,11 @@ export default function OnboardingScreen() {
                 className="mt-2 min-h-8 items-center justify-center"
                 onPress={() => {
                   resetOnboardingForDev();
+                  accountPathSelectionRef.current = false;
                   setActiveIndex(0);
                   setShouldLocateOnEntry(false);
                   setLocalAccountError(null);
+                  setHasAttemptedAccountSubmit(false);
                   setRegistrationNotice(null);
                   setCompletionError(null);
                 }}

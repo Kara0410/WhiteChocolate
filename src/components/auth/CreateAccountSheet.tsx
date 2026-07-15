@@ -83,7 +83,7 @@ export function CreateAccountSheet({
     stiffness: 280,
   });
   const isGoogleSubmitting = account.status === 'signingIn';
-  const googleAuthCopy = getGoogleAuthCopy('benefit');
+  const googleAuthCopy = getGoogleAuthCopy('choice');
 
   useEffect(() => {
     if (isVisible) {
@@ -169,7 +169,7 @@ export function CreateAccountSheet({
         <GoogleAuthButton
           disabled={account.loading || isGoogleSubmitting}
           isLoading={isGoogleSubmitting}
-          mode="benefit"
+          mode="choice"
           onPress={() => {
             void account.continueWithGoogle();
           }}
