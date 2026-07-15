@@ -41,9 +41,10 @@ import { useOnboarding } from '@/context/OnboardingContext';
 import { useAccount } from '@/hooks/use-account';
 import { useMapLocation } from '@/hooks/use-map-location';
 import {
-  clampOnboardingIndex,
   getBackNavigationDecision,
   getContinueWithoutLocationDecision,
+  getNextOnboardingStep,
+  getOnboardingStepIndex,
   getRequestedLocationDecision,
   type AccountMode,
   type OnboardingStepId,
@@ -58,12 +59,6 @@ type OnboardingStep = {
 
 const STEPS: OnboardingStep[] = [
   {
-    id: 'account',
-    title: 'Choose how to continue',
-    subtitle: 'Select an option to begin your onboarding.',
-    icon: User,
-  },
-  {
     id: 'welcome',
     title: 'Find parking faster in Munich',
     subtitle:
@@ -76,6 +71,12 @@ const STEPS: OnboardingStep[] = [
     subtitle:
       `Allow location while using the app so ${APP_DISPLAY_NAME} can center the map and show nearby parking. You can still search manually.`,
     icon: LocateFixed,
+  },
+  {
+    id: 'account',
+    title: 'Choose how to continue',
+    subtitle: 'Select an option to continue setting up the app.',
+    icon: User,
   },
   {
     id: 'ready',
@@ -520,7 +521,8 @@ export default function OnboardingScreen() {
     locationMessage,
     requestCurrentLocation,
   } = useMapLocation();
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [activeStepId, setActiveStepId] =
+    useState<OnboardingStepId>('welcome');
   const [shouldLocateOnEntry, setShouldLocateOnEntry] = useState(false);
   const [accountMode, setAccountMode] =
     useState<AccountMode>('choice');
@@ -549,8 +551,16 @@ export default function OnboardingScreen() {
     () => (account.isSignedIn ? SIGNED_IN_STEPS : STEPS),
     [account.isSignedIn],
   );
-  const stepIndex = clampOnboardingIndex(activeIndex, steps.length);
-  const step = steps[stepIndex];
+  const visibleStepId =
+    account.isSignedIn && activeStepId === 'account'
+      ? 'ready'
+      : activeStepId;
+  const step =
+    steps.find((candidate) => candidate.id === visibleStepId) ?? steps[0]!;
+  const activeIndex = Math.max(
+    0,
+    getOnboardingStepIndex(visibleStepId, steps),
+  );
   const StepIcon = step.icon;
   const isLocationStep = step.id === 'location';
   const isAccountStep = step.id === 'account';
@@ -571,6 +581,9 @@ export default function OnboardingScreen() {
         : accountMode === 'guest'
           ? 'Explore the app without creating an account.'
         : step.subtitle;
+  const readySubtitle = account.isSignedIn
+    ? 'Your setup is complete. Start exploring parking around Munich.'
+    : `Start exploring as a guest. You can create an account later to save favorites and preferences.`;
 
   const isPasswordMode =
     accountMode === 'login' || accountMode === 'register';
@@ -580,9 +593,11 @@ export default function OnboardingScreen() {
     account.status === 'signingIn';
 
   useEffect(() => {
-    setActiveIndex((current) => clampOnboardingIndex(current, steps.length));
-    setAccountMode('choice');
-  }, [steps.length]);
+    if (account.isSignedIn && activeStepId === 'account') {
+      setActiveStepId('ready');
+      setAccountMode('choice');
+    }
+  }, [account.isSignedIn, activeStepId]);
 
   const enterApp = useCallback(async () => {
     if (isCompletingOnboarding) {
@@ -618,9 +633,31 @@ export default function OnboardingScreen() {
     shouldLocateOnEntry,
   ]);
 
+  const goToStep = useCallback(
+    (stepId: OnboardingStepId) => {
+      if (steps.some((candidate) => candidate.id === stepId)) {
+        setActiveStepId(stepId);
+      }
+    },
+    [steps],
+  );
+
   const goNext = useCallback(() => {
-    setActiveIndex((current) => Math.min(current + 1, steps.length - 1));
-  }, [steps.length]);
+    const nextStepId = getNextOnboardingStep(visibleStepId, steps);
+
+    if (nextStepId !== null) {
+      goToStep(nextStepId);
+    }
+  }, [goToStep, steps, visibleStepId]);
+
+  const continueAfterLocation = useCallback(() => {
+    goToStep(account.isSignedIn ? 'ready' : 'account');
+  }, [account.isSignedIn, goToStep]);
+
+  const continueAfterAccountDecision = useCallback(() => {
+    setIsConfirmingGuest(false);
+    goToStep('ready');
+  }, [goToStep]);
 
   const requestLocationAndContinue = useCallback(async () => {
     if (isLocationLoading) {
@@ -632,18 +669,22 @@ export default function OnboardingScreen() {
     setShouldLocateOnEntry(decision.shouldLocateOnEntry);
 
     if (decision.shouldAdvance) {
-      goNext();
+      continueAfterLocation();
     }
-  }, [goNext, isLocationLoading, requestCurrentLocation]);
+  }, [
+    continueAfterLocation,
+    isLocationLoading,
+    requestCurrentLocation,
+  ]);
 
   const skipLocation = useCallback(() => {
     const decision = getContinueWithoutLocationDecision();
     setShouldLocateOnEntry(decision.shouldLocateOnEntry);
 
     if (decision.shouldAdvance) {
-      goNext();
+      continueAfterLocation();
     }
-  }, [goNext]);
+  }, [continueAfterLocation]);
 
   const confirmGuest = useCallback(() => {
     if (
@@ -660,23 +701,23 @@ export default function OnboardingScreen() {
     setPassword('');
     setConfirmPassword('');
     markAccountSkipped();
-    goNext();
+    continueAfterAccountDecision();
   }, [
-    goNext,
+    continueAfterAccountDecision,
     isAccountOperationRunning,
     isConfirmingGuest,
     markAccountSkipped,
   ]);
 
-  const continueToOnboarding = useCallback(() => {
+  const continueToReady = useCallback(() => {
     setPassword('');
     setConfirmPassword('');
     setLocalAccountError(null);
     setHasAttemptedAccountSubmit(false);
     setRegistrationNotice(null);
     setAccountMode('choice');
-    setActiveIndex(0);
-  }, []);
+    goToStep('ready');
+  }, [goToStep]);
 
   const submitAccount = useCallback(async () => {
     if (isSubmittingAccount || !isPasswordMode) {
@@ -715,7 +756,7 @@ export default function OnboardingScreen() {
           return;
         }
 
-        continueToOnboarding();
+        continueToReady();
         return;
       }
 
@@ -729,7 +770,7 @@ export default function OnboardingScreen() {
         return;
       }
 
-      continueToOnboarding();
+      continueToReady();
     } finally {
       setIsSubmittingAccount(false);
     }
@@ -737,7 +778,7 @@ export default function OnboardingScreen() {
     account,
     accountMode,
     confirmPassword,
-    continueToOnboarding,
+    continueToReady,
     email,
     isPasswordMode,
     isSubmittingAccount,
@@ -768,13 +809,13 @@ export default function OnboardingScreen() {
         return;
       }
 
-      continueToOnboarding();
+      continueToReady();
     } finally {
       setIsSubmittingGoogle(false);
     }
   }, [
     account,
-    continueToOnboarding,
+    continueToReady,
     isAccountOperationRunning,
     isPasswordMode,
     isSubmittingGoogle,
@@ -811,9 +852,10 @@ export default function OnboardingScreen() {
   const isBackDisabled =
     isLocationLoading ||
     isAccountOperationRunning ||
+    isConfirmingGuest ||
     isCompletingOnboarding;
   const showBackButton =
-    stepIndex > 0 || (isAccountStep && accountMode !== 'choice');
+    visibleStepId !== 'welcome' || (isAccountStep && accountMode !== 'choice');
 
   const goBack = useCallback(() => {
     if (isBackDisabled) {
@@ -822,7 +864,7 @@ export default function OnboardingScreen() {
 
     const decision = getBackNavigationDecision({
       accountMode,
-      activeIndex: stepIndex,
+      activeStepId: visibleStepId,
       steps,
     });
 
@@ -834,14 +876,15 @@ export default function OnboardingScreen() {
     switchAccountMode(decision.accountMode);
     setIsConfirmingGuest(false);
     setCompletionError(null);
-    setActiveIndex(decision.activeIndex);
+    goToStep(decision.stepId);
     return true;
   }, [
     accountMode,
+    goToStep,
     isBackDisabled,
-    stepIndex,
     steps,
     switchAccountMode,
+    visibleStepId,
   ]);
 
   useEffect(() => {
@@ -1003,7 +1046,11 @@ export default function OnboardingScreen() {
                   : 'mt-3 text-[15px] font-semibold leading-6 text-slate-500'
               }
             >
-              {isAccountStep ? accountSubtitle : step.subtitle}
+              {isAccountStep
+                ? accountSubtitle
+                : isReadyStep
+                  ? readySubtitle
+                  : step.subtitle}
             </Text>
 
             {isAccountStep ? (
@@ -1087,7 +1134,7 @@ export default function OnboardingScreen() {
                 onPress={() => {
                   resetOnboardingForDev();
                   accountPathSelectionRef.current = false;
-                  setActiveIndex(0);
+                  setActiveStepId('welcome');
                   setShouldLocateOnEntry(false);
                   setLocalAccountError(null);
                   setHasAttemptedAccountSubmit(false);
@@ -1101,7 +1148,7 @@ export default function OnboardingScreen() {
               </Pressable>
             ) : null}
 
-            <StepIndicator activeIndex={stepIndex} steps={steps} />
+            <StepIndicator activeIndex={activeIndex} steps={steps} />
           </View>
         </View>
       </ScrollView>

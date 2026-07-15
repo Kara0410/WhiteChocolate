@@ -36,6 +36,39 @@ export type OnboardingFlowStep = {
   id: OnboardingStepId;
 };
 
+export function getOnboardingStepIndex(
+  stepId: OnboardingStepId,
+  steps: OnboardingFlowStep[],
+) {
+  return steps.findIndex((step) => step.id === stepId);
+}
+
+export function getNextOnboardingStep(
+  stepId: OnboardingStepId,
+  steps: OnboardingFlowStep[],
+): OnboardingStepId | null {
+  const currentIndex = getOnboardingStepIndex(stepId, steps);
+
+  if (currentIndex < 0 || currentIndex >= steps.length - 1) {
+    return null;
+  }
+
+  return steps[currentIndex + 1]?.id ?? null;
+}
+
+export function getPreviousOnboardingStep(
+  stepId: OnboardingStepId,
+  steps: OnboardingFlowStep[],
+): OnboardingStepId | null {
+  const currentIndex = getOnboardingStepIndex(stepId, steps);
+
+  if (currentIndex <= 0) {
+    return null;
+  }
+
+  return steps[currentIndex - 1]?.id ?? null;
+}
+
 export type LocationStepDecision = {
   shouldAdvance: boolean;
   shouldLocateOnEntry: boolean;
@@ -44,30 +77,19 @@ export type LocationStepDecision = {
 export type BackNavigationDecision =
   | {
       action: 'stay';
-      activeIndex: number;
+      stepId: OnboardingStepId;
       accountMode: AccountMode;
     }
   | {
       action: 'previous-step';
-      activeIndex: number;
+      stepId: OnboardingStepId;
       accountMode: AccountMode;
     }
   | {
       action: 'account-choice';
-      activeIndex: number;
+      stepId: 'account';
       accountMode: AccountMode;
     };
-
-export function clampOnboardingIndex(
-  activeIndex: number,
-  stepsLength: number,
-) {
-  if (stepsLength <= 0) {
-    return 0;
-  }
-
-  return Math.min(Math.max(activeIndex, 0), stepsLength - 1);
-}
 
 export function getRequestedLocationDecision(
   coordinates: ParkingCoordinates | null,
@@ -87,15 +109,22 @@ export function getContinueWithoutLocationDecision(): LocationStepDecision {
 
 export function getBackNavigationDecision({
   accountMode,
-  activeIndex,
+  activeStepId,
   steps,
 }: {
   accountMode: AccountMode;
-  activeIndex: number;
+  activeStepId: OnboardingStepId;
   steps: OnboardingFlowStep[];
 }): BackNavigationDecision {
-  const currentIndex = clampOnboardingIndex(activeIndex, steps.length);
-  const currentStep = steps[currentIndex];
+  const currentStep = steps.find((step) => step.id === activeStepId);
+
+  if (!currentStep) {
+    return {
+      action: 'stay',
+      stepId: steps[0]?.id ?? activeStepId,
+      accountMode,
+    };
+  }
 
   if (
     currentStep?.id === 'account' &&
@@ -105,22 +134,24 @@ export function getBackNavigationDecision({
   ) {
     return {
       action: 'account-choice',
-      activeIndex: currentIndex,
+      stepId: 'account',
       accountMode: 'choice',
     };
   }
 
-  if (currentIndex <= 0) {
+  const previousStepId = getPreviousOnboardingStep(activeStepId, steps);
+
+  if (previousStepId === null) {
     return {
       action: 'stay',
-      activeIndex: currentIndex,
+      stepId: currentStep.id,
       accountMode,
     };
   }
 
   return {
     action: 'previous-step',
-    activeIndex: currentIndex - 1,
+    stepId: previousStepId,
     accountMode: 'choice',
   };
 }
