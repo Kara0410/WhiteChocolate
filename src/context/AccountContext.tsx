@@ -20,6 +20,13 @@ import {
   type GoogleOAuthAuthClient,
 } from '@/services/account-google-auth';
 import {
+  establishPasswordRecoverySession,
+  finishPasswordRecoveryService,
+  requestPasswordResetService,
+  updateRecoveredPasswordService,
+  type PasswordRecoveryAuthClient,
+} from '@/services/account-password-recovery';
+import {
   hydrateAccountSession,
   subscribeToAccountAuthChanges,
 } from '@/services/account-session';
@@ -29,6 +36,7 @@ import type {
   AccountError,
   AccountUser,
   AuthStatus,
+  PasswordRecoveryStatus,
   RegisterActionResult,
 } from '@/types/account';
 import {
@@ -54,6 +62,15 @@ type AccountContextValue = ReturnType<typeof getCurrentAccountSnapshot> & {
   completeWithGoogleCallback: (
     callbackUrl: string,
   ) => Promise<AccountActionResult>;
+  recoveryStatus: PasswordRecoveryStatus;
+  requestPasswordReset: (email: string) => Promise<AccountActionResult>;
+  completePasswordRecovery: (
+    callbackUrl: string,
+  ) => Promise<AccountActionResult>;
+  updateRecoveredPassword: (
+    password: string,
+  ) => Promise<AccountActionResult>;
+  finishPasswordRecovery: () => Promise<AccountActionResult>;
   registerWithEmailPassword: (
     email: string,
     password: string,
@@ -77,16 +94,40 @@ const googleOAuthAuthClient: GoogleOAuthAuthClient = {
   setSession: (credentials) => supabase.auth.setSession(credentials),
 };
 
+const passwordRecoveryAuthClient: PasswordRecoveryAuthClient = {
+  resetPasswordForEmail: (email, options) =>
+    supabase.auth.resetPasswordForEmail(email, options),
+  exchangeCodeForSession: (code) => supabase.auth.exchangeCodeForSession(code),
+  setSession: (credentials) => supabase.auth.setSession(credentials),
+  updateUser: (attributes) => supabase.auth.updateUser(attributes),
+  signOut: () => supabase.auth.signOut(),
+};
+
 export function AccountProvider({ children }: PropsWithChildren) {
   const [user, setUser] = useState<AccountUser | null>(null);
   const [signingIn, setSigningIn] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<AccountError | null>(null);
+  const [recoveryStatus, setRecoveryStatus] =
+    useState<PasswordRecoveryStatus>('idle');
   const accountIdentityRef = useRef<string | null>(null);
   const googleCallbackInFlightRef = useRef<Promise<AccountActionResult> | null>(
     null,
   );
+  const passwordResetInFlightRef = useRef<Promise<AccountActionResult> | null>(
+    null,
+  );
+  const passwordRecoveryInFlightRef = useRef<
+    Promise<AccountActionResult> | null
+  >(null);
+  const passwordUpdateInFlightRef = useRef<Promise<AccountActionResult> | null>(
+    null,
+  );
+  const passwordRecoveryFinishInFlightRef = useRef<
+    Promise<AccountActionResult> | null
+  >(null);
+  const recoverySessionActiveRef = useRef(false);
 
   const applyAccountUser = useCallback((nextUser: AccountUser | null) => {
     const nextIdentity = nextUser?.id ?? null;
@@ -274,6 +315,184 @@ export function AccountProvider({ children }: PropsWithChildren) {
     [applyAccountUser],
   );
 
+  const requestPasswordReset = useCallback(
+    (email: string): Promise<AccountActionResult> => {
+      if (passwordResetInFlightRef.current) {
+        return passwordResetInFlightRef.current;
+      }
+
+      const operation = (async () => {
+        setError(null);
+        setRecoveryStatus('requestingReset');
+
+        const result = await requestPasswordResetService({
+          auth: passwordRecoveryAuthClient,
+          email,
+        });
+
+        if (!result.ok) {
+          setError(result.error);
+          setRecoveryStatus('error');
+        } else {
+          setRecoveryStatus('completed');
+        }
+
+        return result;
+      })();
+
+      passwordResetInFlightRef.current = operation;
+      void operation.then(
+        () => {
+          if (passwordResetInFlightRef.current === operation) {
+            passwordResetInFlightRef.current = null;
+          }
+        },
+        () => {
+          if (passwordResetInFlightRef.current === operation) {
+            passwordResetInFlightRef.current = null;
+          }
+        },
+      );
+
+      return operation;
+    },
+    [],
+  );
+
+  const completePasswordRecovery = useCallback(
+    (callbackUrl: string): Promise<AccountActionResult> => {
+      if (passwordRecoveryInFlightRef.current) {
+        return passwordRecoveryInFlightRef.current;
+      }
+
+      const operation = (async () => {
+        setError(null);
+        setRecoveryStatus('processingRecovery');
+        recoverySessionActiveRef.current = false;
+
+        const result = await establishPasswordRecoverySession({
+          auth: passwordRecoveryAuthClient,
+          callbackUrl,
+        });
+
+        if (!result.ok) {
+          setError(result.error);
+          setRecoveryStatus('error');
+        } else {
+          recoverySessionActiveRef.current = true;
+          setRecoveryStatus('completed');
+        }
+
+        return result;
+      })();
+
+      passwordRecoveryInFlightRef.current = operation;
+      void operation.then(
+        () => {
+          if (passwordRecoveryInFlightRef.current === operation) {
+            passwordRecoveryInFlightRef.current = null;
+          }
+        },
+        () => {
+          if (passwordRecoveryInFlightRef.current === operation) {
+            passwordRecoveryInFlightRef.current = null;
+          }
+        },
+      );
+
+      return operation;
+    },
+    [],
+  );
+
+  const updateRecoveredPassword = useCallback(
+    (password: string): Promise<AccountActionResult> => {
+      if (passwordUpdateInFlightRef.current) {
+        return passwordUpdateInFlightRef.current;
+      }
+
+      const operation = (async () => {
+        setError(null);
+        setRecoveryStatus('updatingPassword');
+
+        const result = await updateRecoveredPasswordService({
+          auth: passwordRecoveryAuthClient,
+          password,
+          recoverySessionActive: recoverySessionActiveRef.current,
+        });
+
+        if (!result.ok) {
+          setError(result.error);
+          setRecoveryStatus('error');
+        } else {
+          setRecoveryStatus('completed');
+        }
+
+        return result;
+      })();
+
+      passwordUpdateInFlightRef.current = operation;
+      void operation.then(
+        () => {
+          if (passwordUpdateInFlightRef.current === operation) {
+            passwordUpdateInFlightRef.current = null;
+          }
+        },
+        () => {
+          if (passwordUpdateInFlightRef.current === operation) {
+            passwordUpdateInFlightRef.current = null;
+          }
+        },
+      );
+
+      return operation;
+    },
+    [],
+  );
+
+  const finishPasswordRecovery = useCallback((): Promise<AccountActionResult> => {
+    if (passwordRecoveryFinishInFlightRef.current) {
+      return passwordRecoveryFinishInFlightRef.current;
+    }
+
+    const operation = (async () => {
+      setError(null);
+      setSigningOut(true);
+
+      const result = await finishPasswordRecoveryService({
+        auth: passwordRecoveryAuthClient,
+      });
+
+      if (!result.ok) {
+        setError(result.error);
+        setRecoveryStatus('error');
+      } else {
+        recoverySessionActiveRef.current = false;
+        applyAccountUser(null);
+        setRecoveryStatus('completed');
+      }
+
+      setSigningOut(false);
+      return result;
+    })();
+
+    passwordRecoveryFinishInFlightRef.current = operation;
+    void operation.then(
+      () => {
+        if (passwordRecoveryFinishInFlightRef.current === operation) {
+          passwordRecoveryFinishInFlightRef.current = null;
+        }
+      },
+      () => {
+        if (passwordRecoveryFinishInFlightRef.current === operation) {
+          passwordRecoveryFinishInFlightRef.current = null;
+        }
+      },
+    );
+
+    return operation;
+  }, [applyAccountUser]);
+
   const logout = useCallback(async (): Promise<AccountActionResult> => {
     setError(null);
 
@@ -345,10 +564,15 @@ export function AccountProvider({ children }: PropsWithChildren) {
       status,
       loading,
       error,
+      recoveryStatus,
       refresh,
       loginWithEmailPassword,
       continueWithGoogle,
       completeWithGoogleCallback,
+      requestPasswordReset,
+      completePasswordRecovery,
+      updateRecoveredPassword,
+      finishPasswordRecovery,
       registerWithEmailPassword,
       logout,
       deleteAccount,
@@ -358,14 +582,19 @@ export function AccountProvider({ children }: PropsWithChildren) {
       accountSnapshot,
       deleteAccount,
       error,
+      finishPasswordRecovery,
       loading,
       continueWithGoogle,
       completeWithGoogleCallback,
+      completePasswordRecovery,
       loginWithEmailPassword,
       logout,
+      recoveryStatus,
+      requestPasswordReset,
       registerWithEmailPassword,
       refresh,
       status,
+      updateRecoveredPassword,
       upgrade,
     ],
   );

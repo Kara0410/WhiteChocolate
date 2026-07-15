@@ -43,8 +43,8 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     ...(isWeb ? {} : { storage: AsyncStorage }),
     autoRefreshToken: true,
     persistSession: true,
-    // Email/password auth does not use website callbacks, magic links, or
-    // deep-link session detection in this product phase.
+    // Native password recovery deep links are processed explicitly by the
+    // reset-password route; do not let Supabase consume them implicitly.
     detectSessionInUrl: false,
     lock: processLock,
   },

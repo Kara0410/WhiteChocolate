@@ -6,7 +6,7 @@ import {
   useState,
   type ComponentType,
 } from 'react';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   ActivityIndicator,
   BackHandler,
@@ -263,6 +263,7 @@ type EmailAuthViewProps = {
   onChangePassword: (value: string) => void;
   onChangeConfirmPassword: (value: string) => void;
   onContinueWithGoogle: () => void;
+  onForgotPassword: () => void;
   onSubmit: () => void;
   onSwitchMode: (mode: EmailAuthMode) => void;
   password: string;
@@ -294,6 +295,7 @@ function EmailAuthView({
   onChangeEmail,
   onChangePassword,
   onContinueWithGoogle,
+  onForgotPassword,
   onSubmit,
   onSwitchMode,
   password,
@@ -362,6 +364,19 @@ function EmailAuthView({
           textContentType="newPassword"
           value={confirmPassword}
         />
+      ) : null}
+      {!isRegister ? (
+        <Pressable
+          accessibilityLabel="Reset forgotten password"
+          accessibilityRole="button"
+          className="mt-2 min-h-11 self-end justify-center px-2 active:opacity-70"
+          disabled={isAccountOperationRunning}
+          onPress={onForgotPassword}
+        >
+          <Text className="text-[14px] font-extrabold text-blue-700">
+            Forgot password?
+          </Text>
+        </Pressable>
       ) : null}
       {isRegister && confirmPassword.length > 0 && !passwordsMatch ? (
         <Text
@@ -509,6 +524,11 @@ function GuestConfirmationView({
 
 export default function OnboardingScreen() {
   const router = useRouter();
+  const { accountMode: requestedAccountMode, step: requestedStep } =
+    useLocalSearchParams<{
+      accountMode?: string;
+      step?: string;
+    }>();
   const insets = useSafeAreaInsets();
   const account = useAccount();
   const {
@@ -546,6 +566,29 @@ export default function OnboardingScreen() {
     null,
   );
   const accountPathSelectionRef = useRef(false);
+
+  useEffect(() => {
+    if (
+      account.isSignedIn ||
+      requestedStep !== 'account' ||
+      requestedAccountMode !== 'login'
+    ) {
+      return;
+    }
+
+    setActiveStepId('account');
+    setAccountMode('login');
+    setPassword('');
+    setConfirmPassword('');
+    setLocalAccountError(null);
+    setHasAttemptedAccountSubmit(false);
+    setRegistrationNotice(null);
+    setCompletionError(null);
+  }, [
+    account.isSignedIn,
+    requestedAccountMode,
+    requestedStep,
+  ]);
 
   const steps = useMemo(
     () => (account.isSignedIn ? SIGNED_IN_STEPS : STEPS),
@@ -821,6 +864,18 @@ export default function OnboardingScreen() {
     isSubmittingGoogle,
   ]);
 
+  const openForgotPassword = useCallback(() => {
+    if (isAccountOperationRunning) {
+      return;
+    }
+
+    const trimmedEmail = email.trim();
+    router.push({
+      pathname: '/auth/forgot-password',
+      params: trimmedEmail ? { email: trimmedEmail } : {},
+    });
+  }, [email, isAccountOperationRunning, router]);
+
   const switchAccountMode = useCallback((nextMode: AccountMode) => {
     setAccountMode(nextMode);
     setPassword('');
@@ -959,6 +1014,7 @@ export default function OnboardingScreen() {
     onContinueWithGoogle: () => {
       void continueWithGoogle();
     },
+    onForgotPassword: openForgotPassword,
     onSubmit: () => {
       void submitAccount();
     },

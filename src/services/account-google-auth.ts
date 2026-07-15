@@ -2,6 +2,10 @@ import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
 
+import {
+  APP_AUTH_SCHEME,
+  GOOGLE_AUTH_CALLBACK_PATH,
+} from '@/constants/auth';
 import type { AccountActionResult } from '@/types/account';
 import {
   completeGoogleOAuthCallback,
@@ -9,16 +13,15 @@ import {
   type GoogleOAuthAuthClient,
 } from '@/services/account-google-auth-core';
 
-const APP_SCHEME = 'whitechoclate';
-const CALLBACK_PATH = 'auth/callback';
-
 WebBrowser.maybeCompleteAuthSession();
 
 export type { GoogleOAuthAuthClient } from '@/services/account-google-auth-core';
 export { parseGoogleOAuthCallback } from '@/services/account-google-auth-core';
 
 export function getGoogleOAuthRedirectUrl() {
-  return Linking.createURL(CALLBACK_PATH, { scheme: APP_SCHEME });
+  return Linking.createURL(GOOGLE_AUTH_CALLBACK_PATH, {
+    scheme: APP_AUTH_SCHEME,
+  });
 }
 
 export async function completeGoogleOAuthCallbackService({

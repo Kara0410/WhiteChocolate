@@ -70,6 +70,19 @@ test('non-Auth network exceptions are normalized', () => {
   assert.equal(normalized.retryable, true);
 });
 
+test('maps password recovery token failures to a neutral expired-link message', () => {
+  const normalized = normalizeAuthFailure(
+    authError('invalid_refresh_token', 'Refresh Token Not Found', 400),
+    'password-recovery',
+  );
+
+  assert.equal(normalized.code, 'PASSWORD_RECOVERY_LINK_EXPIRED');
+  assert.equal(
+    normalized.message,
+    'This password reset link is invalid or has expired. Request a new one.',
+  );
+});
+
 test('developer diagnostics omit credentials and token-like fields', () => {
   const originalDev = (globalThis as { __DEV__?: boolean }).__DEV__;
   const originalWarn = console.warn;

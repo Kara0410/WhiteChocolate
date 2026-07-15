@@ -46,6 +46,13 @@ export type AccountErrorCode =
   | 'GOOGLE_AUTH_CALLBACK_INVALID'
   | 'GOOGLE_AUTH_CREDENTIALS_MISSING'
   | 'GOOGLE_AUTH_SESSION_FAILED'
+  | 'PASSWORD_RESET_REQUEST_FAILED'
+  | 'PASSWORD_RECOVERY_LINK_INVALID'
+  | 'PASSWORD_RECOVERY_LINK_EXPIRED'
+  | 'PASSWORD_RECOVERY_SESSION_FAILED'
+  | 'PASSWORD_UPDATE_FAILED'
+  | 'PASSWORDS_DO_NOT_MATCH'
+  | 'PASSWORD_TOO_SHORT'
   | 'LOGOUT_FAILED'
   | 'DELETE_NOT_IMPLEMENTED'
   | 'UPGRADE_NOT_IMPLEMENTED';
@@ -73,6 +80,14 @@ export type AccountError = {
 export type AccountActionResult =
   | { ok: true }
   | { ok: false; error: AccountError };
+
+export type PasswordRecoveryStatus =
+  | 'idle'
+  | 'requestingReset'
+  | 'processingRecovery'
+  | 'updatingPassword'
+  | 'completed'
+  | 'error';
 
 export type RegisterActionResult =
   | { ok: true; status: 'authenticated'; user: AccountUser }

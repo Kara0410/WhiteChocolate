@@ -17,7 +17,10 @@ type AuthFailureOperation =
   | 'signup'
   | 'oauth'
   | 'session'
-  | 'logout';
+  | 'logout'
+  | 'password-reset'
+  | 'password-recovery'
+  | 'password-update';
 
 type NormalizedAuthFailure = {
   category: AccountErrorCategory;
@@ -285,6 +288,32 @@ export function normalizeAuthFailure(
     };
   }
 
+  if (
+    operation === 'password-recovery' &&
+    authErrorMatches(cause, [
+      'expired',
+      'invalid token',
+      'invalid_token',
+      'invalid refresh token',
+      'otp_expired',
+      'otp_not_found',
+      'refresh token not found',
+      'refresh_token_not_found',
+      'session not found',
+    ])
+  ) {
+    return {
+      category: 'auth',
+      code: 'PASSWORD_RECOVERY_LINK_EXPIRED',
+      developerMessage,
+      message:
+        'This password reset link is invalid or has expired. Request a new one.',
+      retryable: false,
+      sourceCode,
+      status,
+    };
+  }
+
   const isSupabaseAuthFailure =
     isAuthApiError(cause) || isAuthError(cause) || sourceCode !== null;
 
@@ -299,7 +328,13 @@ export function normalizeAuthFailure(
             ? 'GOOGLE_AUTH_FAILED'
           : operation === 'logout'
             ? 'LOGOUT_FAILED'
-            : 'LOAD_FAILED',
+            : operation === 'password-reset'
+              ? 'PASSWORD_RESET_REQUEST_FAILED'
+              : operation === 'password-recovery'
+                ? 'PASSWORD_RECOVERY_SESSION_FAILED'
+                : operation === 'password-update'
+                  ? 'PASSWORD_UPDATE_FAILED'
+                  : 'LOAD_FAILED',
     developerMessage,
     message:
       operation === 'signup'
@@ -310,7 +345,13 @@ export function normalizeAuthFailure(
           ? 'Sign in did not complete. Check your email and password, then try again.'
           : operation === 'logout'
             ? 'Sign out did not complete. Try again.'
-            : 'Account information could not be loaded. Try again.',
+            : operation === 'password-reset'
+              ? 'Password reset could not be requested. Try again.'
+              : operation === 'password-recovery'
+                ? 'The password reset session could not be established. Request a new link.'
+                : operation === 'password-update'
+                  ? 'Your password could not be updated. Try again.'
+                  : 'Account information could not be loaded. Try again.',
     retryable: true,
     sourceCode,
     status,
@@ -384,6 +425,83 @@ export function googleAuthFailedError(cause: unknown): AccountError {
 
 export function logoutFailedError(cause: unknown): AccountError {
   return accountAuthError('logout', cause);
+}
+
+export function passwordResetRequestError(cause: unknown): AccountError {
+  return accountAuthError('password-reset', cause);
+}
+
+export function passwordRecoverySessionFailedError(
+  cause: unknown,
+): AccountError {
+  return accountAuthError('password-recovery', cause);
+}
+
+export function passwordUpdateFailedError(cause: unknown): AccountError {
+  return accountAuthError('password-update', cause);
+}
+
+export function passwordRecoveryLinkInvalidError(cause?: unknown): AccountError {
+  return createAccountError(
+    'PASSWORD_RECOVERY_LINK_INVALID',
+    'This password reset link is invalid. Request a new one.',
+    cause,
+    { category: 'auth', retryable: false },
+  );
+}
+
+export function passwordRecoveryLinkExpiredError(cause?: unknown): AccountError {
+  return createAccountError(
+    'PASSWORD_RECOVERY_LINK_EXPIRED',
+    'This password reset link is invalid or has expired. Request a new one.',
+    cause,
+    { category: 'auth', retryable: false },
+  );
+}
+
+export function passwordsDoNotMatchError(): AccountError {
+  return createAccountError(
+    'PASSWORDS_DO_NOT_MATCH',
+    'Passwords do not match.',
+    undefined,
+    { category: 'validation', retryable: false },
+  );
+}
+
+export function passwordTooShortError(): AccountError {
+  return createAccountError(
+    'PASSWORD_TOO_SHORT',
+    'Use a password with at least 8 characters.',
+    undefined,
+    { category: 'validation', retryable: false },
+  );
+}
+
+export function logPasswordRecoveryFailure(
+  operation: 'request' | 'session' | 'update' | 'finish',
+  cause: unknown,
+) {
+  if (typeof __DEV__ === 'undefined' || !__DEV__) {
+    return;
+  }
+
+  const normalized = normalizeAuthFailure(
+    cause,
+    operation === 'request'
+      ? 'password-reset'
+      : operation === 'update'
+        ? 'password-update'
+        : 'password-recovery',
+  );
+
+  console.warn(`[AccountAuth] password recovery ${operation} failed`, {
+    operation,
+    name: getErrorName(cause),
+    code: normalized.sourceCode,
+    status: normalized.status,
+    message: normalized.developerMessage,
+    at: new Date().toISOString(),
+  });
 }
 
 export function preferencesLoadError(cause: unknown): PreferencesError {

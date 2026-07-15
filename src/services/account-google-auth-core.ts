@@ -1,10 +1,14 @@
 import type { AccountActionResult, AccountErrorCode } from '@/types/account';
 import {
+  APP_AUTH_SCHEME,
+  GOOGLE_AUTH_CALLBACK_PATH,
+} from '@/constants/auth';
+import {
   createAccountError,
   googleAuthFailedError,
 } from '@/utils/account-errors';
 
-const APP_CALLBACK_URL = 'whitechoclate://auth/callback';
+const APP_CALLBACK_URL = `${APP_AUTH_SCHEME}://${GOOGLE_AUTH_CALLBACK_PATH}`;
 
 type GoogleOAuthCredentials = {
   provider: 'google';
