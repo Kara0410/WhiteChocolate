@@ -385,7 +385,7 @@ export function FavoriteParkingBottomSheet({
   const sheetRef = useRef<ComponentRef<typeof BottomSheet>>(null);
   const pendingSpotRef = useRef<ParkingClusterResponse | null>(null);
   const insets = useSafeAreaInsets();
-  const { favoriteItems, refreshFavorites, removeFavorite } =
+  const { error, favoriteItems, refreshFavorites, removeFavorite } =
     useFavoriteParking();
   const [openRowId, setOpenRowId] = useState<string | null>(null);
   const snapPoints = useMemo(() => ['18%', '70%'], []);
@@ -499,27 +499,51 @@ export function FavoriteParkingBottomSheet({
           </Animated.View>
         }
         ListHeaderComponent={
-          <View className="mb-5 flex-row items-center justify-between">
-            <View className="flex-1 pr-3">
-              <Text className="text-[26px] font-extrabold text-slate-950">
-                Favorite parking areas
-              </Text>
-              <Text className="mt-1 text-[14px] font-semibold text-slate-500">
-                {favoriteItems.length === 1
-                  ? '1 favorite parking area'
-                  : `${favoriteItems.length} favorite parking areas`}
-              </Text>
+          <View>
+            <View className="mb-5 flex-row items-center justify-between">
+              <View className="flex-1 pr-3">
+                <Text className="text-[26px] font-extrabold text-slate-950">
+                  Favorite parking areas
+                </Text>
+                <Text className="mt-1 text-[14px] font-semibold text-slate-500">
+                  {favoriteItems.length === 1
+                    ? '1 favorite parking area'
+                    : `${favoriteItems.length} favorite parking areas`}
+                </Text>
+              </View>
+              <Pressable
+                accessibilityLabel="Close favorite parking areas"
+                accessibilityRole="button"
+                className="h-11 w-11 items-center justify-center rounded-full bg-white active:bg-slate-100"
+                hitSlop={8}
+                onPress={closeSheet}
+                style={{ borderCurve: 'continuous' }}
+              >
+                <X color="#475569" size={19} strokeWidth={2.5} />
+              </Pressable>
             </View>
-            <Pressable
-              accessibilityLabel="Close favorite parking areas"
-              accessibilityRole="button"
-              className="h-11 w-11 items-center justify-center rounded-full bg-white active:bg-slate-100"
-              hitSlop={8}
-              onPress={closeSheet}
-              style={{ borderCurve: 'continuous' }}
-            >
-              <X color="#475569" size={19} strokeWidth={2.5} />
-            </Pressable>
+            {error ? (
+              <View className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3">
+                <Text
+                  accessibilityRole="alert"
+                  className="text-[13px] font-semibold leading-5 text-red-800"
+                >
+                  {error.message}
+                </Text>
+                <Pressable
+                  accessibilityLabel="Retry favorite refresh"
+                  accessibilityRole="button"
+                  className="mt-2 min-h-10 self-start justify-center rounded-full bg-white px-3 active:bg-red-100"
+                  onPress={() => {
+                    void refreshFavorites();
+                  }}
+                >
+                  <Text className="text-[13px] font-extrabold text-red-700">
+                    Retry
+                  </Text>
+                </Pressable>
+              </View>
+            ) : null}
           </View>
         }
         maxToRenderPerBatch={8}

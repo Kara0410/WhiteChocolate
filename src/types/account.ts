@@ -54,7 +54,10 @@ export type AccountErrorCode =
   | 'PASSWORDS_DO_NOT_MATCH'
   | 'PASSWORD_TOO_SHORT'
   | 'LOGOUT_FAILED'
-  | 'DELETE_NOT_IMPLEMENTED'
+  | 'ACCOUNT_DELETION_FAILED'
+  | 'ACCOUNT_DELETION_UNAUTHENTICATED'
+  | 'ACCOUNT_DELETION_SESSION_EXPIRED'
+  | 'ACCOUNT_DELETION_REAUTH_REQUIRED'
   | 'UPGRADE_NOT_IMPLEMENTED';
 
 export type AccountErrorCategory =
@@ -63,6 +66,7 @@ export type AccountErrorCategory =
   | 'configuration'
   | 'database'
   | 'network'
+  | 'timeout'
   | 'rateLimit'
   | 'unknown';
 
@@ -86,6 +90,12 @@ export type PasswordRecoveryStatus =
   | 'requestingReset'
   | 'processingRecovery'
   | 'updatingPassword'
+  | 'completed'
+  | 'error';
+
+export type AccountDeletionStatus =
+  | 'idle'
+  | 'deleting'
   | 'completed'
   | 'error';
 

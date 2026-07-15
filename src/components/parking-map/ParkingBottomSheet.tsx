@@ -32,6 +32,7 @@ import {
 import {
   Platform,
   Pressable,
+  Alert,
   Share,
   StyleSheet,
   Text,
@@ -44,9 +45,11 @@ import {
 } from '@/components/parking-map/map-layers';
 import { useAuthSheet } from '@/context/AuthSheetContext';
 import { useFavoriteParking } from '@/context/FavoriteParkingContext';
+import { SettingsErrorPanel } from '@/components/settings/settings-error-panel';
 import { useAccount } from '@/hooks/use-account';
 import type { ParkingClusterResponse } from '@/types/parking-map';
 import { getAccountAccessTier } from '@/utils/account-tier';
+import { logAppError, normalizeAppError } from '@/utils/app-errors';
 import { openParkingNavigation } from '@/utils/openParkingNavigation';
 import {
   FREE_DETAIL_PREVIEW_CARDS,
@@ -614,7 +617,8 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
   const freeGateCopy = getParkingDetailGateCopy('free-details');
   const premiumGateCopy = getParkingDetailGateCopy('premium-details');
   const { showCreateAccountSheet } = useAuthSheet();
-  const { isFavorite, toggleFavorite } = useFavoriteParking();
+  const { error: favoriteError, isFavorite, refreshFavorites, toggleFavorite } =
+    useFavoriteParking();
   const itemIsFavorite = isFavorite(item.id);
 
   const handleShare = useCallback(async () => {
@@ -624,9 +628,16 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
         title,
       });
     } catch (error) {
-      if (__DEV__) {
-        console.warn('Unable to share parking location', error);
+      const message = error instanceof Error ? error.message.toLowerCase() : '';
+      if (message.includes('cancel') || message.includes('dismiss')) {
+        return;
       }
+
+      logAppError('sharing', error, { source: 'parking-detail' });
+      Alert.alert(
+        'Sharing unavailable',
+        normalizeAppError(error, 'sharing').message,
+      );
     }
   }, [item, percentage, title]);
 
@@ -669,6 +680,17 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
         theme={theme}
         title={title}
       />
+
+      {favoriteError ? (
+        <View className="px-5 pt-3">
+          <SettingsErrorPanel
+            message={favoriteError.message}
+            onRetry={() => {
+              void refreshFavorites();
+            }}
+          />
+        </View>
+      ) : null}
 
       <BottomSheetScrollView
         contentContainerStyle={styles.scrollContent}

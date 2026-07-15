@@ -161,7 +161,9 @@ type ParkingMapProps = {
   searchFocusKey?: string;
   isLocationLoading?: boolean;
   locationMessage?: string | null;
+  locationSettingsRequired?: boolean;
   onRequestUserLocation?: () => Promise<ParkingCoordinates | null>;
+  onOpenLocationSettings?: () => Promise<void>;
   userLocation?: ParkingCoordinates | null;
 };
 
@@ -235,7 +237,9 @@ export function ParkingMap({
   searchFocusKey,
   isLocationLoading = false,
   locationMessage,
+  locationSettingsRequired = false,
   onRequestUserLocation,
+  onOpenLocationSettings,
   userLocation,
 }: ParkingMapProps) {
   const insets = useSafeAreaInsets();
@@ -257,6 +261,7 @@ export function ParkingMap({
     loadedRequestVersion,
     onCameraMove,
     requestParkingForCamera,
+    retryLatest,
     layerState,
     semanticStage,
     visibleSpots,
@@ -1585,12 +1590,24 @@ export function ParkingMap({
           }}
         >
           {locationMessage ? (
-            <View
-              className="max-w-64 rounded-2xl bg-slate-950/90 px-3 py-2 shadow-floating-message"
-            >
+            <View className="max-w-72 items-end rounded-2xl bg-slate-950/90 px-3 py-2 shadow-floating-message">
               <Text className="text-right text-xs font-semibold leading-4 text-white">
                 {locationMessage}
               </Text>
+              {locationSettingsRequired && onOpenLocationSettings ? (
+                <Pressable
+                  accessibilityLabel="Open location settings"
+                  accessibilityRole="button"
+                  className="mt-2 min-h-9 justify-center rounded-full bg-white/15 px-3 active:bg-white/25"
+                  onPress={() => {
+                    void onOpenLocationSettings();
+                  }}
+                >
+                  <Text className="text-xs font-extrabold text-white">
+                    Open Settings
+                  </Text>
+                </Pressable>
+              ) : null}
             </View>
           ) : null}
           <Pressable
@@ -1644,19 +1661,21 @@ export function ParkingMap({
           errorMessage={searchParkingError}
           isLoading={isSearchParkingLoading}
           onClose={closeSearchResults}
+          onRetry={retryLatest}
           onSpotPress={handleSearchSpotPress}
           searchPlace={selectedSearchPlace}
           spots={nearestSearchSpots}
         />
 
         {activeOverlay === 'parking' ? (
-          <ParkingListBottomSheet
+            <ParkingListBottomSheet
             errorMessage={
               visibleSpots.length === 0 && layerState.status === 'error'
                 ? layerState.error
                 : null
             }
             onClose={closeOverlay}
+            onRetry={retryLatest}
             onSpotPress={handleParkingOverlaySpotPress}
             spots={visibleSpots}
           />

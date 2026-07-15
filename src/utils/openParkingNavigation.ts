@@ -1,6 +1,8 @@
 import { Alert, Platform } from 'react-native';
 import * as Linking from 'expo-linking';
 
+import { logAppError } from '@/utils/app-errors';
+
 export type OpenParkingNavigationOptions = {
   latitude: number;
   longitude: number;
@@ -24,17 +26,16 @@ function getFallbackMapUrl(latitude: number, longitude: number) {
 async function openUrlWithFallback(url: string, fallbackUrl: string) {
   try {
     await Linking.openURL(url);
+    return true;
   } catch (error) {
-    if (__DEV__) {
-      console.warn('Unable to open navigation URL', error);
-    }
+    logAppError('navigation', error);
 
     try {
       await Linking.openURL(fallbackUrl);
+      return true;
     } catch (fallbackError) {
-      if (__DEV__) {
-        console.warn('Unable to open fallback navigation URL', fallbackError);
-      }
+      logAppError('navigation', fallbackError);
+      return false;
     }
   }
 }
@@ -44,7 +45,7 @@ async function canOpenNavigationUrl(url: string) {
     return await Linking.canOpenURL(url);
   } catch (error) {
     if (__DEV__) {
-      console.warn('Unable to check navigation app availability', error);
+      logAppError('navigation', error);
     }
 
     return false;
@@ -85,7 +86,14 @@ async function openIosNavigation(
       ...options.map((option) => ({
         text: option.text,
         onPress: () => {
-          void openUrlWithFallback(option.url, fallbackUrl);
+          void openUrlWithFallback(option.url, fallbackUrl).then((opened) => {
+            if (!opened) {
+              Alert.alert(
+                'Navigation unavailable',
+                'Navigation couldn\'t be opened. Please try again or choose another maps app.',
+              );
+            }
+          });
         },
       })),
       { text: 'Cancel', style: 'cancel' as const },
@@ -118,9 +126,21 @@ export async function openParkingNavigation({
   if (Platform.OS === 'android') {
     const geoLabel = encodeURIComponent(safeLabel);
     const geoUrl = `geo:0,0?q=${latitude},${longitude}(${geoLabel})`;
-    await openUrlWithFallback(geoUrl, fallbackUrl);
+    const opened = await openUrlWithFallback(geoUrl, fallbackUrl);
+    if (!opened) {
+      Alert.alert(
+        'Navigation unavailable',
+        'Navigation couldn\'t be opened. Please try again or choose another maps app.',
+      );
+    }
     return;
   }
 
-  await openUrlWithFallback(fallbackUrl, fallbackUrl);
+  const opened = await openUrlWithFallback(fallbackUrl, fallbackUrl);
+  if (!opened) {
+    Alert.alert(
+      'Navigation unavailable',
+      'Navigation couldn\'t be opened. Please try again or choose another maps app.',
+    );
+  }
 }

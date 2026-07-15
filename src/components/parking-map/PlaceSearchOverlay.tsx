@@ -183,7 +183,7 @@ export function PlaceSearchOverlay({
                 <View className="flex-row items-center">
                   <ActivityIndicator color="#2563EB" />
                   <Text className="ml-3 text-[14px] font-semibold text-slate-500">
-                    Searching Google Places...
+                    Searching places...
                   </Text>
                 </View>
               ) : isResolvingPlace ? (
@@ -194,12 +194,16 @@ export function PlaceSearchOverlay({
                   </Text>
                 </View>
               ) : error ? (
-                <Text className="text-[14px] font-semibold text-red-600">
+                <Text
+                  accessibilityRole="alert"
+                  className="text-[14px] font-semibold text-red-600"
+                >
                   {error}
                 </Text>
               ) : hasSearched ? (
                 <Text className="text-[14px] font-semibold text-slate-500">
-                  No places found
+                  No matching places were found. Try a different address or
+                  place name.
                 </Text>
               ) : (
                 <Text className="text-[14px] font-semibold text-slate-500">

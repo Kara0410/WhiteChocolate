@@ -11,6 +11,7 @@ import {
 
 import type { ParkingClusterResponse } from '@/types/parking-map';
 import type { FavoriteParkingReference } from '@/types/parking-domain';
+import type { AppActionResult, AppError } from '@/types/app-error';
 import { fetchParkingSegmentDetails } from '@/services/parkingMapData';
 import {
   clearStoredFavorites,
@@ -20,6 +21,7 @@ import {
 } from '@/utils/favorite-parking-storage';
 import { parkingMapFeatureToLegacyResponse } from '@/utils/parking-feature-adapters';
 import { parkingSegmentToSummary } from '@/utils/parking-segments';
+import { logAppError, normalizeAppError } from '@/utils/app-errors';
 
 type FavoriteParkingContextValue = {
   favoriteItems: ParkingClusterResponse[];
@@ -29,8 +31,10 @@ type FavoriteParkingContextValue = {
   toggleFavorite: (item: ParkingClusterResponse) => void;
   addFavorite: (item: ParkingClusterResponse) => void;
   removeFavorite: (id: string) => void;
-  clearFavorites: () => void;
-  refreshFavorites: () => Promise<void>;
+  clearFavorites: () => Promise<AppActionResult>;
+  refreshFavorites: () => Promise<AppActionResult>;
+  error: AppError | null;
+  persistenceStatus: 'idle' | 'hydrating' | 'saving' | 'refreshing' | 'error';
 };
 
 const FavoriteParkingContext =
@@ -38,11 +42,16 @@ const FavoriteParkingContext =
 
 export function FavoriteParkingProvider({ children }: PropsWithChildren) {
   const [favorites, setFavorites] = useState<StoredFavoriteParkingItem[]>([]);
+  const [error, setError] = useState<AppError | null>(null);
+  const [persistenceStatus, setPersistenceStatus] = useState<
+    'idle' | 'hydrating' | 'saving' | 'refreshing' | 'error'
+  >('hydrating');
   const favoritesRef = useRef(favorites);
   favoritesRef.current = favorites;
   const hydratedRef = useRef(false);
   const interactedRef = useRef(false);
   const writeQueueRef = useRef(Promise.resolve());
+  const latestWriteRef = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -58,15 +67,13 @@ export function FavoriteParkingProvider({ children }: PropsWithChildren) {
         ) {
           setFavorites(storedState.favorites);
         }
+        setPersistenceStatus('idle');
       })
       .catch((error: unknown) => {
         hydratedRef.current = true;
-        if (__DEV__) {
-          console.warn(
-            '[FavoriteParkingProvider] failed to load stored favorites',
-            error,
-          );
-        }
+        setError(normalizeAppError(error, 'favorite-hydration'));
+        setPersistenceStatus('error');
+        logAppError('favorite-hydration', error);
       });
 
     return () => {
@@ -80,15 +87,24 @@ export function FavoriteParkingProvider({ children }: PropsWithChildren) {
     }
 
     writeQueueRef.current = writeQueueRef.current
-      .then(() => saveFavoriteState({ version: 2, favorites }))
-      .catch((error: unknown) => {
-        if (__DEV__) {
-          console.warn(
-            '[FavoriteParkingProvider] failed to save favorites',
-            error,
-          );
+      .then(() => saveFavoriteState({ version: 2, favorites }));
+    const writeId = ++latestWriteRef.current;
+    setPersistenceStatus('saving');
+    setError(null);
+    writeQueueRef.current = writeQueueRef.current.then(
+      () => {
+        if (writeId === latestWriteRef.current) {
+          setPersistenceStatus('idle');
         }
-      });
+      },
+      (saveError: unknown) => {
+        if (writeId === latestWriteRef.current) {
+          setError(normalizeAppError(saveError, 'favorite-save'));
+          setPersistenceStatus('error');
+        }
+        logAppError('favorite-save', saveError);
+      },
+    ).then(() => undefined);
   }, [favorites]);
 
   const favoriteItems = useMemo(
@@ -164,26 +180,38 @@ export function FavoriteParkingProvider({ children }: PropsWithChildren) {
     });
   }, []);
 
-  const clearFavorites = useCallback(() => {
+  const clearFavorites = useCallback((): Promise<AppActionResult> => {
     interactedRef.current = true;
     setFavorites((current) => (current.length === 0 ? current : []));
+    setError(null);
+    setPersistenceStatus('saving');
 
     // Clear the stored key directly as well, so the data is removed even
     // if clearing happens before hydration enables the autosave effect.
-    writeQueueRef.current = writeQueueRef.current
+    const clearPromise = writeQueueRef.current
       .then(() => clearStoredFavorites())
-      .catch((error: unknown) => {
-        if (__DEV__) {
-          console.warn(
-            '[FavoriteParkingProvider] failed to clear stored favorites',
-            error,
-          );
-        }
-      });
+    const resultPromise = clearPromise.then(
+      () => {
+        setPersistenceStatus('idle');
+        return { ok: true } as const;
+      },
+      (clearError: unknown) => {
+        const normalized = normalizeAppError(clearError, 'favorite-clear');
+        setError(normalized);
+        setPersistenceStatus('error');
+        logAppError('favorite-clear', clearError);
+        return { ok: false, error: normalized } as const;
+      },
+    );
+    writeQueueRef.current = resultPromise.then(() => undefined);
+    return resultPromise;
   }, []);
 
-  const refreshFavorites = useCallback(async () => {
+  const refreshFavorites = useCallback(async (): Promise<AppActionResult> => {
     const snapshot = favoritesRef.current;
+    setError(null);
+    setPersistenceStatus('refreshing');
+    let hadError = false;
     const refreshed = await Promise.all(
       snapshot.map(async (favorite) => {
         if (favorite.reference.entityType !== 'segment') {
@@ -225,7 +253,11 @@ export function FavoriteParkingProvider({ children }: PropsWithChildren) {
             segment,
           });
           return { ...favorite, cachedItem };
-        } catch {
+        } catch (refreshError) {
+          hadError = true;
+          logAppError('favorite-refresh', refreshError, {
+            favoriteId: favorite.reference.entityId,
+          });
           return favorite;
         }
       }),
@@ -233,6 +265,17 @@ export function FavoriteParkingProvider({ children }: PropsWithChildren) {
     setFavorites((current) =>
       current === snapshot ? refreshed : current,
     );
+    if (hadError) {
+      const normalized = normalizeAppError(
+        new Error('Favorite refresh failed.'),
+        'favorite-refresh',
+      );
+      setError(normalized);
+      setPersistenceStatus('error');
+      return { ok: false, error: normalized };
+    }
+    setPersistenceStatus('idle');
+    return { ok: true };
   }, []);
 
   const value = useMemo(
@@ -246,6 +289,8 @@ export function FavoriteParkingProvider({ children }: PropsWithChildren) {
       removeFavorite,
       clearFavorites,
       refreshFavorites,
+      error,
+      persistenceStatus,
     }),
     [
       addFavorite,
@@ -256,6 +301,8 @@ export function FavoriteParkingProvider({ children }: PropsWithChildren) {
       isFavorite,
       removeFavorite,
       refreshFavorites,
+      error,
+      persistenceStatus,
       toggleFavorite,
     ],
   );

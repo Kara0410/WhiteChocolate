@@ -85,7 +85,9 @@ export default function ForgotPasswordScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const account = useAccount();
-  const { email: emailParam } = useLocalSearchParams<{ email?: string }>();
+  const { email: emailParam, source: sourceParam } =
+    useLocalSearchParams<{ email?: string; source?: string }>();
+  const source = sourceParam === 'profile' ? 'profile' : 'onboarding';
   const initialEmail = typeof emailParam === 'string' ? emailParam : '';
   const [email, setEmail] = useState(initialEmail);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -108,11 +110,16 @@ export default function ForgotPasswordScreen() {
       return;
     }
 
+    if (source === 'profile') {
+      router.replace('/account/profile');
+      return;
+    }
+
     router.replace({
       pathname: '/onboarding',
       params: { accountMode: 'login', step: 'account' },
     });
-  }, [router]);
+  }, [router, source]);
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener(
@@ -141,7 +148,7 @@ export default function ForgotPasswordScreen() {
     setIsSubmitting(true);
     setRequestError(null);
 
-    const result = await account.requestPasswordReset(email);
+    const result = await account.requestPasswordReset(email, source);
 
     if (!result.ok) {
       setRequestError(result.error.message);
@@ -158,7 +165,7 @@ export default function ForgotPasswordScreen() {
     }
 
     setIsSubmitting(false);
-  }, [account, canSubmit, email]);
+  }, [account, canSubmit, email, source]);
 
   return (
     <View className="flex-1 bg-slate-100">

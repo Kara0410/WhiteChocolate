@@ -45,6 +45,8 @@ export default function MapScreen() {
     initialCamera,
     isLocationLoading,
     locationMessage,
+    locationSettingsRequired,
+    openLocationSettings,
     requestCurrentLocation,
     userLocation,
   } = useMapLocation({ resolveInitialCamera: true });
@@ -70,6 +72,8 @@ export default function MapScreen() {
         initialCamera={initialCamera}
         isLocationLoading={isLocationLoading}
         locationMessage={locationMessage}
+        locationSettingsRequired={locationSettingsRequired}
+        onOpenLocationSettings={openLocationSettings}
         onRequestUserLocation={requestCurrentLocation}
         searchFocusKey={focusSearch}
         userLocation={userLocation}

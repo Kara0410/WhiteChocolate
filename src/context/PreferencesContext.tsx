@@ -14,6 +14,8 @@ import type {
   Preferences,
   PreferencesError,
 } from '@/types/preferences';
+import type { AppActionResult } from '@/types/app-error';
+import { normalizeAppError } from '@/utils/app-errors';
 import {
   preferencesLoadError,
   preferencesSaveError,
@@ -31,7 +33,7 @@ type PreferencesContextValue = {
   loading: boolean;
   error: PreferencesError | null;
   refresh: () => Promise<void>;
-  resetPreferences: () => void;
+  resetPreferences: () => Promise<AppActionResult>;
   setPreference: <Key extends PreferenceKey>(
     key: Key,
     value: Preferences[Key],
@@ -101,19 +103,28 @@ export function PreferencesProvider({ children }: PropsWithChildren) {
     [],
   );
 
-  const resetPreferences = useCallback(() => {
+  const resetPreferences = useCallback((): Promise<AppActionResult> => {
     setError(null);
     setPreferences(DEFAULT_PREFERENCES);
 
     // Defaults are represented by an absent key, so reset removes it
     // instead of writing the default values back.
-    writeQueueRef.current = writeQueueRef.current
+    const writePromise = writeQueueRef.current
       .then(() => clearStoredPreferences())
-      .catch((saveError: unknown) => {
+    const resultPromise = writePromise.then(
+      () => ({ ok: true }) as const,
+      (saveError: unknown) => {
         if (isMountedRef.current) {
           setError(preferencesSaveError(saveError));
         }
-      });
+        return {
+          ok: false,
+          error: normalizeAppError(saveError, 'preference-save'),
+        } as const;
+      },
+    );
+    writeQueueRef.current = resultPromise.then(() => undefined);
+    return resultPromise;
   }, []);
 
   const value = useMemo(

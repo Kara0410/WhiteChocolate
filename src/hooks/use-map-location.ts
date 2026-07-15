@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Location from 'expo-location';
+import { Linking } from 'react-native';
 
 import type {
   ParkingCameraState,
@@ -27,7 +28,7 @@ export const MUNICH_OVERVIEW_CAMERA: ParkingCameraState = {
 
 type LocationResult =
   | { coordinates: ParkingCoordinates }
-  | { message: string };
+  | { message: string; requiresSettings?: boolean };
 
 class LocationRequestTimeoutError extends Error {}
 
@@ -102,15 +103,22 @@ async function getDeviceLocation(
       return {
         message:
           permission.status === Location.PermissionStatus.UNDETERMINED
-            ? 'Location access has not been enabled. Showing the Munich overview.'
-            : 'Location permission is denied. Enable it in Settings to show your position. Showing the Munich overview.',
+            ? 'Location access is off. Allow it to use your current position, or search for an address.'
+            : permission.canAskAgain
+              ? 'Location access is off. Allow it to use your current position, or search for an address.'
+              : 'Location access is turned off. Enable it in Settings to use your current position.',
+        requiresSettings:
+          permission.status !== Location.PermissionStatus.UNDETERMINED &&
+          !permission.canAskAgain,
       };
     }
 
     const servicesEnabled = await Location.hasServicesEnabledAsync();
     if (!servicesEnabled) {
       return {
-        message: 'Location services are off. Showing the Munich overview.',
+        message:
+          'Location services are turned off. Turn them on to use your current position.',
+        requiresSettings: true,
       };
     }
 
@@ -124,7 +132,7 @@ async function getDeviceLocation(
 
       return {
         message:
-          'Current location is unavailable. Showing the Munich overview.',
+          'We couldn\'t get your location. Try again or search for an address.',
       };
     } catch (error) {
       const lastKnownCoordinates = await getRecentLastKnownCoordinates();
@@ -135,13 +143,13 @@ async function getDeviceLocation(
       return {
         message:
           error instanceof LocationRequestTimeoutError
-            ? 'Location request timed out. Showing the Munich overview.'
-            : 'Current location is unavailable. Showing the Munich overview.',
+            ? 'We couldn\'t get your location. Try again or search for an address.'
+            : 'We couldn\'t get your location. Try again or search for an address.',
       };
     }
   } catch {
     return {
-      message: 'Current location is unavailable. Showing the Munich overview.',
+      message: 'We couldn\'t get your location. Try again or search for an address.',
     };
   }
 }
@@ -155,6 +163,9 @@ export function useMapLocation({
 }: UseMapLocationOptions = {}) {
   const isMountedRef = useRef(true);
   const requestIdRef = useRef(0);
+  const locationRequestRef = useRef<Promise<ParkingCoordinates | null> | null>(
+    null,
+  );
   const lastResolvedLocationRef = useRef<{
     coordinates: ParkingCoordinates;
     resolvedAt: number;
@@ -167,6 +178,8 @@ export function useMapLocation({
     useState<ParkingCoordinates | null>(null);
   const [isLocationLoading, setIsLocationLoading] = useState(false);
   const [locationMessage, setLocationMessage] = useState<string | null>(null);
+  const [locationSettingsRequired, setLocationSettingsRequired] =
+    useState(false);
 
   const applyResult = useCallback((result: LocationResult) => {
     if ('coordinates' in result) {
@@ -176,11 +189,13 @@ export function useMapLocation({
       };
       setUserLocation(result.coordinates);
       setLocationMessage(null);
+      setLocationSettingsRequired(false);
       return result.coordinates;
     }
 
     setUserLocation(null);
     setLocationMessage(result.message);
+    setLocationSettingsRequired(result.requiresSettings === true);
     return null;
   }, []);
 
@@ -194,19 +209,33 @@ export function useMapLocation({
   }, []);
 
   const resolveDeviceLocation = useCallback(async (requestPermission: boolean) => {
+    if (locationRequestRef.current) {
+      return locationRequestRef.current;
+    }
+
     const requestId = ++requestIdRef.current;
-    if (isMountedRef.current) {
-      setIsLocationLoading(true);
-    }
-    const result = await getDeviceLocation(requestPermission);
+    const operation = (async () => {
+      if (isMountedRef.current) {
+        setIsLocationLoading(true);
+      }
+      const result = await getDeviceLocation(requestPermission);
 
-    if (!isMountedRef.current || requestId !== requestIdRef.current) {
-      return null;
-    }
+      if (!isMountedRef.current || requestId !== requestIdRef.current) {
+        return null;
+      }
 
-    const coordinates = applyResult(result);
-    setIsLocationLoading(false);
-    return coordinates;
+      return applyResult(result);
+    })().finally(() => {
+      if (locationRequestRef.current === operation) {
+        locationRequestRef.current = null;
+      }
+      if (isMountedRef.current) {
+        setIsLocationLoading(false);
+      }
+    });
+
+    locationRequestRef.current = operation;
+    return operation;
   }, [applyResult]);
 
   const requestCurrentLocation = useCallback(async () => {
@@ -220,6 +249,18 @@ export function useMapLocation({
 
     return resolveDeviceLocation(true);
   }, [resolveDeviceLocation]);
+
+  const openLocationSettings = useCallback(async () => {
+    try {
+      await Linking.openSettings();
+    } catch {
+      if (isMountedRef.current) {
+        setLocationMessage(
+          'Settings could not be opened. Enable location access in your device settings.',
+        );
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (!resolveInitialCamera) {
@@ -251,6 +292,8 @@ export function useMapLocation({
     initialCamera,
     isLocationLoading,
     locationMessage,
+    locationSettingsRequired,
+    openLocationSettings,
     requestCurrentLocation,
     userLocation,
   };

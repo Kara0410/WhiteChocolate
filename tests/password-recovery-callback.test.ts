@@ -8,7 +8,7 @@ const expectedRedirect = 'whitechoclate://auth/reset-password';
 test('parses a valid PKCE recovery callback', () => {
   assert.deepEqual(
     parsePasswordRecoveryCallback(
-      `${expectedRedirect}?code=one-time-code`,
+      `${expectedRedirect}?source=profile&code=one-time-code`,
       expectedRedirect,
     ),
     { ok: true, kind: 'code', code: 'one-time-code' },

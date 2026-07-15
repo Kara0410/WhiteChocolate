@@ -2,7 +2,6 @@ import {
   isAuthApiError,
   isAuthError,
   isAuthRetryableFetchError,
-  isAuthWeakPasswordError,
 } from '@supabase/supabase-js';
 
 import type {
@@ -20,7 +19,8 @@ type AuthFailureOperation =
   | 'logout'
   | 'password-reset'
   | 'password-recovery'
-  | 'password-update';
+  | 'password-update'
+  | 'delete';
 
 type NormalizedAuthFailure = {
   category: AccountErrorCategory;
@@ -108,18 +108,10 @@ function authErrorMatches(cause: unknown, terms: string[]) {
 }
 
 function weakPasswordMessage(cause: unknown) {
-  if (!isAuthWeakPasswordError(cause)) {
-    return 'Your password does not meet the account security requirements.';
-  }
-
-  const reasons = cause.reasons;
-  if (!Array.isArray(reasons) || reasons.length === 0) {
-    return 'Your password does not meet the account security requirements.';
-  }
-
-  return `Your password does not meet the account security requirements: ${reasons
-    .slice(0, 2)
-    .join(', ')}.`;
+  // Supabase's `reasons` array is developer-facing and can contain backend
+  // policy details. Keep it in diagnostics, never in the user-facing copy.
+  void cause;
+  return 'Use a password with at least 8 characters.';
 }
 
 export function normalizeAuthFailure(
@@ -131,6 +123,18 @@ export function normalizeAuthFailure(
   const developerMessage = getSafeDeveloperMessage(cause);
   const lowerMessage = developerMessage.toLowerCase();
 
+  if (sourceCode === 'request_timeout' || lowerMessage.includes('timeout')) {
+    return {
+      category: 'timeout',
+      code: 'REQUEST_TIMEOUT',
+      developerMessage,
+      message: 'This is taking longer than expected. Please try again.',
+      retryable: true,
+      sourceCode,
+      status,
+    };
+  }
+
   if (
     isAuthRetryableFetchError(cause) ||
     authErrorMatches(cause, ['network', 'fetch failed', 'failed to fetch'])
@@ -140,20 +144,7 @@ export function normalizeAuthFailure(
       code: 'NETWORK_ERROR',
       developerMessage,
       message:
-        'Could not reach the account service. Check your connection and try again.',
-      retryable: true,
-      sourceCode,
-      status,
-    };
-  }
-
-  if (sourceCode === 'request_timeout' || lowerMessage.includes('timeout')) {
-    return {
-      category: 'network',
-      code: 'REQUEST_TIMEOUT',
-      developerMessage,
-      message:
-        'Could not reach the account service. Check your connection and try again.',
+        "We couldn't connect. Check your internet connection and try again.",
       retryable: true,
       sourceCode,
       status,
@@ -250,8 +241,10 @@ export function normalizeAuthFailure(
         developerMessage,
         message:
           operation === 'signup'
-            ? 'Account creation is temporarily unavailable. Please try again later.'
-            : 'Sign in did not complete. Check your email and password, then try again.',
+            ? "We couldn't create your account right now. Please try again."
+            : operation === 'login'
+              ? "We couldn't sign you in right now. Please try again."
+              : 'The account action could not be completed. Please try again.',
         retryable: true,
         sourceCode,
         status,
@@ -332,26 +325,30 @@ export function normalizeAuthFailure(
               ? 'PASSWORD_RESET_REQUEST_FAILED'
               : operation === 'password-recovery'
                 ? 'PASSWORD_RECOVERY_SESSION_FAILED'
-                : operation === 'password-update'
-                  ? 'PASSWORD_UPDATE_FAILED'
+              : operation === 'password-update'
+                ? 'PASSWORD_UPDATE_FAILED'
+                : operation === 'delete'
+                  ? 'ACCOUNT_DELETION_FAILED'
                   : 'LOAD_FAILED',
     developerMessage,
     message:
       operation === 'signup'
-        ? 'Account creation is temporarily unavailable. Please try again later.'
+        ? "We couldn't create your account right now. Please try again."
         : operation === 'oauth'
           ? 'Google sign-in did not complete. Please try again.'
         : operation === 'login'
-          ? 'Sign in did not complete. Check your email and password, then try again.'
+          ? "We couldn't sign you in right now. Please try again."
           : operation === 'logout'
             ? 'Sign out did not complete. Try again.'
             : operation === 'password-reset'
               ? 'Password reset could not be requested. Try again.'
               : operation === 'password-recovery'
                 ? 'The password reset session could not be established. Request a new link.'
-                : operation === 'password-update'
-                  ? 'Your password could not be updated. Try again.'
-                  : 'Account information could not be loaded. Try again.',
+            : operation === 'password-update'
+              ? 'Your password could not be updated. Try again.'
+              : operation === 'delete'
+                ? 'Your account could not be deleted. No changes were made. Please try again.'
+              : 'Account information could not be loaded. Try again.',
     retryable: true,
     sourceCode,
     status,
@@ -425,6 +422,61 @@ export function googleAuthFailedError(cause: unknown): AccountError {
 
 export function logoutFailedError(cause: unknown): AccountError {
   return accountAuthError('logout', cause);
+}
+
+export function accountDeletionError(cause: unknown): AccountError {
+  const record = unknownRecord(cause);
+  const sourceCode = getSourceCode(cause);
+
+  if (
+    sourceCode === 'account_deletion_unauthenticated' ||
+    record?.code === 'ACCOUNT_DELETION_UNAUTHENTICATED'
+  ) {
+    return createAccountError(
+      'ACCOUNT_DELETION_UNAUTHENTICATED',
+      'You must be signed in to delete an account.',
+      cause,
+      { category: 'auth', retryable: false, sourceCode },
+    );
+  }
+
+  if (
+    sourceCode === 'account_deletion_session_expired' ||
+    record?.code === 'ACCOUNT_DELETION_SESSION_EXPIRED'
+  ) {
+    return createAccountError(
+      'ACCOUNT_DELETION_SESSION_EXPIRED',
+      'Your session has expired. Sign in again before deleting your account.',
+      cause,
+      { category: 'auth', retryable: false, sourceCode },
+    );
+  }
+
+  if (
+    sourceCode === 'account_deletion_reauth_required' ||
+    record?.code === 'ACCOUNT_DELETION_REAUTH_REQUIRED'
+  ) {
+    return createAccountError(
+      'ACCOUNT_DELETION_REAUTH_REQUIRED',
+      'Please sign in again before deleting your account.',
+      cause,
+      { category: 'auth', retryable: false, sourceCode },
+    );
+  }
+
+  const normalized = normalizeAuthFailure(cause, 'delete');
+  return createAccountError(
+    'ACCOUNT_DELETION_FAILED',
+    'Your account could not be deleted. No changes were made. Please try again.',
+    cause,
+    {
+      category: normalized.category,
+      developerMessage: normalized.developerMessage,
+      retryable: normalized.retryable,
+      sourceCode: normalized.sourceCode,
+      status: normalized.status,
+    },
+  );
 }
 
 export function passwordResetRequestError(cause: unknown): AccountError {

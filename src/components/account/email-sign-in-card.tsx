@@ -16,6 +16,7 @@ type EmailSignInCardProps = {
     email: string,
     password: string,
   ) => Promise<RegisterActionResult>;
+  onForgotPassword?: (email: string) => void;
 };
 
 type AuthMode = 'login' | 'register';
@@ -26,6 +27,7 @@ const INPUT_CLASS =
 export const EmailSignInCard = memo(function EmailSignInCard({
   errorMessage,
   loginWithEmailPassword,
+  onForgotPassword,
   registerWithEmailPassword,
 }: EmailSignInCardProps) {
   const [mode, setMode] = useState<AuthMode>('login');
@@ -171,6 +173,20 @@ export const EmailSignInCard = memo(function EmailSignInCard({
           textContentType="newPassword"
           value={confirmPassword}
         />
+      ) : null}
+
+      {!isRegistering && onForgotPassword ? (
+        <Pressable
+          accessibilityLabel="Reset forgotten password"
+          accessibilityRole="button"
+          className="mt-2 min-h-11 self-end justify-center rounded-full px-2 active:bg-blue-50"
+          disabled={busy}
+          onPress={() => onForgotPassword(email)}
+        >
+          <Text className="text-[13px] font-extrabold text-blue-600">
+            Forgot password?
+          </Text>
+        </Pressable>
       ) : null}
 
       <Pressable

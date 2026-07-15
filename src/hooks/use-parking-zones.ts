@@ -7,6 +7,7 @@ import {
 } from '@/services/parkingZones';
 import type { ParkingAdministrativeZone } from '@/types/parking-domain';
 import { parkingAdministrativeZonesToPolygons } from '@/utils/parking-zones';
+import { logAppError, normalizeAppError } from '@/utils/app-errors';
 
 export function useParkingZones() {
   const [zones, setZones] = useState<ParkingAdministrativeZone[]>([]);
@@ -26,11 +27,8 @@ export function useParkingZones() {
       .catch((cause: unknown) => {
         if (isActive) {
           setZones([]);
-          setError(
-            cause instanceof Error
-              ? cause.message
-              : 'Unable to fetch parking zones.',
-          );
+          setError(normalizeAppError(cause, 'parking-data').message);
+          logAppError('parking-data', cause, { source: 'parking-zones' });
         }
       })
       .finally(() => {

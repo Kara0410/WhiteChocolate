@@ -290,7 +290,7 @@ export function getDangerSettings(isSignedIn: boolean): SettingItem[] {
       id: 'data-controls',
       title: 'Data controls',
       subtitle: isSignedIn
-        ? 'Delete local device data. Account deletion is coming later.'
+        ? 'Delete local device data or permanently delete your account.'
         : 'Delete favorites and preferences from this device.',
       icon: Trash2,
       type: 'navigation',

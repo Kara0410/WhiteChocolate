@@ -30,6 +30,7 @@ type OnboardingContextValue = {
   shouldShowOnboarding: boolean;
   onboardingState: OnboardingState;
   completeOnboarding: () => Promise<OnboardingActionResult>;
+  resetOnboarding: () => Promise<OnboardingActionResult>;
   resetOnboardingForDev: () => void;
   markAccountSkipped: () => void;
   markMapTipSeen: () => void;
@@ -170,13 +171,17 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
     return { ok: true } as const;
   }, [applyOnboardingState, enqueueWrite]);
 
-  const resetOnboardingForDev = useCallback(() => {
+  const resetOnboarding = useCallback(async () => {
     applyOnboardingState(DEFAULT_ONBOARDING_STATE);
-    void enqueueWrite(
+    return enqueueWrite(
       () => clearOnboardingState(),
       '[OnboardingProvider] failed to clear onboarding state',
     );
   }, [applyOnboardingState, enqueueWrite]);
+
+  const resetOnboardingForDev = useCallback(() => {
+    void resetOnboarding();
+  }, [resetOnboarding]);
 
   const markAccountSkipped = useCallback(() => {
     updateState((current) =>
@@ -213,6 +218,7 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
       shouldShowOnboarding,
       onboardingState,
       completeOnboarding,
+      resetOnboarding,
       resetOnboardingForDev,
       markAccountSkipped,
       markMapTipSeen,
@@ -226,6 +232,7 @@ export function OnboardingProvider({ children }: PropsWithChildren) {
       markMapTipSeen,
       onboardingState,
       resetOnboardingForDev,
+      resetOnboarding,
       shouldShowOnboarding,
     ],
   );

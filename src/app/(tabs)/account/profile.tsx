@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { useRouter } from 'expo-router';
 import { Text, Pressable } from 'react-native';
 
 import { AccountPlaceholderScreen } from '@/components/account/account-placeholder-screen';
@@ -6,7 +7,21 @@ import { EmailSignInCard } from '@/components/account/email-sign-in-card';
 import { useAccount } from '@/hooks/use-account';
 
 export default function AccountProfileScreen() {
+  const router = useRouter();
   const account = useAccount();
+
+  const handleForgotPassword = useCallback(
+    (email: string) => {
+      router.push({
+        pathname: '/auth/forgot-password',
+        params: {
+          email: email.trim(),
+          source: 'profile',
+        },
+      });
+    },
+    [router],
+  );
 
   const handleSignOut = useCallback(() => {
     void account.logout();
@@ -64,6 +79,7 @@ export default function AccountProfileScreen() {
       <EmailSignInCard
         errorMessage={account.error?.message ?? null}
         loginWithEmailPassword={account.loginWithEmailPassword}
+        onForgotPassword={handleForgotPassword}
         registerWithEmailPassword={account.registerWithEmailPassword}
       />
     </AccountPlaceholderScreen>

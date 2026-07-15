@@ -872,7 +872,9 @@ export default function OnboardingScreen() {
     const trimmedEmail = email.trim();
     router.push({
       pathname: '/auth/forgot-password',
-      params: trimmedEmail ? { email: trimmedEmail } : {},
+      params: trimmedEmail
+        ? { email: trimmedEmail, source: 'onboarding' }
+        : { source: 'onboarding' },
     });
   }, [email, isAccountOperationRunning, router]);
 

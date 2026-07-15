@@ -6,6 +6,10 @@ import {
   type PlaceSearchResult,
   type PlaceSearchSuggestion,
 } from '@/services/googlePlaces';
+import {
+  logAppError,
+  normalizeAppError,
+} from '@/utils/app-errors';
 
 export type { PlaceSearchResult, PlaceSearchSuggestion };
 
@@ -18,45 +22,6 @@ function normalizeQuery(query: string) {
 
 function createSearchSessionToken() {
   return `places-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
-function userFriendlySearchError(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error ?? '');
-
-  if (message.includes('EXPO_PUBLIC_GOOGLE_PLACES_API_KEY')) {
-    return 'Google Places is not configured. Set EXPO_PUBLIC_GOOGLE_PLACES_API_KEY.';
-  }
-
-  if (
-    message.includes('Android client application <empty>') ||
-    message.includes('are blocked')
-  ) {
-    return 'Google Places needs a separate Places API key. The current key is restricted to Android Maps SDK requests.';
-  }
-
-  if (
-    message.includes('API key') ||
-    message.includes('REQUEST_DENIED') ||
-    message.includes('PERMISSION_DENIED')
-  ) {
-    return 'Google Places is not available for this app key.';
-  }
-
-  if (message.includes('quota') || message.includes('RESOURCE_EXHAUSTED')) {
-    return 'Search is temporarily unavailable. Try again later.';
-  }
-
-  return 'Search failed. Try another place or address.';
-}
-
-function shouldWarnForSearchError(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error ?? '');
-
-  return (
-    !message.includes('EXPO_PUBLIC_GOOGLE_PLACES_API_KEY') &&
-    !message.includes('Android client application <empty>') &&
-    !message.includes('are blocked')
-  );
 }
 
 export function useGooglePlaceSearch() {
@@ -140,10 +105,9 @@ export function useGooglePlaceSearch() {
         }
 
         setSuggestions([]);
-        setError(userFriendlySearchError(searchError));
-        if (__DEV__ && shouldWarnForSearchError(searchError)) {
-          console.warn('Unable to search places', searchError);
-        }
+        const normalized = normalizeAppError(searchError, 'place-search');
+        setError(normalized.message);
+        logAppError('place-search', searchError);
       })
       .finally(() => {
         if (
@@ -215,10 +179,12 @@ export function useGooglePlaceSearch() {
           return null;
         }
 
-        setError(userFriendlySearchError(detailsError));
-        if (__DEV__ && shouldWarnForSearchError(detailsError)) {
-          console.warn('Unable to load place details', detailsError);
-        }
+        const normalized = normalizeAppError(
+          detailsError,
+          'place-details',
+        );
+        setError(normalized.message);
+        logAppError('place-details', detailsError);
         return null;
       } finally {
         if (

@@ -21,6 +21,7 @@ import type { ParkingClusterResponse } from '@/types/parking-map';
 
 type ParkingListBottomSheetProps = {
   errorMessage?: string | null;
+  onRetry?: () => void;
   onClose: () => void;
   onSpotPress: (item: ParkingClusterResponse) => void;
   spots: ParkingClusterResponse[];
@@ -94,6 +95,7 @@ const ParkingListRow = memo(function ParkingListRow({
 
 export function ParkingListBottomSheet({
   errorMessage = null,
+  onRetry,
   onClose,
   onSpotPress,
   spots,
@@ -194,9 +196,23 @@ export function ParkingListBottomSheet({
                 : 'Unable to load parking areas'}
             </Text>
             {errorMessage !== null ? (
-              <Text className="mt-2 text-center text-[14px] font-medium leading-5 text-slate-500">
-                Check your connection and try again.
-              </Text>
+              <>
+                <Text className="mt-2 text-center text-[14px] font-medium leading-5 text-slate-500">
+                  Parking information couldn&apos;t be loaded. Try again.
+                </Text>
+                {onRetry ? (
+                  <Pressable
+                    accessibilityLabel="Retry parking information"
+                    accessibilityRole="button"
+                    className="mt-4 min-h-11 justify-center rounded-full bg-blue-600 px-4 active:bg-blue-700"
+                    onPress={onRetry}
+                  >
+                    <Text className="text-center text-[13px] font-extrabold text-white">
+                      Retry
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </>
             ) : null}
           </View>
         }

@@ -32,6 +32,7 @@ type SearchNearestSpotsBottomSheetProps = {
   spots: ParkingSpotWithDistance[];
   isLoading?: boolean;
   errorMessage?: string | null;
+  onRetry?: () => void;
   onClose: () => void;
   onSpotPress: (spot: ParkingClusterResponse) => void;
 };
@@ -156,6 +157,7 @@ function SearchNearestSpotsBottomSheetComponent({
   spots,
   isLoading = false,
   errorMessage = null,
+  onRetry,
   onClose,
   onSpotPress,
 }: SearchNearestSpotsBottomSheetProps) {
@@ -326,11 +328,23 @@ function SearchNearestSpotsBottomSheetComponent({
             </Text>
             <Text className="mt-2 text-center text-[14px] font-medium leading-5 text-slate-500">
               {errorMessage !== null
-                ? 'Check your connection and search this area again.'
+                ? 'Parking information couldn\'t be loaded. Try again.'
                 : isLoading
                   ? 'Loading parking data around this destination.'
                   : 'Try a different place or address.'}
             </Text>
+            {errorMessage !== null && onRetry ? (
+              <Pressable
+                accessibilityLabel="Retry parking information"
+                accessibilityRole="button"
+                className="mt-4 min-h-11 justify-center rounded-full bg-blue-600 px-4 active:bg-blue-700"
+                onPress={onRetry}
+              >
+                <Text className="text-center text-[13px] font-extrabold text-white">
+                  Retry
+                </Text>
+              </Pressable>
+            ) : null}
           </View>
         }
         maxToRenderPerBatch={8}

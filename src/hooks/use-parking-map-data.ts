@@ -48,6 +48,7 @@ import {
 } from '@/utils/parking-feature-adapters';
 import { parkingSegmentToSummary } from '@/utils/parking-segments';
 import { createParkingZoneMatcher } from '@/utils/parking-zones';
+import { logAppError, normalizeAppError } from '@/utils/app-errors';
 
 const CAMERA_DEBOUNCE_MS = 350;
 const LAYER_TRANSITION_MS = 200;
@@ -358,22 +359,25 @@ export function useParkingMapData(
           return;
         }
         abortControllerRef.current = null;
+        const normalized = normalizeAppError(error, 'parking-data');
         dispatch({
           type: 'reject',
           requestKey,
-          error: error instanceof Error ? error.message : String(error),
+          error: normalized.message,
         });
-        if (__DEV__) {
-          console.warn('[parking-map] semantic data request failed', {
-            durationMs: Date.now() - startedAt,
-            error: error instanceof Error ? error.message : String(error),
-            stage: requestedStage,
-          });
-        }
+        logAppError('parking-data', error, {
+          durationMs: Date.now() - startedAt,
+          stage: requestedStage,
+        });
       }
     },
     [createRequest, fetchStageData, markLoaded],
   );
+
+  const retryLatest = useCallback(() => {
+    const camera = latestCameraRef.current;
+    void loadForCamera(camera, deriveParkingSemanticZoomStage(camera));
+  }, [loadForCamera]);
 
   useEffect(() => {
     if (
@@ -549,6 +553,7 @@ export function useParkingMapData(
     loadedRequestVersion,
     onCameraMove,
     requestParkingForCamera,
+    retryLatest,
     semanticStage,
     visibleSpots,
   };

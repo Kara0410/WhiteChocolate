@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Linking from 'expo-linking';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   ActivityIndicator,
   BackHandler,
@@ -19,6 +19,28 @@ import { passwordsDoNotMatchError } from '@/utils/account-errors';
 
 const INPUT_CLASS =
   'mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-[15px] font-semibold text-slate-900';
+
+function getRecoverySource(
+  routeSource: string | undefined,
+  callbackUrl: string | null,
+): 'onboarding' | 'profile' {
+  if (routeSource === 'profile') {
+    return 'profile';
+  }
+
+  if (callbackUrl) {
+    try {
+      if (new URL(callbackUrl).searchParams.get('source') === 'profile') {
+        return 'profile';
+      }
+    } catch {
+      // The recovery service owns callback validation. Use the safe default
+      // here if the incoming URL cannot be parsed for its navigation source.
+    }
+  }
+
+  return 'onboarding';
+}
 
 function PrimaryButton({
   disabled,
@@ -79,6 +101,9 @@ export default function ResetPasswordScreen() {
   const insets = useSafeAreaInsets();
   const account = useAccount();
   const callbackUrl = Linking.useLinkingURL();
+  const { source: sourceParam } =
+    useLocalSearchParams<{ source?: string }>();
+  const source = getRecoverySource(sourceParam, callbackUrl);
   const processedCallbackRef = useRef(false);
   const [isVerifying, setIsVerifying] = useState(true);
   const [isRecoveryValid, setIsRecoveryValid] = useState(false);
@@ -91,7 +116,7 @@ export default function ResetPasswordScreen() {
   const [isUpdated, setIsUpdated] = useState(false);
 
   useEffect(() => {
-    if (processedCallbackRef.current) {
+    if (processedCallbackRef.current || account.loading) {
       return;
     }
 
@@ -115,7 +140,7 @@ export default function ResetPasswordScreen() {
 
       setIsRecoveryValid(true);
     });
-  }, [account, callbackUrl]);
+  }, [account, account.loading, callbackUrl]);
 
   const returnToLogin = useCallback(async () => {
     if (isVerifying || isSubmitting || isFinishingRecovery) {
@@ -137,6 +162,11 @@ export default function ResetPasswordScreen() {
       setIsRecoveryValid(false);
     }
 
+    if (source === 'profile') {
+      router.replace('/account/profile');
+      return;
+    }
+
     router.replace({
       pathname: '/onboarding',
       params: { accountMode: 'login', step: 'account' },
@@ -149,6 +179,7 @@ export default function ResetPasswordScreen() {
     isUpdated,
     isVerifying,
     router,
+    source,
   ]);
 
   useEffect(() => {
@@ -264,7 +295,12 @@ export default function ResetPasswordScreen() {
                 disabled={false}
                 isLoading={false}
                 label="Request a new link"
-                onPress={() => router.replace('/auth/forgot-password')}
+                onPress={() =>
+                  router.replace({
+                    pathname: '/auth/forgot-password',
+                    params: { source },
+                  })
+                }
               />
               <SecondaryButton
                 label="Return to login"

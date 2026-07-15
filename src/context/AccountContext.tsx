@@ -15,6 +15,10 @@ import {
   type AccountAuthClient,
 } from '@/services/account-auth';
 import {
+  deleteAccountService,
+  type AccountDeletionClient,
+} from '@/services/account-deletion';
+import {
   completeGoogleOAuthCallbackService,
   continueWithGoogleService,
   type GoogleOAuthAuthClient,
@@ -25,6 +29,7 @@ import {
   requestPasswordResetService,
   updateRecoveredPasswordService,
   type PasswordRecoveryAuthClient,
+  type PasswordRecoverySource,
 } from '@/services/account-password-recovery';
 import {
   hydrateAccountSession,
@@ -35,6 +40,7 @@ import type {
   AccountActionResult,
   AccountError,
   AccountUser,
+  AccountDeletionStatus,
   AuthStatus,
   PasswordRecoveryStatus,
   RegisterActionResult,
@@ -44,6 +50,7 @@ import {
   googleAuthFailedError,
   logAccountAuthFailure,
   logoutFailedError,
+  accountDeletionError,
 } from '@/utils/account-errors';
 import { getCurrentAccountSnapshot } from '@/utils/account-state';
 import { mapSupabaseUser } from '@/utils/auth-user';
@@ -53,6 +60,7 @@ type AccountContextValue = ReturnType<typeof getCurrentAccountSnapshot> & {
   status: AuthStatus;
   loading: boolean;
   error: AccountError | null;
+  deletionStatus: AccountDeletionStatus;
   refresh: () => Promise<void>;
   loginWithEmailPassword: (
     email: string,
@@ -63,7 +71,10 @@ type AccountContextValue = ReturnType<typeof getCurrentAccountSnapshot> & {
     callbackUrl: string,
   ) => Promise<AccountActionResult>;
   recoveryStatus: PasswordRecoveryStatus;
-  requestPasswordReset: (email: string) => Promise<AccountActionResult>;
+  requestPasswordReset: (
+    email: string,
+    source?: PasswordRecoverySource,
+  ) => Promise<AccountActionResult>;
   completePasswordRecovery: (
     callbackUrl: string,
   ) => Promise<AccountActionResult>;
@@ -103,12 +114,20 @@ const passwordRecoveryAuthClient: PasswordRecoveryAuthClient = {
   signOut: () => supabase.auth.signOut(),
 };
 
+const accountDeletionClient: AccountDeletionClient = {
+  functions: {
+    invoke: (functionName) => supabase.functions.invoke(functionName),
+  },
+};
+
 export function AccountProvider({ children }: PropsWithChildren) {
   const [user, setUser] = useState<AccountUser | null>(null);
   const [signingIn, setSigningIn] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<AccountError | null>(null);
+  const [deletionStatus, setDeletionStatus] =
+    useState<AccountDeletionStatus>('idle');
   const [recoveryStatus, setRecoveryStatus] =
     useState<PasswordRecoveryStatus>('idle');
   const accountIdentityRef = useRef<string | null>(null);
@@ -128,6 +147,9 @@ export function AccountProvider({ children }: PropsWithChildren) {
     Promise<AccountActionResult> | null
   >(null);
   const recoverySessionActiveRef = useRef(false);
+  const accountDeletionInFlightRef = useRef<Promise<AccountActionResult> | null>(
+    null,
+  );
 
   const applyAccountUser = useCallback((nextUser: AccountUser | null) => {
     const nextIdentity = nextUser?.id ?? null;
@@ -316,7 +338,10 @@ export function AccountProvider({ children }: PropsWithChildren) {
   );
 
   const requestPasswordReset = useCallback(
-    (email: string): Promise<AccountActionResult> => {
+    (
+      email: string,
+      source?: PasswordRecoverySource,
+    ): Promise<AccountActionResult> => {
       if (passwordResetInFlightRef.current) {
         return passwordResetInFlightRef.current;
       }
@@ -328,6 +353,7 @@ export function AccountProvider({ children }: PropsWithChildren) {
         const result = await requestPasswordResetService({
           auth: passwordRecoveryAuthClient,
           email,
+          source,
         });
 
         if (!result.ok) {
@@ -524,15 +550,63 @@ export function AccountProvider({ children }: PropsWithChildren) {
     }
   }, [applyAccountUser, user]);
 
-  const deleteAccount =
-    useCallback(async (): Promise<AccountActionResult> => {
-      const deleteError = createAccountError(
-        'DELETE_NOT_IMPLEMENTED',
-        'Account deletion will be connected when the backend deletion flow exists.',
-      );
-      setError(deleteError);
-      return { ok: false, error: deleteError };
-    }, []);
+  const deleteAccount = useCallback((): Promise<AccountActionResult> => {
+    if (accountDeletionInFlightRef.current) {
+      return accountDeletionInFlightRef.current;
+    }
+
+    if (user === null) {
+      const error = accountDeletionError({
+        code: 'ACCOUNT_DELETION_UNAUTHENTICATED',
+      });
+      setError(error);
+      setDeletionStatus('error');
+      return Promise.resolve({
+        ok: false,
+        error,
+      } as const);
+    }
+
+    const operation = (async (): Promise<AccountActionResult> => {
+      setError(null);
+      setDeletionStatus('deleting');
+      setSigningOut(true);
+
+      const result = await deleteAccountService({
+        client: accountDeletionClient,
+      });
+
+      if (!result.ok) {
+        setError(result.error);
+        setDeletionStatus('error');
+        setSigningOut(false);
+        return result;
+      }
+
+      try {
+        await supabase.auth.signOut();
+      } catch (signOutError) {
+        if (__DEV__) {
+          console.warn('[Account] deleted account session cleanup failed', signOutError);
+        }
+      }
+
+      applyAccountUser(null);
+      setError(null);
+      setDeletionStatus('completed');
+      setSigningOut(false);
+      return result;
+    })();
+
+    accountDeletionInFlightRef.current = operation;
+    void operation.finally(() => {
+      if (accountDeletionInFlightRef.current === operation) {
+        accountDeletionInFlightRef.current = null;
+      }
+    });
+
+    return operation;
+  }, [applyAccountUser, user]);
 
   const upgrade = useCallback(async (): Promise<AccountActionResult> => {
     const upgradeError = createAccountError(
@@ -564,6 +638,7 @@ export function AccountProvider({ children }: PropsWithChildren) {
       status,
       loading,
       error,
+      deletionStatus,
       recoveryStatus,
       refresh,
       loginWithEmailPassword,
@@ -582,6 +657,7 @@ export function AccountProvider({ children }: PropsWithChildren) {
       accountSnapshot,
       deleteAccount,
       error,
+      deletionStatus,
       finishPasswordRecovery,
       loading,
       continueWithGoogle,

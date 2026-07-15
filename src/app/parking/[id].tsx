@@ -15,6 +15,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import InfoRow from '@/components/InfoRow';
 import { fetchParkingSegmentDetails } from '@/services/parkingMapData';
 import type { ParkingSegment } from '@/types/parking-segment';
+import { logAppError, normalizeAppError } from '@/utils/app-errors';
 import { getBadgeColor } from '@/utils/parking';
 
 type DetailState =
@@ -76,12 +77,11 @@ export default function ParkingDetailScreen() {
           return;
         }
 
+        const normalized = normalizeAppError(error, 'parking-details');
+        logAppError('parking-details', error, { segmentId: id });
         setState({
           status: 'error',
-          message:
-            error instanceof Error
-              ? error.message
-              : 'Unable to load parking details.',
+          message: normalized.message,
         });
       });
 

@@ -54,9 +54,49 @@ test('unknown Auth API errors use a safe signup fallback', () => {
   assert.equal(normalized.code, 'UNKNOWN_AUTH_ERROR');
   assert.equal(
     normalized.message,
-    'Account creation is temporarily unavailable. Please try again later.',
+    "We couldn't create your account right now. Please try again.",
   );
   assert.equal(normalized.developerMessage, 'raw database stack trace');
+});
+
+test('invalid credentials use the combined safe login message', () => {
+  const normalized = normalizeAuthFailure(
+    authError('invalid_credentials', 'Invalid login credentials', 400),
+    'login',
+  );
+
+  assert.equal(normalized.code, 'LOGIN_FAILED');
+  assert.equal(normalized.message, 'The email or password is incorrect.');
+});
+
+test('duplicate signup fallbacks do not expose backend wording', () => {
+  const normalized = normalizeAuthFailure(
+    authError('unknown', 'User already registered in auth.users', 400),
+    'signup',
+  );
+
+  assert.equal(normalized.code, 'ACCOUNT_EXISTS');
+  assert.equal(
+    normalized.message,
+    'An account with this email already exists. Sign in instead.',
+  );
+  assert.equal(normalized.message.includes('auth.users'), false);
+});
+
+test('weak password reasons are never rendered in the user message', () => {
+  const normalized = normalizeAuthFailure(
+    {
+      name: 'AuthWeakPasswordError',
+      code: 'weak_password',
+      message: 'Password policy failed',
+      reasons: ['must contain an internal policy marker'],
+    },
+    'signup',
+  );
+
+  assert.equal(normalized.code, 'WEAK_PASSWORD');
+  assert.equal(normalized.message, 'Use a password with at least 8 characters.');
+  assert.equal(normalized.message.includes('internal policy marker'), false);
 });
 
 test('non-Auth network exceptions are normalized', () => {
