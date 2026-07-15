@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { AccountPlaceholderScreen } from '@/components/account/account-placeholder-screen';
 import { useFavoriteParking } from '@/context/FavoriteParkingContext';
@@ -8,16 +8,16 @@ import { useOnboarding } from '@/context/OnboardingContext';
 import { usePreferences } from '@/context/PreferencesContext';
 import { useAccount } from '@/hooks/use-account';
 
-type DeletionStep = 'idle' | 'confirm' | 'done';
+type DeletionStep = 'overview' | 'confirm' | 'done';
 
-function BulletLine({ text }: { text: string }) {
+function Consequence({ children }: { children: string }) {
   return (
     <View className="mt-2 flex-row">
-      <Text className="text-[13px] font-semibold leading-5 text-slate-400">
-        {'-'}
+      <Text className="text-[13px] font-semibold leading-5 text-red-500">
+        {'•'}
       </Text>
-      <Text className="ml-2 flex-1 text-[13px] font-semibold leading-5 text-slate-500">
-        {text}
+      <Text className="ml-2 flex-1 text-[13px] font-semibold leading-5 text-slate-600">
+        {children}
       </Text>
     </View>
   );
@@ -26,45 +26,16 @@ function BulletLine({ text }: { text: string }) {
 export default function AccountDeleteScreen() {
   const router = useRouter();
   const account = useAccount();
-  const { clearFavorites, favoriteItems } = useFavoriteParking();
+  const { clearFavorites } = useFavoriteParking();
   const { resetOnboarding } = useOnboarding();
   const { resetPreferences } = usePreferences();
-  const [localStep, setLocalStep] = useState<DeletionStep>('idle');
-  const [accountStep, setAccountStep] = useState<DeletionStep>('idle');
-  const [confirmation, setConfirmation] = useState('');
+  const [step, setStep] = useState<DeletionStep>('overview');
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isClearingLocal, setIsClearingLocal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cleanupWarning, setCleanupWarning] = useState<string | null>(null);
 
-  const handleConfirmLocalDelete = useCallback(async () => {
-    if (isClearingLocal) {
-      return;
-    }
-
-    setIsClearingLocal(true);
-    setError(null);
-    try {
-      const [favoritesResult, preferencesResult] = await Promise.all([
-        clearFavorites(),
-        resetPreferences(),
-      ]);
-
-      if (!favoritesResult.ok || !preferencesResult.ok) {
-        setError(
-          'Some local data could not be deleted. Please try again.',
-        );
-        return;
-      }
-
-      setLocalStep('done');
-    } finally {
-      setIsClearingLocal(false);
-    }
-  }, [clearFavorites, isClearingLocal, resetPreferences]);
-
-  const handleConfirmAccountDelete = useCallback(async () => {
-    if (isDeleting || confirmation !== 'DELETE' || !account.isSignedIn) {
+  const handleDelete = useCallback(async () => {
+    if (isDeleting || step !== 'confirm' || !account.isSignedIn) {
       return;
     }
 
@@ -96,44 +67,38 @@ export default function AccountDeleteScreen() {
       );
     }
 
-    setConfirmation('');
-    setAccountStep('done');
+    setStep('done');
     setIsDeleting(false);
   }, [
     account,
     clearFavorites,
-    confirmation,
     isDeleting,
     resetOnboarding,
     resetPreferences,
+    step,
   ]);
 
-  const continueAfterAccountDelete = useCallback(() => {
+  const continueAfterDeletion = useCallback(() => {
     router.replace('/onboarding');
   }, [router]);
-
-  const favoriteCount = favoriteItems.length;
-  const accountDeleted = accountStep === 'done';
 
   return (
     <AccountPlaceholderScreen
       description={
-        accountDeleted
-          ? 'Your account has been deleted. You can continue using the app as a guest.'
-          : account.isSignedIn
-            ? 'Manage local app data or permanently delete your account and its server data.'
-            : 'Delete data stored by this app on this device.'
+        step === 'done'
+          ? 'Your account has been deleted. You can continue using the app without an account.'
+          : 'Permanently remove your account and account data. This cannot be undone.'
       }
-      title="Data controls"
+      title="Delete account"
     >
-      {accountDeleted ? (
+      {step === 'done' ? (
         <View accessibilityRole="alert">
-          <Text className="text-[15px] font-extrabold text-slate-900">
+          <Text className="text-[17px] font-extrabold text-slate-900">
             Account deleted
           </Text>
           <Text className="mt-2 text-[13px] font-semibold leading-5 text-slate-500">
-            The server confirmed deletion. You are signed out and can start
-            again as a guest.
+            You are signed out and can continue using the app without an
+            account.
           </Text>
           {cleanupWarning ? (
             <Text className="mt-3 text-[13px] font-semibold leading-5 text-amber-800">
@@ -141,16 +106,25 @@ export default function AccountDeleteScreen() {
             </Text>
           ) : null}
           <Pressable
-            accessibilityLabel="Continue as guest"
+            accessibilityLabel="Continue without an account"
             accessibilityRole="button"
             className="mt-5 min-h-12 items-center justify-center rounded-full bg-blue-600 active:bg-blue-700"
-            onPress={continueAfterAccountDelete}
+            onPress={continueAfterDeletion}
             style={{ borderCurve: 'continuous' }}
           >
             <Text className="text-[15px] font-extrabold text-white">
-              Continue as guest
+              Continue
             </Text>
           </Pressable>
+        </View>
+      ) : !account.isSignedIn && !isDeleting ? (
+        <View accessibilityRole="alert">
+          <Text className="text-[17px] font-extrabold text-slate-900">
+            Sign in required
+          </Text>
+          <Text className="mt-2 text-[13px] font-semibold leading-5 text-slate-500">
+            Sign in to manage and delete your account.
+          </Text>
         </View>
       ) : (
         <>
@@ -163,43 +137,49 @@ export default function AccountDeleteScreen() {
             </Text>
           ) : null}
 
-          <Text className="text-[15px] font-extrabold text-slate-900">
-            Delete local data
-          </Text>
-          <Text className="mt-2 text-[13px] font-semibold leading-5 text-slate-500">
-            This separate action deletes data stored on this device:
-          </Text>
-          <BulletLine
-            text={`Favorite parking areas (${favoriteCount.toLocaleString()} saved)`}
-          />
-          <BulletLine text="Preferences, reset to their defaults" />
+          <View className="rounded-2xl border border-red-100 bg-red-50 p-4">
+            <Text className="text-[15px] font-extrabold text-red-900">
+              What will be removed
+            </Text>
+            <Consequence>Your profile and account</Consequence>
+            <Consequence>
+              Favorites and preferences associated with your account
+            </Consequence>
+            <Consequence>Other account data stored by the app</Consequence>
+          </View>
 
-          {localStep === 'confirm' ? (
+          {step === 'confirm' ? (
             <>
-              <Text className="mt-5 text-[13px] font-bold leading-5 text-red-700">
-                This cannot be undone.
+              <Text className="mt-5 text-[14px] font-extrabold leading-5 text-red-800">
+                Are you sure? This action cannot be undone.
               </Text>
               <Pressable
-                accessibilityLabel="Confirm delete local data"
+                accessibilityLabel="Permanently delete account"
                 accessibilityRole="button"
-                className={`mt-4 min-h-12 items-center justify-center rounded-full ${
-                  isClearingLocal ? 'bg-red-300' : 'bg-red-600 active:bg-red-700'
-                }`}
-                disabled={isClearingLocal}
+                className={
+                  isDeleting
+                    ? 'mt-4 min-h-12 flex-row items-center justify-center rounded-full bg-red-300'
+                    : 'mt-4 min-h-12 flex-row items-center justify-center rounded-full bg-red-700 active:bg-red-800'
+                }
+                disabled={isDeleting}
                 onPress={() => {
-                  void handleConfirmLocalDelete();
+                  void handleDelete();
                 }}
                 style={{ borderCurve: 'continuous' }}
               >
+                {isDeleting ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : null}
                 <Text className="text-[15px] font-extrabold text-white">
-                  {isClearingLocal ? 'Deleting local data' : 'Delete local data'}
+                  {isDeleting ? 'Deleting account' : 'Delete permanently'}
                 </Text>
               </Pressable>
               <Pressable
-                accessibilityLabel="Cancel local data deletion"
+                accessibilityLabel="Cancel account deletion"
                 accessibilityRole="button"
-                className="mt-3 min-h-12 items-center justify-center rounded-full bg-slate-200 active:bg-slate-300"
-                onPress={() => setLocalStep('idle')}
+                className="mt-3 min-h-12 items-center justify-center rounded-full bg-slate-100 active:bg-slate-200"
+                disabled={isDeleting}
+                onPress={() => setStep('overview')}
                 style={{ borderCurve: 'continuous' }}
               >
                 <Text className="text-[15px] font-extrabold text-slate-700">
@@ -209,106 +189,18 @@ export default function AccountDeleteScreen() {
             </>
           ) : (
             <Pressable
-              accessibilityLabel="Delete local data"
+              accessibilityHint="Shows a confirmation before deletion"
+              accessibilityLabel="Delete account"
               accessibilityRole="button"
-              className="mt-5 min-h-12 items-center justify-center rounded-full bg-red-600 active:bg-red-700"
-              onPress={() => setLocalStep('confirm')}
+              className="mt-5 min-h-12 items-center justify-center rounded-full border border-red-300 bg-red-50 active:bg-red-100"
+              onPress={() => setStep('confirm')}
               style={{ borderCurve: 'continuous' }}
             >
-              <Text className="text-[15px] font-extrabold text-white">
-                {localStep === 'done' ? 'Delete local data again' : 'Delete local data'}
+              <Text className="text-[15px] font-extrabold text-red-700">
+                Delete account
               </Text>
             </Pressable>
           )}
-
-          {localStep === 'done' ? (
-            <Text className="mt-3 text-[13px] font-semibold leading-5 text-emerald-700">
-              Local favorites and preferences were deleted.
-            </Text>
-          ) : null}
-
-          {account.isSignedIn ? (
-            <View className="mt-8 border-t border-slate-200 pt-6">
-              <Text className="text-[15px] font-extrabold text-slate-900">
-                Permanently delete account
-              </Text>
-              <Text className="mt-2 text-[13px] font-semibold leading-5 text-slate-500">
-                This permanently deletes your authenticated account and its
-                server data. Subscriptions are not cancelled by this action.
-              </Text>
-              <BulletLine text="Your profile, favorites, preferences, and consent records" />
-              <BulletLine text="Your authentication account" />
-
-              {accountStep === 'confirm' ? (
-                <>
-                  <Text className="mt-5 text-[13px] font-bold leading-5 text-red-700">
-                    Type DELETE to confirm. This action is permanent.
-                  </Text>
-                  <TextInput
-                    accessibilityLabel="Type DELETE to confirm account deletion"
-                    autoCapitalize="characters"
-                    autoCorrect={false}
-                    className="mt-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-[15px] font-bold text-slate-900"
-                    editable={!isDeleting}
-                    onChangeText={setConfirmation}
-                    placeholder="DELETE"
-                    placeholderTextColor="#94A3B8"
-                    value={confirmation}
-                  />
-                  <Pressable
-                    accessibilityLabel="Confirm permanent account deletion"
-                    accessibilityRole="button"
-                    className={`mt-4 min-h-12 flex-row items-center justify-center rounded-full ${
-                      isDeleting || confirmation !== 'DELETE'
-                        ? 'bg-red-300'
-                        : 'bg-red-700 active:bg-red-800'
-                    }`}
-                    disabled={
-                      isDeleting || confirmation !== 'DELETE'
-                    }
-                    onPress={() => {
-                      void handleConfirmAccountDelete();
-                    }}
-                    style={{ borderCurve: 'continuous' }}
-                  >
-                    {isDeleting ? (
-                      <ActivityIndicator color="#FFFFFF" size="small" />
-                    ) : null}
-                    <Text className="text-[15px] font-extrabold text-white">
-                      {isDeleting ? 'Deleting account' : 'Delete account permanently'}
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    accessibilityLabel="Cancel account deletion"
-                    accessibilityRole="button"
-                    className="mt-3 min-h-12 items-center justify-center rounded-full bg-slate-200 active:bg-slate-300"
-                    disabled={isDeleting}
-                    onPress={() => {
-                      setAccountStep('idle');
-                      setConfirmation('');
-                    }}
-                    style={{ borderCurve: 'continuous' }}
-                  >
-                    <Text className="text-[15px] font-extrabold text-slate-700">
-                      Cancel
-                    </Text>
-                  </Pressable>
-                </>
-              ) : (
-                <Pressable
-                  accessibilityLabel="Delete account permanently"
-                  accessibilityRole="button"
-                  className="mt-5 min-h-12 items-center justify-center rounded-full bg-red-700 active:bg-red-800"
-                  onPress={() => setAccountStep('confirm')}
-                  style={{ borderCurve: 'continuous' }}
-                >
-                  <Text className="text-[15px] font-extrabold text-white">
-                    Delete account permanently
-                  </Text>
-                </Pressable>
-              )}
-            </View>
-          ) : null}
         </>
       )}
     </AccountPlaceholderScreen>

@@ -16,8 +16,15 @@ export const DangerSection = memo(function DangerSection({
     [isSignedIn],
   );
 
+  if (!isSignedIn) {
+    return null;
+  }
+
   return (
-    <SettingsSection title="Data controls">
+    <SettingsSection
+      subtitle="Permanent changes to your signed-in account."
+      title="Account actions"
+    >
       <SettingItemList items={items} />
     </SettingsSection>
   );

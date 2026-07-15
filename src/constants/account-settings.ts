@@ -6,6 +6,7 @@ import {
   Bug,
   CircleHelp,
   Crown,
+  Database,
   FileText,
   Gauge,
   Heart,
@@ -279,24 +280,39 @@ export function getAppDataSettings({
       accessibilityHint:
         'Opens system Settings. Location is not requested from this page.',
     },
+    {
+      id: 'local-data',
+      title: 'Storage & local data',
+      subtitle: 'Clear favorites and preferences saved on this device.',
+      icon: Database,
+      type: 'navigation',
+      navigationTarget: '/account/local-data',
+      group: 'app-data',
+      accessibilityLabel: 'Storage and local data',
+      accessibilityHint: 'Opens controls for data saved on this device',
+    },
   ];
 }
 
 // "Delete account" must not appear until the backend deletion flow exists,
 // even for signed-in users (docs/auth-foundation.md §7).
 export function getDangerSettings(isSignedIn: boolean): SettingItem[] {
+  if (!isSignedIn) {
+    return [];
+  }
+
   return [
     {
-      id: 'data-controls',
-      title: 'Data controls',
-      subtitle: isSignedIn
-        ? 'Delete local device data or permanently delete your account.'
-        : 'Delete favorites and preferences from this device.',
+      id: 'delete-account',
+      title: 'Delete account',
+      subtitle: 'Permanently delete your account and associated data.',
       icon: Trash2,
       type: 'navigation',
       navigationTarget: '/account/delete',
-      requiresLogin: isSignedIn,
+      danger: true,
       group: 'danger',
+      accessibilityLabel: 'Delete account',
+      accessibilityHint: 'Opens permanent account deletion',
     },
   ];
 }

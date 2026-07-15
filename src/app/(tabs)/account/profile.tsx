@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { useRouter } from 'expo-router';
-import { Text, Pressable } from 'react-native';
+import { Text, Pressable, View } from 'react-native';
 
 import { AccountPlaceholderScreen } from '@/components/account/account-placeholder-screen';
 import { EmailSignInCard } from '@/components/account/email-sign-in-card';
@@ -26,6 +26,14 @@ export default function AccountProfileScreen() {
   const handleSignOut = useCallback(() => {
     void account.logout();
   }, [account]);
+
+  const handleDeleteAccount = useCallback(() => {
+    if (account.status === 'signingOut') {
+      return;
+    }
+
+    router.push('/account/delete');
+  }, [account.status, router]);
 
   if (account.isSignedIn || account.status === 'signingOut') {
     return (
@@ -67,6 +75,32 @@ export default function AccountProfileScreen() {
             {account.error.message}
           </Text>
         ) : null}
+        <View className="mt-7 border-t border-slate-200 pt-6">
+          <Text className="text-[15px] font-extrabold text-red-700">
+            Delete account
+          </Text>
+          <Text className="mt-2 text-[13px] font-semibold leading-5 text-slate-500">
+            Permanently delete your account and associated server data. This
+            action cannot be undone.
+          </Text>
+          <Pressable
+            accessibilityHint="Opens the account deletion confirmation"
+            accessibilityLabel="Delete account"
+            accessibilityRole="button"
+            className={`mt-4 min-h-12 items-center justify-center rounded-full border border-red-300 ${
+              account.status === 'signingOut'
+                ? 'bg-red-100 opacity-60'
+                : 'bg-red-50 active:bg-red-100'
+            }`}
+            disabled={account.status === 'signingOut'}
+            onPress={handleDeleteAccount}
+            style={{ borderCurve: 'continuous' }}
+          >
+            <Text className="text-[15px] font-extrabold text-red-700">
+              Delete account
+            </Text>
+          </Pressable>
+        </View>
       </AccountPlaceholderScreen>
     );
   }
