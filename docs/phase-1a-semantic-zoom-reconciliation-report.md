@@ -2,7 +2,7 @@
 
 Date: 2026-07-16  
 Repository: WhiteChocolate  
-Branch: `master`
+Branch: `feat/phase-1a-semantic-zoom-reconciliation`
 
 ## Status
 
@@ -10,7 +10,7 @@ The UUID-compatible reconciliation migration and post-migration diagnostic are a
 
 The app target is confirmed by project identity, but the remote environment tier is not explicitly documented as development, staging, or production. The repository contains local `.env` configuration and EAS development profiles, but no Supabase environment mapping or non-production project reference. Per the task stop conditions, remote writes and type regeneration are gated until the project is explicitly approved as a non-production validation target.
 
-Files added:
+Prepared files:
 
 - `supabase/migrations/20260716000100_reconcile_parking_semantic_zoom_uuid.sql`
 - `supabase/diagnostics/semantic_zoom_reconciliation_verification.sql`
@@ -18,11 +18,11 @@ Files added:
 - `tests/parking-segments.test.ts` UUID regression coverage
 - `tests/parking-map-data.test.ts` UUID summary-normalization coverage
 
-Phase 1A files are not committed. At inspection time, `git status --short`
-reported the two modified parking tests and the new Phase 1A report,
-diagnostic, migration, and rollback files. Do not treat the working tree as a
-reviewed or deployable migration bundle until those changes have been reviewed
-and committed intentionally.
+The prepared files were already present in commit `313a2b3` on `master` when
+this review began, contrary to the expected uncommitted starting state. The
+dedicated review branch preserves that history and contains only follow-up
+safety hardening from this review. An unrelated untracked
+`.claude/settings.local.json` file was not touched or staged.
 
 No city ownership, prediction, provider, stable-cell, UI, favorite-schema, or dependency changes were made.
 
@@ -31,6 +31,9 @@ No city ownership, prediction, provider, stable-cell, UI, favorite-schema, or de
 Complete locally. The UUID-compatible migration, read-only diagnostic, manual
 rollback, and focused UUID regression tests exist and have been reviewed. Local
 validation passed, but no remote database was changed.
+
+Types regenerated: no. Regeneration remains blocked until an approved staging
+database receives the migration.
 
 ## Applied to staging
 
@@ -244,8 +247,8 @@ run the rollback on the current linked project or production.
 Production rollout is a separate, explicitly approved operation. The checklist
 must be completed in order:
 
-- [ ] Commit and review all Phase 1A files; current Phase 1A files are presently
-      uncommitted.
+- [ ] Commit and review all Phase 1A files, including the follow-up ownership
+      markers and diagnostic hardening on this branch.
 - [ ] Confirm a successful staging run and rollback/reapply rehearsal.
 - [ ] Confirm a current backup/restore path for the target project. Supabase
       documents dashboard backups and logical dump options in its

@@ -19,6 +19,8 @@ declare
   zone_id_type text;
   location_type text;
   location_generated "char";
+  location_not_null boolean;
+  parking_zone_not_null boolean;
 begin
   if to_regclass('public.parking_segments') is null
      or to_regclass('public.parking_zones') is null then
@@ -107,11 +109,22 @@ begin
       and a.attnum > 0
       and not a.attisdropped;
 
-    if location_type <> 'geometry(Point,4326)' or location_generated <> 's' then
+    select a.attnotnull
+    into location_not_null
+    from pg_catalog.pg_attribute as a
+    where a.attrelid = 'public.parking_segments'::regclass
+      and a.attname = 'location'
+      and a.attnum > 0
+      and not a.attisdropped;
+
+    if location_type <> 'geometry(Point,4326)'
+       or location_generated <> 's'
+       or location_not_null then
       raise exception
-        'Refusing reconciliation: existing parking_segments.location is %, generated=%; manual review required',
+        'Refusing reconciliation: existing parking_segments.location is %, generated=%, not_null=%; manual review required',
         coalesce(location_type, '<missing>'),
-        coalesce(location_generated::text, '<none>');
+        coalesce(location_generated::text, '<none>'),
+        coalesce(location_not_null::text, '<none>');
     end if;
   end if;
 
@@ -122,8 +135,10 @@ begin
       and table_name = 'parking_segments'
       and column_name = 'parking_zone_id'
   ) then
-    select pg_catalog.format_type(a.atttypid, a.atttypmod)
-    into zone_id_type
+    select
+      pg_catalog.format_type(a.atttypid, a.atttypmod),
+      a.attnotnull
+    into zone_id_type, parking_zone_not_null
     from pg_catalog.pg_attribute as a
     where a.attrelid = 'public.parking_segments'::regclass
       and a.attname = 'parking_zone_id'
@@ -136,6 +151,11 @@ begin
         coalesce(zone_id_type, '<missing>');
     end if;
 
+    if parking_zone_not_null then
+      raise exception
+        'Refusing reconciliation: existing parking_segments.parking_zone_id is NOT NULL; expected nullable';
+    end if;
+
     if exists (
       select 1
       from public.parking_segments as segment
@@ -145,6 +165,38 @@ begin
     ) then
       raise exception
         'Refusing reconciliation: existing parking_zone_id values contain invalid foreign keys';
+    end if;
+
+    if exists (
+      select 1
+      from pg_catalog.pg_constraint as constraint_row
+      where constraint_row.conrelid = 'public.parking_segments'::regclass
+        and constraint_row.conname = 'parking_segments_parking_zone_id_fkey'
+    )
+    and not exists (
+      select 1
+      from pg_catalog.pg_constraint as constraint_row
+      join pg_catalog.pg_attribute as segment_column
+        on segment_column.attrelid = constraint_row.conrelid
+       and segment_column.attname = 'parking_zone_id'
+       and segment_column.attnum > 0
+       and not segment_column.attisdropped
+      join pg_catalog.pg_attribute as zone_column
+        on zone_column.attrelid = constraint_row.confrelid
+       and zone_column.attname = 'id'
+       and zone_column.attnum > 0
+       and not zone_column.attisdropped
+      where constraint_row.conrelid = 'public.parking_segments'::regclass
+        and constraint_row.conname = 'parking_segments_parking_zone_id_fkey'
+        and constraint_row.contype = 'f'
+        and constraint_row.confrelid = 'public.parking_zones'::regclass
+        and constraint_row.conkey = array[segment_column.attnum]::smallint[]
+        and constraint_row.confkey = array[zone_column.attnum]::smallint[]
+        and constraint_row.confupdtype = 'c'
+        and constraint_row.confdeltype = 'n'
+    ) then
+      raise exception
+        'Refusing reconciliation: existing parking_segments_parking_zone_id_fkey has an incompatible definition';
     end if;
   end if;
 
@@ -160,17 +212,43 @@ begin
 end;
 $$;
 
-alter table public.parking_segments
-  add column if not exists location geometry(Point, 4326)
-  generated always as (
-    case
-      when lat is null or lon is null then null
-      else st_setsrid(st_makepoint(lon, lat), 4326)
-    end
-  ) stored;
+do $$
+begin
+  if not exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'parking_segments'
+      and column_name = 'location'
+  ) then
+    alter table public.parking_segments
+      add column location geometry(Point, 4326)
+      generated always as (
+        case
+          when lat is null or lon is null then null
+          else st_setsrid(st_makepoint(lon, lat), 4326)
+        end
+      ) stored;
 
-alter table public.parking_segments
-  add column if not exists parking_zone_id bigint;
+    comment on column public.parking_segments.location is
+      'Phase 1A managed column: generated WGS84 point from lon/lat for semantic parking zoom.';
+  end if;
+
+  if not exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'parking_segments'
+      and column_name = 'parking_zone_id'
+  ) then
+    alter table public.parking_segments
+      add column parking_zone_id bigint;
+
+    comment on column public.parking_segments.parking_zone_id is
+      'Phase 1A managed column: administrative zone assigned server-side with ST_Covers.';
+  end if;
+end;
+$$;
 
 do $$
 declare
@@ -197,16 +275,89 @@ begin
 end;
 $$;
 
-create index if not exists parking_segments_location_gix
-  on public.parking_segments using gist (location)
-  where location is not null;
+-- Index existence is checked by access method and indexed column, not only by
+-- a preferred name. Newly created indexes receive ownership comments so the
+-- manual rollback cannot remove an equivalent pre-existing index.
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_catalog.pg_index as index_row
+    join pg_catalog.pg_class as index_class
+      on index_class.oid = index_row.indexrelid
+    join pg_catalog.pg_am as access_method
+      on access_method.oid = index_class.relam
+    join pg_catalog.pg_attribute as column_row
+      on column_row.attrelid = index_row.indrelid
+     and column_row.attname = 'location'
+     and column_row.attnum > 0
+     and not column_row.attisdropped
+    where index_row.indrelid = 'public.parking_segments'::regclass
+      and index_row.indisvalid
+      and index_row.indnatts = 1
+      and index_row.indkey[0] = column_row.attnum
+      and access_method.amname = 'gist'
+  ) then
+    create index parking_segments_location_gix
+      on public.parking_segments using gist (location)
+      where location is not null;
 
-create index if not exists parking_segments_parking_zone_id_idx
-  on public.parking_segments (parking_zone_id);
+    comment on index public.parking_segments_location_gix is
+      'Phase 1A managed index: generated segment locations.';
+  end if;
 
-create index if not exists parking_zones_geom_gix
-  on public.parking_zones using gist (geom)
-  where geom is not null;
+  if not exists (
+    select 1
+    from pg_catalog.pg_index as index_row
+    join pg_catalog.pg_class as index_class
+      on index_class.oid = index_row.indexrelid
+    join pg_catalog.pg_am as access_method
+      on access_method.oid = index_class.relam
+    join pg_catalog.pg_attribute as column_row
+      on column_row.attrelid = index_row.indrelid
+     and column_row.attname = 'parking_zone_id'
+     and column_row.attnum > 0
+     and not column_row.attisdropped
+    where index_row.indrelid = 'public.parking_segments'::regclass
+      and index_row.indisvalid
+      and index_row.indnatts = 1
+      and index_row.indkey[0] = column_row.attnum
+      and access_method.amname = 'btree'
+  ) then
+    create index parking_segments_parking_zone_id_idx
+      on public.parking_segments (parking_zone_id);
+
+    comment on index public.parking_segments_parking_zone_id_idx is
+      'Phase 1A managed index: segment-to-zone relationship.';
+  end if;
+
+  if not exists (
+    select 1
+    from pg_catalog.pg_index as index_row
+    join pg_catalog.pg_class as index_class
+      on index_class.oid = index_row.indexrelid
+    join pg_catalog.pg_am as access_method
+      on access_method.oid = index_class.relam
+    join pg_catalog.pg_attribute as column_row
+      on column_row.attrelid = index_row.indrelid
+     and column_row.attname = 'geom'
+     and column_row.attnum > 0
+     and not column_row.attisdropped
+    where index_row.indrelid = 'public.parking_zones'::regclass
+      and index_row.indisvalid
+      and index_row.indnatts = 1
+      and index_row.indkey[0] = column_row.attnum
+      and access_method.amname = 'gist'
+  ) then
+    create index parking_zones_geom_gix
+      on public.parking_zones using gist (geom)
+      where geom is not null;
+
+    comment on index public.parking_zones_geom_gix is
+      'Phase 1A managed index: parking zone geometries.';
+  end if;
+end;
+$$;
 
 do $$
 begin
@@ -222,6 +373,10 @@ begin
       references public.parking_zones(id)
       on update cascade
       on delete set null;
+
+    comment on constraint parking_segments_parking_zone_id_fkey
+      on public.parking_segments is
+      'Phase 1A managed constraint: preserves segment-zone referential integrity.';
   end if;
 end;
 $$;
@@ -616,10 +771,6 @@ grant execute on function public.fetch_parking_cells(
   text
 ) to anon, authenticated;
 
-comment on column public.parking_segments.location is
-  'Generated WGS84 point from lon/lat for semantic parking zoom; null when coordinates are incomplete.';
-comment on column public.parking_segments.parking_zone_id is
-  'Administrative zone assigned server-side with ST_Covers; UUID segment IDs remain unchanged.';
 comment on view public.parking_segment_summaries is
   'Compatibility summary over the UUID inventory; availability is deterministic synthetic development data.';
 comment on view public.parking_zone_summaries is

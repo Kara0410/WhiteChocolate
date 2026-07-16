@@ -31,6 +31,24 @@ where n.nspname = 'public'
 order by c.relname;
 
 select
+  'parking_zone_raw' as object_name,
+  count(*) as row_count
+from public.parking_zone_raw;
+
+select
+  schemaname,
+  tablename,
+  policyname,
+  roles,
+  cmd,
+  qual,
+  with_check
+from pg_catalog.pg_policies
+where schemaname = 'public'
+  and tablename in ('parking_segments', 'parking_zones')
+order by tablename, policyname;
+
+select
   n.nspname || '.' || p.proname as function_name,
   pg_catalog.pg_get_function_identity_arguments(p.oid) as identity_arguments,
   pg_catalog.pg_get_function_result(p.oid) as return_type,
@@ -128,7 +146,25 @@ select
   count(*) as invalid_summary_capacity_count
 from public.parking_zone_summaries
 where available_capacity is not null
-  and available_capacity < 0;
+   and available_capacity < 0;
+
+select
+  'parking_segment_summaries' as object_name,
+  count(*) as row_count,
+  min(estimated_availability_percent) as minimum_percentage,
+  max(estimated_availability_percent) as maximum_percentage,
+  min(estimated_available_capacity) as minimum_available_capacity,
+  max(estimated_available_capacity) as maximum_available_capacity
+from public.parking_segment_summaries
+union all
+select
+  'parking_zone_summaries',
+  count(*),
+  min(availability_percent),
+  max(availability_percent),
+  min(available_capacity),
+  max(available_capacity)
+from public.parking_zone_summaries;
 
 select
   'parking_segment_summaries' as object_name,
@@ -166,7 +202,17 @@ select
   resolution,
   count(*) as cell_count,
   min(availability_percent) as minimum_percentage,
-  max(availability_percent) as maximum_percentage
+  max(availability_percent) as maximum_percentage,
+  min(available_capacity) as minimum_available_capacity,
+  max(available_capacity) as maximum_available_capacity,
+  bool_and(
+    availability_percent is null
+    or availability_percent between 0 and 100
+  ) as percentages_in_range,
+  bool_and(
+    available_capacity is null
+    or available_capacity >= 0
+  ) as capacities_in_range
 from (
   select 'coarse' as resolution, *
   from public.fetch_parking_cells(11.35, 48.00, 11.75, 48.25, 'coarse')
@@ -184,9 +230,32 @@ select
   has_table_privilege('authenticated', 'public.parking_zone_summaries', 'select') as authenticated_zone_summary_select,
   has_function_privilege('anon', 'public.fetch_parking_cells(double precision, double precision, double precision, double precision, text)', 'execute') as anon_cell_rpc_execute,
   has_function_privilege('authenticated', 'public.fetch_parking_cells(double precision, double precision, double precision, double precision, text)', 'execute') as authenticated_cell_rpc_execute,
+  (
+    select exists (
+      select 1
+      from pg_catalog.pg_proc as assignment_function
+      cross join lateral aclexplode(
+        coalesce(
+          assignment_function.proacl,
+          acldefault('f', assignment_function.proowner)
+        )
+      ) as privilege
+      where assignment_function.oid = 'public.assign_parking_segment_zone()'::regprocedure
+        and privilege.grantee = 0
+        and privilege.privilege_type = 'EXECUTE'
+    )
+  ) as public_assignment_execute,
   has_table_privilege('anon', 'public.parking_segments', 'insert') as anon_inventory_insert,
+  has_table_privilege('anon', 'public.parking_segments', 'update') as anon_inventory_update,
+  has_table_privilege('anon', 'public.parking_segments', 'delete') as anon_inventory_delete,
   has_table_privilege('authenticated', 'public.parking_segments', 'insert') as authenticated_inventory_insert,
-  has_table_privilege('anon', 'public.parking_zones', 'update') as anon_inventory_update,
-  has_table_privilege('authenticated', 'public.parking_zones', 'update') as authenticated_inventory_update;
+  has_table_privilege('authenticated', 'public.parking_segments', 'update') as authenticated_inventory_update,
+  has_table_privilege('authenticated', 'public.parking_segments', 'delete') as authenticated_inventory_delete,
+  has_table_privilege('anon', 'public.parking_zones', 'insert') as anon_zone_insert,
+  has_table_privilege('anon', 'public.parking_zones', 'update') as anon_zone_update,
+  has_table_privilege('anon', 'public.parking_zones', 'delete') as anon_zone_delete,
+  has_table_privilege('authenticated', 'public.parking_zones', 'insert') as authenticated_zone_insert,
+  has_table_privilege('authenticated', 'public.parking_zones', 'update') as authenticated_zone_update,
+  has_table_privilege('authenticated', 'public.parking_zones', 'delete') as authenticated_zone_delete;
 
 rollback;
