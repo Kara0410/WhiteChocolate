@@ -75,6 +75,29 @@ test('segment rows support unassigned segments and unknown values', () => {
   assert.equal(segment?.pricing.status, 'unknown');
 });
 
+test('normalizes UUID-derived summary IDs without changing their text value', () => {
+  const uuid = '8c2a4d42-4f9c-4d26-8a85-0b1b5f3d2f10';
+  const segment = normalizeParkingSegmentSummaryRow({
+    id: uuid,
+    parking_zone_id: 7,
+    street_name: 'Test Street',
+    source_area_name: 'Altstadt',
+    lat: 48.137,
+    lon: 11.575,
+    capacity: 4,
+    estimated_available_capacity: 2,
+    estimated_availability_percent: 50,
+    availability_status: 'estimated',
+    pricing_status: 'paid',
+    hourly_rate: 2.5,
+    updated_at: '2026-07-16T10:00:00.000Z',
+  });
+
+  assert.equal(segment?.id, uuid);
+  assert.equal(segment?.zoneId, '7');
+  assert.equal(segment?.availability.status, 'estimated');
+});
+
 test('invalid service rows are rejected instead of fabricated', () => {
   assert.equal(normalizeParkingZoneSummaryRow({ ...aggregateRow }), null);
   assert.equal(

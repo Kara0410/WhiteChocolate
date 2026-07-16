@@ -63,6 +63,15 @@ test('maps Supabase columns to explicit domain fields', () => {
   assert.equal(segment.updatedAt, '2026-06-30T00:00:00.000Z');
 });
 
+test('preserves UUID-shaped segment IDs as string domain identifiers', () => {
+  const uuid = '8c2a4d42-4f9c-4d26-8a85-0b1b5f3d2f10';
+  const segment = parkingSegmentFromRow(row({ id: uuid }));
+
+  assert.ok(segment);
+  assert.equal(segment.id, uuid);
+  assert.equal(segment.availability.status, 'estimated');
+});
+
 test('rejects missing or invalid coordinates', () => {
   assert.equal(parkingSegmentFromRow(row({ id: '' })), null);
   assert.equal(parkingSegmentFromRow(row({ lat: null })), null);

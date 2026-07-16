@@ -39,6 +39,12 @@ expo-*.log
 # Supabase CLI local state
 supabase/.temp/
 
+# Temporary staging database exports (never commit)
+.staging-exports/
+supabase/.staging-exports/
+*.dump
+*.dump.sql
+
 # typescript
 *.tsbuildinfo
 
