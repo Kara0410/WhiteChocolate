@@ -7,7 +7,7 @@
 import type {
   UserFavoriteRow,
   UserPreferencesRow,
-} from '@/types/database';
+} from '@/types/database-aliases';
 import type { ParkingClusterResponse } from '@/types/parking-map';
 import type { Preferences } from '@/types/preferences';
 import type { KeyValueStorage } from '@/types/storage';

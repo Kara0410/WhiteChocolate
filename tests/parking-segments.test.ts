@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import type { ParkingSegmentRow } from '../src/types/database';
+import type { ParkingSegmentRow } from '../src/types/database-aliases';
 import {
   getParkingSegmentPageRange,
   parkingSegmentFromRow,

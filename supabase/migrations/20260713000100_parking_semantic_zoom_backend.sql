@@ -124,7 +124,7 @@ select
     when segment.angebot is null then null
     when segment.angebot <= 0 then 0
     else mod(
-      hashtextextended(segment.id, 0) & 2147483647,
+      hashtextextended(segment.id::text, 0) & 2147483647,
       segment.angebot::bigint + 1
     )::integer
   end as estimated_available_capacity,
@@ -132,7 +132,7 @@ select
     when segment.angebot is null or segment.angebot <= 0 then null
     else round(
       100.0 * mod(
-        hashtextextended(segment.id, 0) & 2147483647,
+        hashtextextended(segment.id::text, 0) & 2147483647,
         segment.angebot::bigint + 1
       ) / segment.angebot
     )::integer
@@ -314,7 +314,7 @@ as $$
       max(segment.updated_at) as updated_at
     from cell_assignments as assignment
     join public.parking_segment_summaries as segment
-      on segment.id = assignment.segment_id::text
+      on segment.id = assignment.segment_id
     where assignment.cell_rank = 1
     group by assignment.i, assignment.j, assignment.geom_4326
   )

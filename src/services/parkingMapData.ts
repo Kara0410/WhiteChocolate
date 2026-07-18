@@ -54,14 +54,20 @@ export async function fetchParkingCells(input: {
   signal?: AbortSignal;
 }): Promise<ParkingCellSummary[]> {
   assertBounds(input.bounds);
-  let query = supabase.rpc('fetch_parking_cells', {
+  const rpcArguments = {
     p_min_lng: input.bounds.minLng,
     p_min_lat: input.bounds.minLat,
     p_max_lng: input.bounds.maxLng,
     p_max_lat: input.bounds.maxLat,
     p_resolution: input.resolution,
-    p_context_hash: input.contextHash,
-  });
+  };
+  let query =
+    input.contextHash === null
+      ? supabase.rpc('fetch_parking_cells', rpcArguments)
+      : supabase.rpc('fetch_parking_cells', {
+          ...rpcArguments,
+          p_context_hash: input.contextHash,
+        });
   if (input.signal) {
     query = query.abortSignal(input.signal);
   }

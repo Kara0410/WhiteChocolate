@@ -16,6 +16,7 @@ set local search_path = public, extensions, pg_temp;
 do $$
 declare
   segment_id_type text;
+  summary_id_type text;
   zone_id_type text;
   location_type text;
   location_generated "char";
@@ -200,17 +201,44 @@ begin
     end if;
   end if;
 
-  if to_regclass('public.parking_segment_summaries') is not null
-     or to_regclass('public.parking_zone_summaries') is not null
+  if to_regclass('public.parking_segment_summaries') is null
+     or to_regclass('public.parking_zone_summaries') is null
      or to_regprocedure(
        'public.fetch_parking_cells(double precision,double precision,double precision,double precision,text)'
-     ) is not null
-     or to_regprocedure('public.assign_parking_segment_zone()') is not null then
+     ) is null
+     or to_regprocedure('public.assign_parking_segment_zone()') is null then
     raise exception
-      'Refusing reconciliation: one or more semantic-zoom objects already exist; compare their active definitions first';
+      'Refusing reconciliation: migration 20260713000100 semantic-zoom objects are missing';
+  end if;
+
+  select pg_catalog.format_type(a.atttypid, a.atttypmod)
+  into summary_id_type
+  from pg_catalog.pg_attribute as a
+  where a.attrelid = 'public.parking_segment_summaries'::regclass
+    and a.attname = 'id'
+    and a.attnum > 0
+    and not a.attisdropped;
+
+  if summary_id_type <> 'uuid' then
+    raise exception
+      'Refusing reconciliation: parking_segment_summaries.id is %, expected the UUID contract from migration 20260713000100',
+      coalesce(summary_id_type, '<missing>');
   end if;
 end;
 $$;
+
+-- Migration 20260713000100 exposes the source UUID in its compatibility view.
+-- Remove dependants in dependency order before recreating the app-facing view
+-- with a text ID. Persistent table IDs and all relational joins remain UUID.
+drop function public.fetch_parking_cells(
+  double precision,
+  double precision,
+  double precision,
+  double precision,
+  text
+);
+drop view public.parking_zone_summaries;
+drop view public.parking_segment_summaries;
 
 do $$
 begin

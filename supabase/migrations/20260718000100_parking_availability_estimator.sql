@@ -57,6 +57,9 @@ create index parking_availability_estimates_context_valid_idx
 
 alter table public.parking_availability_estimates enable row level security;
 revoke all on table public.parking_availability_estimates from public, anon, authenticated;
+grant select, insert, update, delete
+  on table public.parking_availability_estimates
+  to service_role;
 
 comment on table public.parking_availability_estimates is
   'Short-lived deterministic heuristic snapshots. Values are estimates, not observations or live occupancy.';
@@ -433,6 +436,59 @@ as $$
   limit 400;
 $$;
 
+-- Preserve the pre-estimator RPC signature for older clients and operational
+-- verification. Without a context hash it deliberately returns unknown
+-- availability by delegating with NULL; it never mixes estimates from unrelated
+-- destination contexts.
+create function public.fetch_parking_cells(
+  p_min_lng double precision,
+  p_min_lat double precision,
+  p_max_lng double precision,
+  p_max_lat double precision,
+  p_resolution text
+)
+returns table (
+  id text,
+  parent_zone_ids text[],
+  center_latitude double precision,
+  center_longitude double precision,
+  min_lng double precision,
+  min_lat double precision,
+  max_lng double precision,
+  max_lat double precision,
+  resolution text,
+  segment_count integer,
+  total_capacity bigint,
+  available_capacity bigint,
+  availability_percent integer,
+  minimum_hourly_rate double precision,
+  maximum_hourly_rate double precision,
+  has_free_parking boolean,
+  has_unknown_pricing boolean,
+  availability_status text,
+  estimated_segment_count integer,
+  unknown_segment_count integer,
+  estimate_coverage_ratio double precision,
+  oldest_estimate_generated_at timestamptz,
+  newest_estimate_generated_at timestamptz,
+  updated_at timestamptz
+)
+language sql
+stable
+security definer
+set search_path = public, extensions, pg_temp
+as $$
+  select *
+  from public.fetch_parking_cells(
+    p_min_lng,
+    p_min_lat,
+    p_max_lng,
+    p_max_lat,
+    p_resolution,
+    null::text
+  );
+$$;
+
 grant select on public.parking_segment_summaries to anon, authenticated;
 grant select on public.parking_zone_summaries to anon, authenticated;
 revoke all on function public.fetch_parking_cells(
@@ -451,6 +507,20 @@ grant execute on function public.fetch_parking_cells(
   text,
   text
 ) to anon, authenticated;
+revoke all on function public.fetch_parking_cells(
+  double precision,
+  double precision,
+  double precision,
+  double precision,
+  text
+) from public;
+grant execute on function public.fetch_parking_cells(
+  double precision,
+  double precision,
+  double precision,
+  double precision,
+  text
+) to anon, authenticated;
 
 comment on view public.parking_segment_summaries is
   'Parking inventory with the newest non-expired heuristic snapshot; no segment-ID hash fallback.';
@@ -465,5 +535,13 @@ comment on function public.fetch_parking_cells(
   text
 ) is
   'Context-specific semantic-zoom cells; unknown segments are excluded from the availability denominator.';
+comment on function public.fetch_parking_cells(
+  double precision,
+  double precision,
+  double precision,
+  double precision,
+  text
+) is
+  'Backward-compatible semantic-zoom cells without a destination context; availability remains unknown.';
 
 commit;

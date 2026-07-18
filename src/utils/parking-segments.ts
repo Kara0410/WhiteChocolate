@@ -1,4 +1,4 @@
-import type { ParkingSegmentRow } from '@/types/database';
+import type { ParkingSegmentRow } from '@/types/database-aliases';
 import type {
   ParkingAvailability,
   ParkingPricing,

@@ -84,3 +84,46 @@ test('migration has snapshot selection, weighted coverage, and no hash fallback'
   assert.match(migration, /estimated_capacity/);
   assert.doesNotMatch(migration, /hashtextextended|mod\s*\(\s*hash/i);
 });
+
+test('pending migration chain preserves UUID joins and explicitly changes the view contract', async () => {
+  const migrationDirectory = resolve(
+    dirname(fileURLToPath(import.meta.url)),
+    '../supabase/migrations',
+  );
+  const [semanticZoom, reconciliation, estimator] = await Promise.all([
+    readFile(
+      resolve(migrationDirectory, '20260713000100_parking_semantic_zoom_backend.sql'),
+      'utf8',
+    ),
+    readFile(
+      resolve(migrationDirectory, '20260716000100_reconcile_parking_semantic_zoom_uuid.sql'),
+      'utf8',
+    ),
+    readFile(
+      resolve(migrationDirectory, '20260718000100_parking_availability_estimator.sql'),
+      'utf8',
+    ),
+  ]);
+
+  assert.match(semanticZoom, /hashtextextended\(segment\.id::text, 0\)/);
+  assert.match(semanticZoom, /on segment\.id = assignment\.segment_id\b/);
+  assert.doesNotMatch(semanticZoom, /assignment\.segment_id::text/);
+
+  const dropFunction = reconciliation.indexOf('drop function public.fetch_parking_cells(');
+  const dropZoneView = reconciliation.indexOf('drop view public.parking_zone_summaries;');
+  const dropSegmentView = reconciliation.indexOf('drop view public.parking_segment_summaries;');
+  const createSegmentView = reconciliation.indexOf('create view public.parking_segment_summaries');
+  assert.ok(dropFunction >= 0 && dropFunction < dropZoneView);
+  assert.ok(dropZoneView < dropSegmentView);
+  assert.ok(dropSegmentView < createSegmentView);
+  assert.match(reconciliation, /segment\.id::text as id/);
+  assert.match(reconciliation, /segment\.id = assignment\.segment_id::text/);
+
+  assert.match(
+    estimator,
+    /segment_id uuid not null references public\.parking_segments\(id\)/,
+  );
+  assert.match(estimator, /snapshot\.segment_id = segment\.id/);
+  assert.match(estimator, /segment\.id = assignment\.segment_id/);
+  assert.doesNotMatch(estimator, /segment_id::text|segment\.id = .*::text/);
+});
