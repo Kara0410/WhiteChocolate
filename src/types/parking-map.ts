@@ -3,15 +3,15 @@ import type {
   ParkingCoordinates,
 } from '@/types/parking-domain';
 
-export type AvailabilityColorStatus = 'green' | 'orange' | 'red';
+export type AvailabilityColorStatus = 'green' | 'orange' | 'red' | 'neutral';
 
 export type WalkingCategory = 'close' | 'acceptable' | 'far';
 
 export type ParkingBestSpot = {
   id: string;
   zoneName: string;
-  availableSpots: number;
-  availabilityPercent: number;
+  availableSpots: number | null;
+  availabilityPercent: number | null;
   pricePerHour: number | null;
 };
 
@@ -24,18 +24,16 @@ export type ParkingClusterResponse = {
   type: 'cluster' | 'spot';
   latitude: number;
   longitude: number;
-  availabilityPercent: number;
-  availabilityStatus?:
-    | 'live'
-    | 'predicted'
-    | 'estimated'
-    | 'unknown'
-    | 'mixed';
+  availabilityPercent: number | null;
+  availabilityStatus?: 'estimated' | 'unknown' | 'mixed';
+  availabilityConfidence?: 'low' | 'medium' | null;
+  estimateGeneratedAt?: string | null;
+  estimateValidUntil?: string | null;
   count: number;
   zoneCount?: number;
   spotCount?: number;
   totalCapacity: number;
-  availableSpots: number;
+  availableSpots: number | null;
   colorStatus: AvailabilityColorStatus;
   minPrice: number | null;
   avgPrice: number | null;

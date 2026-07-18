@@ -22,12 +22,14 @@ export type GeoJsonMultiPolygon = {
 
 export type ParkingAvailability =
   | {
-      status: 'live' | 'predicted' | 'estimated';
-      availableSpaces: number | null;
-      totalSpaces: number | null;
-      percent: number | null;
-      confidence: number | null;
-      observedAt: string | null;
+      status: 'estimated';
+      availableSpaces: number;
+      totalSpaces: number;
+      percent: number;
+      confidence: 'low' | 'medium';
+      generatedAt: string;
+      validUntil: string;
+      factors: ParkingEstimateFactor[];
     }
   | {
       status: 'unknown';
@@ -35,8 +37,20 @@ export type ParkingAvailability =
       totalSpaces: number | null;
       percent: null;
       confidence: null;
-      observedAt: null;
+      generatedAt: null;
+      validUntil: null;
+      factors: ParkingEstimateFactor[];
     };
+
+export type ParkingEstimateFactor = {
+  code: string;
+  impact: 'increases-demand' | 'reduces-demand' | 'neutral';
+  weight: number;
+};
+
+export type ParkingEstimateDestination = ParkingCoordinates & {
+  placeId: string | null;
+};
 
 export type ParkingPricing =
   | { status: 'free'; currency: 'EUR' }
@@ -67,6 +81,11 @@ export type ParkingAggregateStats = {
     hasUnknownPricing: boolean;
   };
   availabilityStatus: ParkingAvailability['status'] | 'mixed';
+  estimatedSegmentCount?: number;
+  unknownSegmentCount?: number;
+  estimateCoverageRatio?: number;
+  oldestEstimateGeneratedAt?: string | null;
+  newestEstimateGeneratedAt?: string | null;
   updatedAt: string | null;
 };
 

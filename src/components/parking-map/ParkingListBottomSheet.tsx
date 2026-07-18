@@ -36,10 +36,12 @@ const ParkingListRow = memo(function ParkingListRow({
 }) {
   const hasKnownAvailability =
     item.availabilityStatus !== undefined &&
-    item.availabilityStatus !== 'unknown';
-  const percentage = hasKnownAvailability
-    ? Math.max(0, Math.min(100, Math.round(item.availabilityPercent)))
-    : null;
+    item.availabilityStatus !== 'unknown' &&
+    item.availabilityPercent !== null;
+  const percentage =
+    hasKnownAvailability && item.availabilityPercent !== null
+      ? Math.max(0, Math.min(100, Math.round(item.availabilityPercent)))
+      : null;
   const price = item.avgPrice ?? item.minPrice;
   const availabilityColor =
     percentage === null

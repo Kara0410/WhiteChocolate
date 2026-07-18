@@ -58,7 +58,7 @@ test('maps Supabase columns to explicit domain fields', () => {
     longitude: 11.58,
   });
   assert.equal(segment.pricing.status, 'unknown');
-  assert.equal(segment.availability.status, 'estimated');
+  assert.equal(segment.availability.status, 'unknown');
   assert.equal(segment.regulation.name, 'Bew 9-23');
   assert.equal(segment.updatedAt, '2026-06-30T00:00:00.000Z');
 });
@@ -69,7 +69,7 @@ test('preserves UUID-shaped segment IDs as string domain identifiers', () => {
 
   assert.ok(segment);
   assert.equal(segment.id, uuid);
-  assert.equal(segment.availability.status, 'estimated');
+  assert.equal(segment.availability.status, 'unknown');
 });
 
 test('rejects missing or invalid coordinates', () => {
@@ -88,7 +88,7 @@ test('keeps null and zero capacity distinct', () => {
   assert.equal(unknown?.capacity, null);
   assert.equal(unknown?.availability.status, 'unknown');
   assert.equal(zero?.capacity, 0);
-  assert.equal(zero?.availability.status, 'estimated');
+  assert.equal(zero?.availability.status, 'unknown');
 });
 
 test('preserves stable identity for segments on the same street', () => {

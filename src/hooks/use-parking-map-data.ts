@@ -15,6 +15,10 @@ import {
 import { useParkingSemanticZoomStage } from '@/hooks/use-map-detail-level';
 import { clusterParkingSegmentFeatures } from '@/services/parking-feature-clustering';
 import {
+  mergeParkingAvailabilityEstimates,
+  requestParkingAvailabilityEstimates,
+} from '@/services/parkingAvailabilityEstimator';
+import {
   fetchParkingCells,
   fetchParkingSegmentSummaries,
   fetchParkingZoneSummaries,
@@ -22,6 +26,7 @@ import {
 import { fetchParkingSegments } from '@/services/parkingSegments';
 import type {
   ParkingBoundingBox,
+  ParkingEstimateDestination,
   ParkingMapFeature,
   ParkingSegmentSummary,
 } from '@/types/parking-domain';
@@ -55,6 +60,8 @@ const LAYER_TRANSITION_MS = 200;
 const STATIC_ZONE_TTL_MS = 10 * 60 * 1000;
 const CELL_TTL_MS = 60 * 1000;
 const SEGMENT_TTL_MS = 30 * 1000;
+const TRAFFIC_ESTIMATES_ENABLED =
+  process.env.EXPO_PUBLIC_PARKING_TRAFFIC_ESTIMATES === 'true';
 
 type CameraMoveEvent = {
   coordinates: { latitude?: number; longitude?: number };
@@ -72,7 +79,8 @@ type CachedStageData = {
 
 export function useParkingMapData(
   initialCamera: ParkingCameraState,
-  destination?: ParkingCoordinates,
+  destination?: ParkingEstimateDestination,
+  origin?: ParkingCoordinates | null,
   mapSize?: ParkingMapSize,
   isAutomaticFetchEnabled = true,
   parkingZonePolygons: ParkingZonePolygon[] = [],
@@ -143,10 +151,29 @@ export function useParkingMapData(
         };
       }
 
+      let estimateResponse: Awaited<
+        ReturnType<typeof requestParkingAvailabilityEstimates>
+      > | null = null;
+      if (destination) {
+        try {
+          estimateResponse = await requestParkingAvailabilityEstimates({
+            bounds: request.bbox,
+            destination,
+            origin,
+            includeTraffic: TRAFFIC_ESTIMATES_ENABLED && origin !== null,
+            signal,
+          });
+        } catch (error) {
+          if (signal.aborted) throw error;
+          logAppError('parking-data', error, { stage, source: 'estimator' });
+        }
+      }
+
       if (stage === 'cell') {
         const resolution = camera.zoom < 14 ? 'coarse' : 'fine';
         const cells = await fetchParkingCells({
           bounds: request.bbox,
+          contextHash: estimateResponse?.contextHash ?? null,
           resolution,
           signal,
         });
@@ -166,6 +193,12 @@ export function useParkingMapData(
           signal,
         });
         segments = response.segments;
+        if (estimateResponse) {
+          segments = mergeParkingAvailabilityEstimates(
+            segments,
+            estimateResponse.estimates,
+          );
+        }
         truncated = response.truncated;
         if (__DEV__ && parkingZonePolygons.length > 0) {
           const sample = segments.slice(0, 100);
@@ -258,7 +291,7 @@ export function useParkingMapData(
 
       return { features, segments, bounds: request.bbox, truncated };
     },
-    [parkingZoneMatcher, parkingZonePolygons.length],
+    [destination, origin, parkingZoneMatcher, parkingZonePolygons.length],
   );
 
   const loadForCamera = useCallback(

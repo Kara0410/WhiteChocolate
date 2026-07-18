@@ -12,14 +12,14 @@ export type ParkingDetailGateCopy = {
 
 export const FREE_DETAIL_PREVIEW_CARDS = [
   { label: 'Pricing', valueWidth: 96, descriptionWidth: 128 },
-  { label: 'Max Stay', valueWidth: 84, descriptionWidth: 116 },
   { label: 'Distance', valueWidth: 112, descriptionWidth: 132 },
-  { label: 'Open Hours', valueWidth: 92, descriptionWidth: 104 },
+  { label: 'Capacity', valueWidth: 84, descriptionWidth: 116 },
+  { label: 'Parking rules', valueWidth: 92, descriptionWidth: 104 },
 ] as const;
 
 export const PREMIUM_DETAIL_PREVIEW_SECTIONS = [
-  'Historical Usage',
-  'Parking insights',
+  'Estimate explanation',
+  'Data quality',
 ] as const;
 
 export function getParkingDetailAccess(tier: AccountAccessTier) {
@@ -39,10 +39,10 @@ export function getParkingDetailGateCopy(
     return {
       title: 'Unlock parking details',
       description:
-        'Create a free account to see pricing, parking limits, distance, and opening hours.',
+        'Create a free account to save parking locations and preferences.',
       actionLabel: 'Create free account',
       accessibilityLabel:
-        'Parking details locked. Create a free account to see pricing, parking limits, distance, and opening hours.',
+        'Parking features locked. Create a free account to save parking locations and preferences.',
       accessibilityHint: 'Opens the account creation sheet.',
     };
   }
@@ -50,10 +50,10 @@ export function getParkingDetailGateCopy(
   return {
     title: 'Unlock advanced parking insights',
     description:
-      'Upgrade to Premium to see usage trends, EV information, restrictions, security details, and more.',
+      'Upgrade to Premium for additional estimate explanations and data-quality context.',
     actionLabel: 'Explore Premium',
     accessibilityLabel:
-      'Advanced parking insights locked. Upgrade to Premium to see usage trends and additional parking details.',
+      'Advanced parking insights locked. Upgrade to Premium for additional estimate explanations and data-quality context.',
     accessibilityHint: 'Opens Premium membership options.',
   };
 }

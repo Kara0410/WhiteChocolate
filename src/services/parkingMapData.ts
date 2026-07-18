@@ -49,6 +49,7 @@ export async function fetchParkingZoneSummaries(options?: {
 
 export async function fetchParkingCells(input: {
   bounds: ParkingBoundingBox;
+  contextHash: string | null;
   resolution: ParkingCellResolution;
   signal?: AbortSignal;
 }): Promise<ParkingCellSummary[]> {
@@ -59,6 +60,7 @@ export async function fetchParkingCells(input: {
     p_max_lng: input.bounds.maxLng,
     p_max_lat: input.bounds.maxLat,
     p_resolution: input.resolution,
+    p_context_hash: input.contextHash,
   });
   if (input.signal) {
     query = query.abortSignal(input.signal);

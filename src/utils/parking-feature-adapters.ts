@@ -48,7 +48,7 @@ export function parkingMapFeatureToLegacyResponse(
   if (feature.kind !== 'segment' && feature.kind !== 'segment-cluster') {
     return null;
   }
-  const percentage = feature.stats.availabilityPercent ?? 0;
+  const percentage = feature.stats.availabilityPercent;
   const isCluster = feature.kind === 'segment-cluster';
   const segment = feature.kind === 'segment' ? feature.segment : null;
   const title = segment ? segmentTitle(segment) : 'Parking areas';
@@ -61,17 +61,29 @@ export function parkingMapFeatureToLegacyResponse(
     longitude: feature.coordinates.longitude,
     availabilityPercent: percentage,
     availabilityStatus: feature.stats.availabilityStatus,
+    availabilityConfidence:
+      segment?.availability.status === 'estimated'
+        ? segment.availability.confidence
+        : null,
+    estimateGeneratedAt:
+      segment?.availability.status === 'estimated'
+        ? segment.availability.generatedAt
+        : feature.stats.newestEstimateGeneratedAt ?? null,
+    estimateValidUntil:
+      segment?.availability.status === 'estimated'
+        ? segment.availability.validUntil
+        : null,
     count: feature.stats.segmentCount,
     zoneCount: feature.parentId === null ? 0 : 1,
     spotCount: feature.stats.segmentCount,
     totalCapacity: feature.stats.totalCapacity ?? 0,
-    availableSpots: feature.stats.availableCapacity ?? 0,
+    availableSpots: feature.stats.availableCapacity,
     colorStatus:
       feature.stats.availabilityPercent === null
-        ? 'orange'
-        : percentage >= 60
+        ? 'neutral'
+        : feature.stats.availabilityPercent >= 60
           ? 'green'
-          : percentage >= 30
+          : feature.stats.availabilityPercent >= 30
             ? 'orange'
             : 'red',
     minPrice: minimumRate,
@@ -84,7 +96,7 @@ export function parkingMapFeatureToLegacyResponse(
     bestSpot: {
       id: segment?.id ?? feature.id,
       zoneName: title,
-      availableSpots: feature.stats.availableCapacity ?? 0,
+      availableSpots: feature.stats.availableCapacity,
       availabilityPercent: percentage,
       pricePerHour: minimumRate,
     },

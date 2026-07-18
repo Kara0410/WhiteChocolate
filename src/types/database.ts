@@ -77,6 +77,71 @@ export type Database = {
         }
         Relationships: []
       }
+      parking_availability_estimates: {
+        Row: {
+          availability_percent: number | null
+          available_spaces: number | null
+          confidence: string
+          context_hash: string
+          created_at: string
+          destination_category: string | null
+          destination_is_open: boolean | null
+          destination_place_id: string | null
+          estimator_version: string
+          factor_summary: Json
+          generated_at: string
+          id: string
+          segment_id: string
+          status: string
+          traffic_ratio: number | null
+          valid_until: string
+        }
+        Insert: {
+          availability_percent?: number | null
+          available_spaces?: number | null
+          confidence: string
+          context_hash: string
+          created_at?: string
+          destination_category?: string | null
+          destination_is_open?: boolean | null
+          destination_place_id?: string | null
+          estimator_version: string
+          factor_summary?: Json
+          generated_at: string
+          id?: string
+          segment_id: string
+          status: string
+          traffic_ratio?: number | null
+          valid_until: string
+        }
+        Update: {
+          availability_percent?: number | null
+          available_spaces?: number | null
+          confidence?: string
+          context_hash?: string
+          created_at?: string
+          destination_category?: string | null
+          destination_is_open?: boolean | null
+          destination_place_id?: string | null
+          estimator_version?: string
+          factor_summary?: Json
+          generated_at?: string
+          id?: string
+          segment_id?: string
+          status?: string
+          traffic_ratio?: number | null
+          valid_until?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parking_availability_estimates_segment_id_fkey"
+            columns: ["segment_id"]
+            isOneToOne: false
+            referencedRelation: "parking_segments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       parking_segments: {
         Row: {
           angebot: number | null
@@ -87,11 +152,11 @@ export type Database = {
           lat: number | null
           location: unknown
           lon: number | null
-          parking_zone_id: number | null
           parkregel_beschreibung: string | null
           parkregel_gruppe: string | null
           parkregel_id: number | null
           parkregel_name: string | null
+          parking_zone_id: number | null
           prm_name: string | null
           shape: string | null
           strasse: string | null
@@ -106,11 +171,11 @@ export type Database = {
           lat?: number | null
           location?: never
           lon?: number | null
-          parking_zone_id?: number | null
           parkregel_beschreibung?: string | null
           parkregel_gruppe?: string | null
           parkregel_id?: number | null
           parkregel_name?: string | null
+          parking_zone_id?: number | null
           prm_name?: string | null
           shape?: string | null
           strasse?: string | null
@@ -125,11 +190,11 @@ export type Database = {
           lat?: number | null
           location?: never
           lon?: number | null
-          parking_zone_id?: number | null
           parkregel_beschreibung?: string | null
           parkregel_gruppe?: string | null
           parkregel_id?: number | null
           parkregel_name?: string | null
+          parking_zone_id?: number | null
           prm_name?: string | null
           shape?: string | null
           strasse?: string | null
@@ -337,14 +402,55 @@ export type Database = {
         }
         Relationships: []
       }
+      user_vehicles: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          license_plate: string
+          license_plate_normalized: string | null
+          local_created_at: string | null
+          nickname: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          license_plate: string
+          license_plate_normalized?: string | null
+          local_created_at?: string | null
+          nickname: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          license_plate?: string
+          license_plate_normalized?: string | null
+          local_created_at?: string | null
+          nickname?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       parking_segment_summaries: {
         Row: {
+          availability_confidence: string | null
           availability_status: string | null
           capacity: number | null
+          estimate_factors: Json | null
+          estimate_generated_at: string | null
+          estimate_valid_until: string | null
           estimated_availability_percent: number | null
           estimated_available_capacity: number | null
+          estimator_version: string | null
           geoportal_class: string | null
           hourly_rate: number | null
           id: string | null
@@ -366,15 +472,20 @@ export type Database = {
           availability_percent: number | null
           availability_status: string | null
           available_capacity: number | null
+          estimate_coverage_ratio: number | null
+          estimated_segment_count: number | null
           has_free_parking: boolean | null
           has_unknown_pricing: boolean | null
           maximum_hourly_rate: number | null
           minimum_hourly_rate: number | null
+          newest_estimate_generated_at: string | null
+          oldest_estimate_generated_at: string | null
           representative_latitude: number | null
           representative_longitude: number | null
           segment_count: number | null
           source_status: string | null
           total_capacity: number | null
+          unknown_segment_count: number | null
           updated_at: string | null
           zone_id: string | null
           zone_name: string | null
@@ -427,6 +538,7 @@ export type Database = {
     Functions: {
       fetch_parking_cells: {
         Args: {
+          p_context_hash: string | null
           p_max_lat: number
           p_max_lng: number
           p_min_lat: number
@@ -434,25 +546,30 @@ export type Database = {
           p_resolution: string
         }
         Returns: {
-          availability_percent: number | null
+          availability_percent: number
           availability_status: string
-          available_capacity: number | null
+          available_capacity: number
           center_latitude: number
           center_longitude: number
+          estimate_coverage_ratio: number
+          estimated_segment_count: number
           has_free_parking: boolean
           has_unknown_pricing: boolean
           id: string
           max_lat: number
           max_lng: number
-          maximum_hourly_rate: number | null
+          maximum_hourly_rate: number
           min_lat: number
           min_lng: number
-          minimum_hourly_rate: number | null
+          minimum_hourly_rate: number
+          newest_estimate_generated_at: string
+          oldest_estimate_generated_at: string
           parent_zone_ids: string[]
           resolution: string
           segment_count: number
-          total_capacity: number | null
-          updated_at: string | null
+          total_capacity: number
+          unknown_segment_count: number
+          updated_at: string
         }[]
       }
       _postgis_deprecate: {
@@ -1488,34 +1605,13 @@ export const Constants = {
   },
 } as const
 
-// ---------------------------------------------------------------------------
-// Hand-maintained aliases below the generated output. Re-add this block if
-// the file is regenerated with `supabase gen types typescript`.
-// ---------------------------------------------------------------------------
-
+export type ParkingAvailabilityEstimateRow =
+  Database["public"]["Tables"]["parking_availability_estimates"]["Row"]
 export type ParkingSegmentRow =
-  Database['public']['Tables']['parking_segments']['Row'];
-
+  Database["public"]["Tables"]["parking_segments"]["Row"]
 export type ParkingZoneRow =
-  Database['public']['Tables']['parking_zones']['Row'];
-
-export type ParkingSegmentSummaryRow =
-  Database['public']['Views']['parking_segment_summaries']['Row'];
-
-export type ParkingZoneSummaryRow =
-  Database['public']['Views']['parking_zone_summaries']['Row'];
-
+  Database["public"]["Tables"]["parking_zones"]["Row"]
 export type UserFavoriteRow =
-  Database['public']['Tables']['user_favorites']['Row'];
-
-export type UserFavoriteInsert =
-  Database['public']['Tables']['user_favorites']['Insert'];
-
+  Database["public"]["Tables"]["user_favorites"]["Row"]
 export type UserPreferencesRow =
-  Database['public']['Tables']['user_preferences']['Row'];
-
-export type UserPreferencesInsert =
-  Database['public']['Tables']['user_preferences']['Insert'];
-
-export type ProfileRow =
-  Database['public']['Tables']['profiles']['Row'];
+  Database["public"]["Tables"]["user_preferences"]["Row"]

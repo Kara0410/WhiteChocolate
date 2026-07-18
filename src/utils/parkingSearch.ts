@@ -93,7 +93,10 @@ function compareCuratedSpots(
   }
 
   if (first.availabilityPercent !== second.availabilityPercent) {
-    return second.availabilityPercent - first.availabilityPercent;
+    return (
+      (second.availabilityPercent ?? -1) -
+      (first.availabilityPercent ?? -1)
+    );
   }
 
   const firstPrice = getEffectivePrice(first);

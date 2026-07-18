@@ -1,300 +1,145 @@
 # Parking Data and Prediction Readiness Audit
 
-**Audit date:** 2026-07-16  
-**Scope:** Expo app source, mock/demo data, Supabase migrations/types, parking API clients, and the current map/detail data flow.
+**Audit date:** 2026-07-18
+**Scope:** Current Expo source, Supabase migrations/generated types, parking services/hooks/normalizers, map/detail UI, demo data, tests, TypeScript, and lint.
+**Method note:** Repository audit only. No live Supabase query or production-data sample was available; migrations are treated as intended contract, not proof of deployment.
 
-## Executive summary
+## Executive verdict
 
-The project is already wired to Supabase for real parking inventory and geometry, but it is not yet wired to a real occupancy or prediction model.
+The project has a useful static parking-inventory foundation, but it is not prediction-ready and must not claim live occupancy, historical usage, confidence, fresh reports, or a calculated “spot chance.”
 
-The current availability percentages are synthetic estimates:
+| Capability | Readiness | Finding |
+|---|---:|---|
+| Static inventory and map geometry | **Ready with integration work** | Coordinates, capacity, regulations, zone geometry, and spatial assignment are represented. |
+| Honest live availability | **Not ready** | Summary views generate a deterministic estimate from segment ID and capacity. |
+| Historical occupancy dataset | **Not started** | No append-only observation/report table or persisted occupancy target exists. |
+| Prediction model | **Not started** | No feature pipeline, training set, model artifact, serving contract, or evaluation is present. |
+| Prediction UI | **Demo-only** | Premium charts, Spot Chance, fresh-check copy, and several parking facts are hardcoded. |
+| Current client/backend build contract | **Blocked in this worktree** | The modified generated database type file is UTF-16LE, lint sees it as binary, and `tsc` cannot see the summary views/RPC. |
 
-- The primary Supabase view derives available spaces from a deterministic hash of `parking_segments.id` and `angebot` (capacity).
-- The legacy client fallback uses the same idea in `src/utils/parking-segments.ts`.
-- The percentage is therefore stable for a segment, but it does not change with time, traffic, reports, weather, events, or observed occupancy.
+The right product status today is: **static parking inventory plus clearly labelled deterministic development estimates**.
 
-The premium detail chart and several premium detail fields are still hardcoded UI demo values. They are not backed by Supabase or an API.
+## What is in the repository
 
-The repository has enough static data to build a sensible first baseline and to define the model input contract. It does **not** currently have enough labelled historical data to train or validate a trustworthy parking prediction model.
+The base schema represented in [`src/types/database.ts`](../src/types/database.ts) includes `parking_segments` (stable ID, latitude/longitude, `angebot` capacity, street/source-area names, regulation fields, GeoPortal class, source fields, and inventory timestamps), `parking_zones` (numeric ID, metadata, GeoJSON, and PostGIS geometry), and `parking_zone_raw`. User/account tables and `consent_events` are present, but none are occupancy observations.
+
+The semantic-zoom migration adds a generated WGS84 point, nullable `parking_zone_id`, a foreign key, spatial indexes, boundary-inclusive `ST_Covers` assignment, and a trigger for later coordinate updates ([migration](../supabase/migrations/20260716000100_reconcile_parking_semantic_zoom_uuid.sql:215)). This is a sound spatial foundation.
+
+The intended read contract is:
+
+| Object | Role | Availability source |
+|---|---|---|
+| `parking_segment_summaries` | Segment map/detail rows | `estimated_available_capacity` and `estimated_availability_percent` |
+| `parking_zone_summaries` | Complete-zone aggregates | Capacity-weighted sums of the segment estimate |
+| `fetch_parking_cells(...)` | Coarse/fine semantic-zoom cells | Aggregates of the same estimate; max 400 cells |
+
+The migration explicitly calls this compatibility data retained “before predictions exist” and “deterministic synthetic development data” ([view](../supabase/migrations/20260716000100_reconcile_parking_semantic_zoom_uuid.sql:513), [comment](../supabase/migrations/20260716000100_reconcile_parking_semantic_zoom_uuid.sql:774)).
 
 ## Current data flow
 
-```text
-Google Places API
-  └─ destination/address → coordinates only
-
-Supabase parking_zones
-  └─ zone geometry and metadata → map polygons
-
-Supabase parking_segments
-  ├─ legacy detailed query → client parser → deterministic synthetic availability
-  └─ spatial backend/view path
-       └─ parking_segment_summaries → normalized segment data
+The active path is implemented by [`parkingMapData.ts`](../src/services/parkingMapData.ts:33) and [`use-parking-map-data.ts`](../src/hooks/use-parking-map-data.ts:132):
 
-Supabase parking_zone_summaries
-  └─ complete-zone aggregates → city/zone map markers
+1. City/zone stages query `parking_zone_summaries`.
+2. Cell stage calls `fetch_parking_cells` with coarse 500 m or fine 250 m cells.
+3. Segment stage queries `parking_segment_summaries`, capped at 2,000 rows.
+4. A view failure falls back to the legacy `parking_segments` query and client-side zone matching.
+5. Segments are clustered by zone, adapted to the legacy `ParkingClusterResponse`, then consumed by map/list/search/detail UI.
 
-Supabase fetch_parking_cells RPC
-  └─ PostGIS hex-cell aggregates → intermediate semantic zoom markers
-
-normalized features
-  └─ clustering/adapters → ParkingClusterResponse
-       ├─ map bubbles and percentages
-       ├─ list/search/favorites
-       └─ ParkingBottomSheet detail header
+The cache uses 10-minute zone, 60-second cell, and 30-second segment TTLs ([hook](../src/hooks/use-parking-map-data.ts:53)). These are cache controls, not evidence that occupancy was observed at those times.
 
-parking segment details
-  └─ /parking/[id] route → regulation, capacity, price, coordinates
-```
+## Availability audit
 
-Relevant entry points: [`parkingMapData.ts`](../src/services/parkingMapData.ts), [`parkingSegments.ts`](../src/services/parkingSegments.ts), [`parkingZones.ts`](../src/services/parkingZones.ts), [`use-parking-map-data.ts`](../src/hooks/use-parking-map-data.ts), and [`parking-feature-adapters.ts`](../src/utils/parking-feature-adapters.ts).
+### Primary SQL path: synthetic
 
-## Supabase inventory and connectivity
+The summary view hashes `segment.id` and takes the result modulo capacity. It does not read occupancy, sensors, reports, traffic, weather, time of day, or events ([migration](../supabase/migrations/20260716000100_reconcile_parking_semantic_zoom_uuid.sql:525)). The result is stable for a segment and behaves like a fixture, not a live estimate or forecast.
 
-### Parking tables and views
-
-| Object | Data available | Connected to app? | Prediction value |
-|---|---|---:|---|
-| `public.parking_segments` | Segment ID, street, source area, capacity (`angebot`), parking rules, coordinates, Geoportal class, timestamps, assigned zone ID | Yes, direct legacy fallback and detail route | Strong static features; no occupancy history |
-| `public.parking_zones` | Zone ID, name, status, measure/action, GeoJSON and PostGIS geometry | Yes, direct zone polygon fetch | Useful spatial context and aggregation boundary |
-| `public.parking_zone_raw` | Raw zone import fields | No app query found | Possible import provenance; not a model source until verified |
-| `public.parking_segment_summaries` view | Segment fields plus derived availability, pricing status/rate, regulation fields, zone ID, timestamp | Yes, primary map/detail path | Useful API contract, but current availability is synthetic |
-| `public.parking_zone_summaries` view | Segment count, total capacity, available capacity, availability %, price range, free/unknown flags, status, latest timestamp | Yes, city/zone map path | Useful aggregate features; availability inherits synthetic segment values |
-| `public.fetch_parking_cells(...)` RPC | PostGIS hex cells with bounds, parent zones, aggregate capacity/availability/pricing | Yes, cell semantic zoom | Useful spatial aggregate response; not a historical prediction source |
-
-The backend migration creates `parking_segments.location`, assigns `parking_zone_id` using `ST_Covers`, and aggregates segments into zones/cells. This is a good spatial foundation.
+Zone and cell percentages inherit this value through sums and capacity-weighted division ([zone aggregation](../supabase/migrations/20260716000100_reconcile_parking_semantic_zoom_uuid.sql:584), [cell aggregation](../supabase/migrations/20260716000100_reconcile_parking_semantic_zoom_uuid.sql:701)). Aggregation improves display scalability but adds no predictive information.
 
-### Account and storage tables
+### Fallback path: a different synthetic algorithm
 
-| Object | Current role | Model-data relevance |
-|---|---|---|
-| `profiles` | Created by auth trigger and stores display name/avatar/subscription status | No occupancy data; the app currently maps the Supabase Auth user and does not query this table for model inputs |
-| `user_favorites` | Stores a user’s favorite segment plus a display snapshot | Consumer/cache data, not reliable ground truth; snapshots can contain synthetic availability |
-| `user_preferences` | App settings | No occupancy value |
-| `consent_events` | Consent audit log | Could support consent for future crowd reports/analytics, but is not an observation table |
-| `deletion_requests` | Account deletion workflow | Not model data |
-| `auth.users` | Supabase Auth identity | Not model data |
+The client fallback also returns `status: 'estimated'`, but uses an FNV-style JavaScript hash in [`availabilityFor`](../src/utils/parking-segments.ts:176), while SQL uses PostgreSQL `hashtextextended` ([SQL](../supabase/migrations/20260716000100_reconcile_parking_semantic_zoom_uuid.sql:529)). These are not the same calculation. If the view fails, the same segment can show a different percentage.
 
-The generated [`database.ts`](../src/types/database.ts) confirms there is no occupancy-observation, parking-report, prediction, weather, event, or historical availability table in the current public schema types.
+This is a P1 correctness issue: use one development placeholder implementation, or make the fallback return unknown.
 
-## Data audit by field
+### Timestamp semantics are unsafe
 
-### Real or usable now
+The normalizer assigns `updated_at` to `availability.observedAt` for estimated rows ([normalizer](../src/utils/parking-map-data-normalizers.ts:167)). That is an inventory/source timestamp, not the time an available-space count was observed. The domain type supports `live`, `predicted`, `estimated`, confidence, and observation time ([domain type](../src/types/parking-domain.ts:23)), but the current path only produces `estimated` or `unknown`; no confidence or real observation time is supplied.
 
-These fields are present in the source database and already reach the app in at least one path:
+### Unknown can become zero
 
-- Stable segment ID.
-- Segment latitude/longitude.
-- Street name and source area/district.
-- Capacity / number of spaces, when `angebot` is populated.
-- Parking regulation group, name, and description.
-- Parsed maximum stay when the regulation description contains an hour value.
-- GeoPortal class.
-- Zone membership from the spatial assignment.
-- Zone name/status and polygon geometry.
-- Source `created_at` / `updated_at` timestamps.
-- Heuristic pricing status and hourly rate.
-- Aggregated capacity, segment counts, price range, and zone/cell membership.
-- Destination coordinates from Google Places, which can support distance/walking/ranking features.
+The legacy adapter converts a null aggregate percentage to `0` ([adapter](../src/utils/parking-feature-adapters.ts:45)). Some list components check `availabilityStatus`, but detail/header and sharing paths receive the coerced percentage. This can make “unknown” look like 0% and influence color, copy, or shared messages. Unknown must remain null through every adapter.
 
-### Derived but currently synthetic or heuristic
+## UI and demo-data audit
 
-These values look like live/predicted data at the UI level, but are not observations:
+[`ParkingBottomSheet.tsx`](../src/components/parking-map/ParkingBottomSheet.tsx:434) renders unsupported premium claims: seven hardcoded Historical Usage bars; `6 / 10 available` EV chargers and Type 2/22 kW details; CCTV, lighting, staff, and gated-entry availability; vehicle height/width limits; overnight, truck, and resident restrictions; payment methods; a hardcoded Spot Chance of 92%; `Public parking`, `Paved`, and `Just now` details.
 
-- `estimated_available_capacity`.
-- `estimated_availability_percent`.
-- `available_capacity` and `availability_percent` on zone/cell summaries.
-- `availabilityStatus = 'estimated'`.
-- Client fallback availability in `availabilityFor()`.
-- Hourly rates inferred from regulation group names (`Kurzzeitparken`, `Mischparken`, `Altstadt`).
-- Aggregated percentages calculated from those values.
+The free detail path hardcodes `2 hours` and `24 hours`/`Open now`, and derives daily price as hourly price × 7.2 ([details](../src/components/parking-map/ParkingBottomSheet.tsx:294), [calculation](../src/components/parking-map/ParkingBottomSheet.tsx:614)). Regulation text only supports a limited parsed maximum-stay value.
 
-The SQL and client fallback use different implementations of the same placeholder idea. This makes the values deterministic and repeatable, but not predictive.
+[`fresh-check.tsx`](../src/app/fresh-check.tsx:18) runs a 75-second interval and navigates back. It does not call Supabase, submit a report, poll an endpoint, receive an observation, or update map state. Its “fresh report” and “standing prediction” copy describes unimplemented behavior.
 
-### Not present in a trustworthy form
+[`src/constants/zones.ts`](../src/constants/zones.ts) contains four fixed Munich demo zones with percentages, ages, report counts, EV flags, and prices. The archived/demo [`App.jsx`](../Munich-Parking-App-Pages-App-2026-06-22-072318/source/App.jsx) duplicates the same product story. These are fixtures, not the active Supabase source.
 
-The app currently has no source for:
+## Prediction-data readiness
 
-- Timestamped occupied/free observations.
-- User-submitted parking reports, despite UI copy referring to reports.
-- A fresh occupancy-check request or response. [`fresh-check.tsx`](../src/app/fresh-check.tsx) only runs a 75-second timer and then navigates back.
-- Historical hourly/daily occupancy data.
-- Forecast horizons such as “in 30 minutes” or “at 18:00”.
-- Model confidence or calibration data.
-- Weather, public holidays, events, traffic, road closures, or nearby demand signals.
-- EV charger inventory or charger availability.
-- Security features, payment methods, open hours, surface, vehicle dimensions, or overnight restrictions as structured fields.
+### Available inputs for a future baseline
 
-## Mock and hardcoded UI audit
+Static features available today include segment/zone identity, coordinates, capacity, segment density, street/source area, regulation group/name/description, parsed maximum stay, heuristic pricing, inventory timestamps, destination distance, and nearby spatial context.
 
-### Zone mock data
+These describe supply and rules. They do not describe demand or current occupancy.
 
-[`src/constants/zones.ts`](../src/constants/zones.ts) contains four static Munich zones:
+### Missing targets and features
 
-| Zone | Mock percentage | Mock freshness/reports | Other mock fields |
-|---|---:|---|---|
-| Haidhausen Nord | 72% | 3 min / 4 reports | EV, price, rule, coordinates |
-| Glockenbachviertel | 43% | 18 min / 2 reports | price, rule, coordinates |
-| Maxvorstadt | null | no reports / 0 | EV, price, rule, coordinates |
-| Sendling Tor | 61% | 7 min / 3 reports | EV, price, rule, coordinates |
+No repository schema or runtime path was found for timestamped occupied/free-space observations, user “found one”/“no spots” reports, source/quality/confidence, deduplication IDs, forecast horizon, historical hourly/daily occupancy, weather, holidays, events, traffic, road closures, demand signals, model version, generated time, calibration, or evaluation metrics. EV inventory/availability, security, payment methods, surface, opening hours, and vehicle dimensions are also not structured data.
 
-This module is not imported by the current `src` map flow, so it appears to be legacy/design mock data rather than the active runtime source. The same data is duplicated in [`Munich-Parking-App-Pages-App-2026-06-22-072318/source/App.jsx`](../Munich-Parking-App-Pages-App-2026-06-22-072318/source/App.jsx).
+The deterministic estimate must not be used as a training label. Training on it would teach a model to reproduce the hash formula rather than parking behavior.
 
-### Active parking detail mock data
+## Current-worktree contract blocker
 
-[`ParkingBottomSheet.tsx`](../src/components/parking-map/ParkingBottomSheet.tsx) still contains hardcoded values in the premium detail experience:
+The working tree has an uncommitted change to [`src/types/database.ts`](../src/types/database.ts). It is UTF-16LE with embedded null bytes, so ESLint reports “File appears to be binary.” Its current content also lacks the app-facing `parking_segment_summaries`, `parking_zone_summaries`, and `fetch_parking_cells` definitions and compatibility aliases present in the committed version.
 
-- Historical Usage bars: `76, 68, 84, 72, 91, 58, 44` for Mon–Sun.
-- EV chargers: `6 / 10 available`, Type 2 AC, 22 kW.
-- Security: CCTV, lighting, staff, and gated entry all marked available.
-- Vehicle limits: 2.10 m height and 2.40 m width.
-- Restrictions: no overnight parking, no trucks, resident-only zones.
-- Payment methods: VISA, Mastercard, Apple Pay, Google Pay.
-- Spot Chance: `92%`.
-- Surface: `Paved`.
-- Zone Type: `Public parking`.
-- Last Updated: `Just now`.
+Validation results:
 
-Some values are partially dynamic but still unsafe to present as facts:
+- `npm test`: **217 passed**.
+- `npx tsc --noEmit`: **fails** on missing summary view/RPC typings, missing `ParkingSegmentRow`/favorite aliases, and resulting row-type errors.
+- `npm run lint`: **fails** because `src/types/database.ts` is parsed as binary.
 
-- Missing distance falls back to `3 min walk · 250 m`.
-- Max stay is hardcoded to `2 hours` in the free detail card, although regulation text can provide a parsed value elsewhere.
-- Open hours are hardcoded to `24 hours` / `Open now`.
-- Daily price is calculated as hourly price × `7.2`, not read from a database field.
+This is not a model gap, but it blocks reliable implementation until the generated type file is restored/regenerated as UTF-8 and synchronized with deployed migration state. It was not modified because it is an existing user change outside this documentation audit.
 
-### UI-only demo values
+## Recommended delivery sequence
 
-[`ParkingAvailabilityBubbleDemo.tsx`](../src/components/parking-map/ParkingAvailabilityBubbleDemo.tsx) uses fixed percentages `72`, `46`, and `28` to demonstrate marker states and sizes. This is safe as a visual demo but should never be used as a data source.
+### P0 — Make current claims and contracts truthful
 
-## What the current UI actually consumes
+1. Restore/regenerate UTF-8 Supabase types from the actual deployed schema, including summary views, the cell RPC, and app aliases.
+2. Verify migration deployment before treating semantic-zoom objects as live.
+3. Keep `estimated` labelled as a development placeholder; never call it live, fresh, observed, or predicted.
+4. Preserve unknown as null through adapters and UI; remove null-to-zero conversion.
+5. Gate unsupported detail claims with “data unavailable.” Remove Spot Chance and Historical Usage as facts.
+6. Make SQL and fallback placeholder behavior identical, or have fallback return unknown.
+7. Stop mapping inventory `updated_at` to `observedAt`.
 
-The active map uses semantic zoom stages:
+### P1 — Build an observation pipeline
 
-1. **City/zone:** `parking_zone_summaries` gives complete-zone aggregates.
-2. **Cell:** `fetch_parking_cells` gives PostGIS hex-cell aggregates.
-3. **Segment:** `parking_segment_summaries` gives individual segments and derived availability.
-4. **Fallback:** if the summary view is unavailable, the client queries `parking_segments` directly and synthesizes availability locally.
+Add an append-only `parking_availability_observations` table, separate from inventory and predictions, with: `id`, `segment_id`/`zone_id`, `observed_at`, `submitted_at`, `available_spaces` (one canonical target), capacity snapshot, source, source event ID, confidence/quality, pseudonymous reporter/device reference, and `created_at`.
 
-The map and search/list layers consume the normalized fields below:
+Validate non-negative counts, available ≤ capacity, valid references, timezone-aware timestamps, idempotency, retention, and RLS. The fresh-check screen should submit or poll this pipeline and return a new observation only when one exists.
 
-```text
-availabilityPercent
-availableSpots / availableCapacity
-totalCapacity
-availabilityStatus
-segmentCount / count
-price range and pricingStatus
-coordinates
-zoneId / zoneName
-distanceToDestination (computed client-side)
-```
+### P2 — Establish an explainable baseline
 
-The bottom-sheet header uses `availabilityPercent`, while the detail screen at [`src/app/parking/[id].tsx`](../src/app/parking/[id].tsx) can show real segment metadata: regulation, district, capacity, and coordinates.
+Use a time-aware baseline with backoff: segment × weekday × time bucket, then zone × weekday × time bucket, then city/overall; return unknown when support is insufficient. Use time-based holdouts, compare against naive persistence, and report sample count, MAE/RMSE for spaces, and calibration/Brier score for “at least one space.” Never train on synthetic estimates or randomly split rows from the same time series.
 
-## Prediction-model readiness
+### P3 — Publish a time-aware prediction contract
 
-### Good inputs already available
+Expose `segment_id`/`zone_id`, `prediction_for`, `horizon_minutes`, availability percent/spaces, confidence, `model_version`, `generated_at`, `source_observation_at`, and `training_window_end`. Historical charts must consume timestamped API points, not seven static weekday values.
 
-The current schema can immediately support a baseline model with:
+## Readiness gates before launch
 
-- segment/zone identity;
-- latitude/longitude and spatial neighborhood;
-- capacity;
-- street/source area and zone;
-- parking rule group/name/description;
-- heuristic price category/rate;
-- source update age;
-- destination distance and map context;
-- nearby segment density and aggregate capacity, calculated from existing data.
-
-### Critical missing training data
-
-The missing piece is a labelled target over time. A model needs observations such as:
-
-```text
-segment_id
-observed_at
-available_spaces or occupied_spaces
-total_capacity
-source (sensor, user_report, imported_feed, operator)
-quality/confidence/reliability
-```
-
-The current `updated_at` is an inventory/source timestamp, not an occupancy observation timestamp. The existing synthetic estimate must not be used as the label: training on it would teach the model to reproduce the hash formula, not parking behavior.
-
-## Recommended path from here
-
-### Phase 1: make the data contract honest
-
-- Keep the existing static inventory and map aggregation.
-- Rename or clearly label the current deterministic values as `estimated_placeholder` during development.
-- Do not show them as “live”, “fresh”, “reports agree”, or calibrated confidence.
-- Stop rendering hardcoded premium details as factual parking attributes; show “data unavailable” until backed by fields.
-
-### Phase 2: collect observations
-
-Add a dedicated append-only observation/report table rather than putting history on `parking_segments`. A practical first version would include:
-
-```text
-parking_availability_observations
-  id
-  segment_id or zone_id
-  observed_at
-  available_spaces
-  total_capacity_snapshot
-  source
-  reporter/user reference where applicable
-  confidence/reliability
-  created_at
-```
-
-Use RLS and consent-aware retention for user reports. Keep raw observations separate from the current prediction so the data can be audited and reprocessed.
-
-### Phase 3: start with a baseline before ML
-
-Use a confidence-weighted historical baseline:
-
-1. segment × weekday × time bucket;
-2. back off to zone × weekday × time bucket;
-3. back off to city/overall bucket when sparse;
-4. return unknown when there is insufficient evidence.
-
-This creates a useful benchmark and makes the first “prediction” explainable. A later model can add weather, events, traffic, and spatial features once those sources exist.
-
-### Phase 4: expose predictions as time-aware data
-
-The current `ParkingAvailability` type already has room for `predicted`, `confidence`, and `observedAt`, but the API shape needs more information for plots:
-
-```text
-prediction_for
-availability_percent
-available_spaces
-confidence
-model_version
-source_observation_at
-generated_at
-```
-
-For the historical/prediction chart, return an array of timestamped points. Do not reuse the current seven hardcoded weekday values.
-
-## Main risks to resolve
-
-1. **Synthetic data leakage:** the current deterministic percentages can be mistaken for real labels.
-2. **Duplicate estimation logic:** SQL and client fallback can diverge as soon as the placeholder formula changes.
-3. **Timestamp ambiguity:** `updated_at` does not mean “occupancy observed at”.
-4. **Unsupported detail claims:** premium UI currently displays EV, security, restriction, payment, and usage facts absent from the schema.
-5. **Status semantics:** the type supports `live` and `predicted`, but the active backend currently produces `estimated`; there is no model version or confidence payload.
-6. **No feedback loop:** the fresh-check screen has no report endpoint, persistence, or result handling.
-7. **Sparse data policy:** the UI needs an explicit unknown/insufficient-data state instead of fallback percentages.
+- Real observations cover multiple weekdays, time buckets, zones, and capacity sizes.
+- Provenance, duplicates, missingness, quality, privacy, and retention are documented.
+- A baseline beats persistence on a time-based holdout, or is labelled experimental.
+- Confidence is calibrated and shown with support/freshness.
+- Sparse areas return “not enough data,” not a synthetic percentage.
+- UI, generated types, migration state, and API contract pass one end-to-end test.
 
 ## Bottom line
 
-The project is ready to replace the mock UI in layers, but not ready to claim that it has a trained parking prediction dataset. The best immediate use of the existing data is:
-
-- real map geometry and parking inventory;
-- real regulations, capacity, coordinates, and zone relationships;
-- a clearly labelled deterministic demo estimate for visual development only;
-- a new observation pipeline that can create the historical data needed for a real baseline/model.
-
-Until observations are collected, the historical chart, confidence values, fresh reports, Spot Chance, and advanced parking attributes should remain explicitly unavailable or demo-only.
-
+The project is ready to continue building the **static map and inventory experience**. It is not ready to claim a real parking prediction system. Repair the current schema/type contract, remove misleading claims, and start collecting auditable occupancy observations before introducing a complex model.

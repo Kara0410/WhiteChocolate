@@ -27,8 +27,10 @@ function segment(
       availableSpaces: 5,
       totalSpaces: 10,
       percent: 50,
-      confidence: null,
-      observedAt: null,
+      confidence: 'medium',
+      generatedAt: '2026-07-13T10:00:00.000Z',
+      validUntil: '2026-07-13T10:15:00.000Z',
+      factors: [],
     },
     updatedAt: null,
     ...overrides,
@@ -36,7 +38,7 @@ function segment(
 }
 
 test('unknown capacity stays unknown and is not estimated as zero', () => {
-  const availability = availabilityFor('unknown', null, null);
+  const availability = availabilityFor(null);
   assert.equal(availability.status, 'unknown');
   assert.equal(availability.totalSpaces, null);
   assert.equal(availability.availableSpaces, null);
@@ -60,14 +62,10 @@ test('pricing distinguishes unknown, explicit free, and paid euros', () => {
   });
 });
 
-test('deterministic availability is explicitly estimated, never live', () => {
-  const availability = availabilityFor(
-    'segment-1',
-    12,
-    '2026-07-13T10:00:00.000Z',
-  );
-  assert.equal(availability.status, 'estimated');
-  assert.notEqual(availability.status, 'live');
+test('inventory fallback never fabricates availability from an ID', () => {
+  const availability = availabilityFor(12);
+  assert.equal(availability.status, 'unknown');
+  assert.equal(availability.percent, null);
 });
 
 test('aggregate availability is capacity weighted', () => {
@@ -79,8 +77,10 @@ test('aggregate availability is capacity weighted', () => {
         availableSpaces: 10,
         totalSpaces: 10,
         percent: 100,
-        confidence: null,
-        observedAt: null,
+        confidence: 'medium',
+        generatedAt: '2026-07-13T10:00:00.000Z',
+        validUntil: '2026-07-13T10:15:00.000Z',
+        factors: [],
       },
     }),
     segment('large', {
@@ -90,8 +90,10 @@ test('aggregate availability is capacity weighted', () => {
         availableSpaces: 0,
         totalSpaces: 90,
         percent: 0,
-        confidence: null,
-        observedAt: null,
+        confidence: 'medium',
+        generatedAt: '2026-07-13T10:00:00.000Z',
+        validUntil: '2026-07-13T10:15:00.000Z',
+        factors: [],
       },
     }),
   ]);
@@ -111,7 +113,9 @@ test('record count and physical capacity remain separate', () => {
         totalSpaces: null,
         percent: null,
         confidence: null,
-        observedAt: null,
+        generatedAt: null,
+        validUntil: null,
+        factors: [],
       },
     }),
   ]);
@@ -129,8 +133,10 @@ test('unknown availability is excluded from the weighted percentage', () => {
         availableSpaces: 5,
         totalSpaces: 10,
         percent: 50,
-        confidence: null,
-        observedAt: null,
+        confidence: 'medium',
+        generatedAt: '2026-07-13T10:00:00.000Z',
+        validUntil: '2026-07-13T10:15:00.000Z',
+        factors: [],
       },
     }),
     segment('unknown', {
@@ -141,7 +147,9 @@ test('unknown availability is excluded from the weighted percentage', () => {
         totalSpaces: 90,
         percent: null,
         confidence: null,
-        observedAt: null,
+        generatedAt: null,
+        validUntil: null,
+        factors: [],
       },
     }),
   ]);

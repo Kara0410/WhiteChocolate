@@ -98,11 +98,9 @@ export function parkingSegmentFromRow(
       cleanText(row.parkregel_beschreibung),
     ),
     availability: availabilityFor(
-      id,
       typeof row.angebot === 'number' && Number.isFinite(row.angebot)
         ? Math.max(0, row.angebot)
         : null,
-      cleanText(row.updated_at),
     ),
     regulation: {
       description: cleanText(row.parkregel_beschreibung),
@@ -115,17 +113,6 @@ export function parkingSegmentFromRow(
     geoportalClass: cleanText(row.geoportal_class),
     updatedAt: cleanText(row.updated_at),
   };
-}
-
-function hashString(value: string) {
-  let hash = 2166136261;
-
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-
-  return hash >>> 0;
 }
 
 function inferredHourlyRate(groupName: string | null) {
@@ -174,33 +161,17 @@ function maxStayFor(description: string | null) {
 }
 
 export function availabilityFor(
-  id: string,
   capacity: number | null,
-  observedAt: string | null,
 ): ParkingAvailability {
-  if (capacity === null) {
-    return {
-      status: 'unknown',
-      availableSpaces: null,
-      totalSpaces: null,
-      percent: null,
-      confidence: null,
-      observedAt: null,
-    };
-  }
-
-  const availableSpaces =
-    capacity === 0 ? 0 : hashString(id) % (capacity + 1);
   return {
-    status: 'estimated',
-    availableSpaces,
+    status: 'unknown',
+    availableSpaces: null,
     totalSpaces: capacity,
-    percent:
-      capacity === 0
-        ? null
-        : Math.round((availableSpaces / capacity) * 100),
+    percent: null,
     confidence: null,
-    observedAt,
+    generatedAt: null,
+    validUntil: null,
+    factors: [],
   };
 }
 

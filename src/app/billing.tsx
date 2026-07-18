@@ -7,7 +7,7 @@ import { C } from '@/constants/theme';
 
 const INCLUDED = [
   'Confidence-weighted availability by hour',
-  'Price, max-stay, EV and resident rules',
+  'Available price, capacity and parking-rule details',
   'One-tap fresh occupancy checks',
 ];
 

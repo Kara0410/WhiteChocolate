@@ -301,7 +301,8 @@ export function selectSpatiallySeparatedMarkers(
       return (
         (second.item.spotCount ?? second.item.count) -
           (first.item.spotCount ?? first.item.count) ||
-        second.item.availabilityPercent - first.item.availabilityPercent
+        (second.item.availabilityPercent ?? -1) -
+          (first.item.availabilityPercent ?? -1)
       );
     });
 

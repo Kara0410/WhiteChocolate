@@ -1,0 +1,7 @@
+project_id = "white_choclate"
+
+[functions.estimate-parking-availability]
+verify_jwt = true
+
+[functions.delete-account]
+verify_jwt = true

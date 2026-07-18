@@ -101,20 +101,20 @@ test('gate copy and upgrade destination match the intended actions', () => {
   assert.deepEqual(getParkingDetailGateCopy('free-details'), {
     title: 'Unlock parking details',
     description:
-      'Create a free account to see pricing, parking limits, distance, and opening hours.',
+      'Create a free account to save parking locations and preferences.',
     actionLabel: 'Create free account',
     accessibilityLabel:
-      'Parking details locked. Create a free account to see pricing, parking limits, distance, and opening hours.',
+      'Parking features locked. Create a free account to save parking locations and preferences.',
     accessibilityHint: 'Opens the account creation sheet.',
   });
 
   assert.deepEqual(getParkingDetailGateCopy('premium-details'), {
     title: 'Unlock advanced parking insights',
     description:
-      'Upgrade to Premium to see usage trends, EV information, restrictions, security details, and more.',
+      'Upgrade to Premium for additional estimate explanations and data-quality context.',
     actionLabel: 'Explore Premium',
     accessibilityLabel:
-      'Advanced parking insights locked. Upgrade to Premium to see usage trends and additional parking details.',
+      'Advanced parking insights locked. Upgrade to Premium for additional estimate explanations and data-quality context.',
     accessibilityHint: 'Opens Premium membership options.',
   });
 

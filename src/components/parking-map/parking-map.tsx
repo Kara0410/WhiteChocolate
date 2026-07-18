@@ -251,6 +251,17 @@ export function ParkingMap({
     useState<ParkingMapMode>(
       startsAtUserLocation ? 'userLocation' : 'munichOverview',
     );
+  const [selectedSearchPlace, setSelectedSearchPlace] =
+    useState<PlaceSearchResult | null>(null);
+  const estimateDestination = selectedSearchPlace
+    ? {
+        latitude: selectedSearchPlace.latitude,
+        longitude: selectedSearchPlace.longitude,
+        placeId: selectedSearchPlace.placeId,
+      }
+    : destination
+      ? { ...destination, placeId: null }
+      : undefined;
   const { polygons: parkingZonePolygons } = useParkingZones();
   const {
     clearParkingData,
@@ -267,7 +278,8 @@ export function ParkingMap({
     visibleSpots,
   } = useParkingMapData(
     initialCamera,
-    destination,
+    estimateDestination,
+    userLocation,
     mapSize,
     isAutomaticParkingFetchEnabled,
     parkingZonePolygons,
@@ -317,8 +329,6 @@ export function ParkingMap({
     useRef<ReturnType<typeof setTimeout> | null>(null);
   const [selectedParkingItem, setSelectedParkingItem] =
     useState<ParkingClusterResponse | null>(null);
-  const [selectedSearchPlace, setSelectedSearchPlace] =
-    useState<PlaceSearchResult | null>(null);
   const [searchParkingRequest, setSearchParkingRequest] =
     useState<SearchParkingRequest | null>(null);
   const [searchSpotsSnapshot, setSearchSpotsSnapshot] =

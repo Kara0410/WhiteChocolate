@@ -136,7 +136,8 @@ const FavoriteSpotRow = memo(function FavoriteSpotRow({
   onPress: (item: ParkingClusterResponse) => void;
 }) {
   const percentage =
-    item.availabilityStatus === 'unknown'
+    item.availabilityStatus === 'unknown' ||
+    item.availabilityPercent === null
       ? null
       : clampPercentage(item.availabilityPercent);
   const title = item.bestSpot.zoneName || 'Parking Area';

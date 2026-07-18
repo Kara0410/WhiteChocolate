@@ -108,8 +108,6 @@ export function normalizeStoredFavorite(
   };
 
   if (
-    value.availabilityStatus === 'live' ||
-    value.availabilityStatus === 'predicted' ||
     value.availabilityStatus === 'estimated' ||
     value.availabilityStatus === 'unknown' ||
     value.availabilityStatus === 'mixed'

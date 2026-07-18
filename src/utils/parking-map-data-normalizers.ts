@@ -1,6 +1,8 @@
 import type {
   ParkingAggregateStats,
+  ParkingAvailability,
   ParkingCellSummary,
+  ParkingEstimateFactor,
   ParkingSegmentSummary,
   ParkingZoneSummary,
 } from '@/types/parking-domain';
@@ -31,9 +33,7 @@ function booleanValue(value: unknown) {
 function availabilityStatus(
   value: unknown,
 ): ParkingAggregateStats['availabilityStatus'] {
-  return value === 'live' ||
-    value === 'predicted' ||
-    value === 'estimated' ||
+  return value === 'estimated' ||
     value === 'mixed'
     ? value
     : 'unknown';
@@ -57,8 +57,40 @@ function normalizeStats(row: UnknownRow): ParkingAggregateStats | null {
       hasUnknownPricing: booleanValue(row.has_unknown_pricing),
     },
     availabilityStatus: availabilityStatus(row.availability_status),
+    estimatedSegmentCount:
+      nonNegativeNumber(row.estimated_segment_count) ?? undefined,
+    unknownSegmentCount:
+      nonNegativeNumber(row.unknown_segment_count) ?? undefined,
+    estimateCoverageRatio:
+      nonNegativeNumber(row.estimate_coverage_ratio) ?? undefined,
+    oldestEstimateGeneratedAt: parkingStringValue(
+      row.oldest_estimate_generated_at,
+    ),
+    newestEstimateGeneratedAt: parkingStringValue(
+      row.newest_estimate_generated_at,
+    ),
     updatedAt: parkingStringValue(row.updated_at),
   };
+}
+
+function normalizeEstimateFactors(value: unknown): ParkingEstimateFactor[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (!isRecord(item)) return [];
+    const code = parkingStringValue(item.code);
+    const impact = item.impact;
+    const weight = numberValue(item.weight);
+    if (
+      code === null ||
+      weight === null ||
+      (impact !== 'increases-demand' &&
+        impact !== 'reduces-demand' &&
+        impact !== 'neutral')
+    ) {
+      return [];
+    }
+    return [{ code, impact, weight }];
+  });
 }
 
 export function normalizeParkingZoneSummaryRow(
@@ -168,15 +200,29 @@ export function normalizeParkingSegmentSummaryRow(
     value.estimated_available_capacity,
   );
   const percent = nonNegativeNumber(value.estimated_availability_percent);
-  const availability =
-    value.availability_status === 'estimated' && capacity !== null
+  const confidence = value.availability_confidence;
+  const normalizedConfidence: 'low' | 'medium' | null =
+    confidence === 'low' || confidence === 'medium' ? confidence : null;
+  const generatedAt = parkingStringValue(value.estimate_generated_at);
+  const validUntil = parkingStringValue(value.estimate_valid_until);
+  const availability: ParkingAvailability =
+    value.availability_status === 'estimated' &&
+    capacity !== null &&
+    capacity > 0 &&
+    availableSpaces !== null &&
+    percent !== null &&
+    normalizedConfidence !== null &&
+    generatedAt !== null &&
+    validUntil !== null
       ? {
           status: 'estimated' as const,
           availableSpaces,
           totalSpaces: capacity,
           percent,
-          confidence: null,
-          observedAt: parkingStringValue(value.updated_at),
+          confidence: normalizedConfidence,
+          generatedAt,
+          validUntil,
+          factors: normalizeEstimateFactors(value.estimate_factors),
         }
       : {
           status: 'unknown' as const,
@@ -184,7 +230,9 @@ export function normalizeParkingSegmentSummaryRow(
           totalSpaces: capacity,
           percent: null,
           confidence: null,
-          observedAt: null,
+          generatedAt: null,
+          validUntil: null,
+          factors: normalizeEstimateFactors(value.estimate_factors),
         };
   const pricing =
     value.pricing_status === 'free'

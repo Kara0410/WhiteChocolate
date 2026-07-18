@@ -7,7 +7,7 @@ import type { AvailabilityTheme } from './parking-availability-status';
 
 export type ParkingDetailHeaderProps = {
   title: string;
-  percentage: number;
+  percentage: number | null;
   distanceLabel: string;
   theme: AvailabilityTheme;
   showMetrics?: boolean;
@@ -36,7 +36,10 @@ export const ParkingDetailHeader = memo(function ParkingDetailHeader({
   isFavorite = false,
 }: ParkingDetailHeaderProps) {
   const ringOffset =
-    RING_CIRCUMFERENCE * (1 - Math.max(0, Math.min(100, percentage)) / 100);
+    percentage === null
+      ? RING_CIRCUMFERENCE
+      : RING_CIRCUMFERENCE *
+        (1 - Math.max(0, Math.min(100, percentage)) / 100);
 
   return (
     <View className="px-5 pb-5 pt-2">
@@ -128,14 +131,14 @@ export const ParkingDetailHeader = memo(function ParkingDetailHeader({
                   letterSpacing: -0.5,
                 }}
               >
-                {percentage}%
+                {percentage === null ? '—' : `${percentage}%`}
               </Text>
             </View>
             <Text
               className="ml-3 text-[14px] font-semibold"
               style={{ color: theme.text }}
             >
-              Available
+              {percentage === null ? 'Not enough data' : 'Estimated availability'}
             </Text>
           </View>
 
