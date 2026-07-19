@@ -18,12 +18,28 @@ export type ParkingAvailabilityEstimateResult = {
 export function mergeParkingAvailabilityEstimates(
   segments: ParkingSegmentSummary[],
   estimates: ParkingAvailabilityEstimateResult[],
+  options?: { unknownWhenMissing?: boolean },
 ) {
   const estimateBySegment = new Map(
     estimates.map((estimate) => [estimate.segmentId, estimate]),
   );
   return segments.map((segment) => {
     const estimate = estimateBySegment.get(segment.id);
+    if (!estimate && options?.unknownWhenMissing) {
+      return {
+        ...segment,
+        availability: {
+          status: 'unknown' as const,
+          availableSpaces: null,
+          totalSpaces: segment.capacity,
+          percent: null,
+          confidence: null,
+          generatedAt: null,
+          validUntil: null,
+          factors: [],
+        },
+      };
+    }
     if (
       !estimate ||
       estimate.status !== 'estimated' ||

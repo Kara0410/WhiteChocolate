@@ -256,6 +256,19 @@ function SearchNearestSpotsBottomSheetComponent({
                 Showing the closest recommended parking areas
               </Text>
             ) : null}
+            {spots.length > 0 && errorMessage !== null ? (
+              <Text className="mt-2 text-[12px] font-semibold leading-4 text-amber-700">
+                {errorMessage}
+              </Text>
+            ) : null}
+            {spots.length > 0 && isLoading ? (
+              <View className="mt-2 flex-row items-center">
+                <ActivityIndicator color="#2563EB" size="small" />
+                <Text className="ml-2 text-[12px] font-semibold text-blue-700">
+                  Updating parking availability
+                </Text>
+              </View>
+            ) : null}
           </View>
           <Pressable
             accessibilityLabel="Close nearby parking areas"

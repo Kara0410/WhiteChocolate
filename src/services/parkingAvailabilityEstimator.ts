@@ -1,20 +1,32 @@
 import { supabase } from '@/lib/supabase';
 import type {
-  ParkingBoundingBox,
-  ParkingCoordinates,
-  ParkingEstimateDestination,
   ParkingEstimateFactor,
 } from '@/types/parking-domain';
 import type { ParkingAvailabilityEstimateResult } from '@/utils/parking-estimates';
+import {
+  ParkingEstimatorRequestCoordinator,
+  ParkingEstimatorRequestError,
+  parkingEstimatorUserMessage,
+  parkingEstimatorRequestKey,
+  type ParkingEstimatorErrorKind,
+  type ParkingEstimatorRequest,
+} from '@/utils/parking-estimator-request';
 export { mergeParkingAvailabilityEstimates } from '@/utils/parking-estimates';
+export { buildParkingEstimatorRequest } from '@/utils/parking-estimator-request';
 
 const ESTIMATOR_REQUEST_TIMEOUT_MS = 10_000;
 const ESTIMATOR_CLIENT_CACHE_MS = 30_000;
-const ESTIMATOR_BOUNDS_GRID_DEGREES = 0.002;
-const estimateCache = new Map<
-  string,
-  { expiresAt: number; response: ParkingAvailabilityEstimateResponse }
->();
+
+const requestCoordinator =
+  new ParkingEstimatorRequestCoordinator<ParkingAvailabilityEstimateResponse>(
+    ESTIMATOR_CLIENT_CACHE_MS,
+  );
+
+export type ParkingEstimatorProviderStatus = {
+  place: string;
+  nearby: string;
+  routes: string;
+};
 
 export type ParkingAvailabilityEstimateResponse = {
   contextHash: string;
@@ -22,7 +34,23 @@ export type ParkingAvailabilityEstimateResponse = {
   estimates: ParkingAvailabilityEstimateResult[];
   reusedCount: number;
   generatedCount: number;
+  providerStatus: ParkingEstimatorProviderStatus;
 };
+
+export class ParkingEstimatorServiceError extends Error {
+  constructor(
+    public readonly kind: ParkingEstimatorErrorKind,
+    message: string,
+    options?: { cause?: unknown },
+  ) {
+    super(message, options);
+    this.name = 'ParkingEstimatorServiceError';
+  }
+
+  get userMessage() {
+    return parkingEstimatorUserMessage(this.kind);
+  }
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -78,78 +106,104 @@ function normalizedEstimate(value: unknown): ParkingAvailabilityEstimateResult |
   };
 }
 
-export async function requestParkingAvailabilityEstimates(input: {
-  bounds: ParkingBoundingBox;
-  destination: ParkingEstimateDestination;
-  origin?: ParkingCoordinates | null;
-  includeTraffic?: boolean;
-  requestedAt?: Date;
-  signal?: AbortSignal;
-}): Promise<ParkingAvailabilityEstimateResponse> {
-  const requestBounds = {
-    minLat:
-      Math.floor(input.bounds.minLat / ESTIMATOR_BOUNDS_GRID_DEGREES) *
-      ESTIMATOR_BOUNDS_GRID_DEGREES,
-    minLng:
-      Math.floor(input.bounds.minLng / ESTIMATOR_BOUNDS_GRID_DEGREES) *
-      ESTIMATOR_BOUNDS_GRID_DEGREES,
-    maxLat:
-      Math.ceil(input.bounds.maxLat / ESTIMATOR_BOUNDS_GRID_DEGREES) *
-      ESTIMATOR_BOUNDS_GRID_DEGREES,
-    maxLng:
-      Math.ceil(input.bounds.maxLng / ESTIMATOR_BOUNDS_GRID_DEGREES) *
-      ESTIMATOR_BOUNDS_GRID_DEGREES,
-  };
-  const cacheKey = JSON.stringify({
-    bounds: requestBounds,
-    destination:
-      input.destination.placeId ??
-      [
-        input.destination.latitude.toFixed(3),
-        input.destination.longitude.toFixed(3),
-      ],
-    includeTraffic: input.includeTraffic ?? false,
-    origin: input.origin
-      ? [input.origin.latitude.toFixed(3), input.origin.longitude.toFixed(3)]
-      : null,
-  });
-  const cached = estimateCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) return cached.response;
+function providerStatus(value: unknown): ParkingEstimatorProviderStatus | null {
+  if (!isRecord(value)) return null;
+  return typeof value.place === 'string' &&
+    typeof value.nearby === 'string' &&
+    typeof value.routes === 'string'
+    ? { place: value.place, nearby: value.nearby, routes: value.routes }
+    : null;
+}
 
+function errorStatus(error: unknown) {
+  if (!isRecord(error) || !isRecord(error.context)) return null;
+  return typeof error.context.status === 'number' ? error.context.status : null;
+}
+
+function serviceError(error: unknown): ParkingEstimatorServiceError {
+  if (error instanceof ParkingEstimatorRequestError) {
+    return new ParkingEstimatorServiceError(
+      error.code === 'BOUNDS_TOO_LARGE' ? 'area-too-large' : 'invalid-request',
+      error.message,
+      { cause: error },
+    );
+  }
+  const status = errorStatus(error);
+  const message = error instanceof Error ? error.message : String(error);
+  const lower = message.toLowerCase();
+  if (status === 413) {
+    return new ParkingEstimatorServiceError(
+      'area-too-large',
+      message,
+      { cause: error },
+    );
+  }
+  if (status === 401 || status === 403) {
+    return new ParkingEstimatorServiceError(
+      'unauthorized',
+      message,
+      { cause: error },
+    );
+  }
+  if (lower.includes('timeout') || lower.includes('aborted')) {
+    return new ParkingEstimatorServiceError(
+      'timeout',
+      message,
+      { cause: error },
+    );
+  }
+  if (lower.includes('network') || lower.includes('fetch')) {
+    return new ParkingEstimatorServiceError(
+      'network',
+      message,
+      { cause: error },
+    );
+  }
+  return new ParkingEstimatorServiceError(
+    'server',
+    message,
+    { cause: error },
+  );
+}
+
+async function invokeEstimator(
+  request: ParkingEstimatorRequest,
+  signal?: AbortSignal,
+): Promise<ParkingAvailabilityEstimateResponse> {
   const { data, error } = await supabase.functions.invoke(
     'estimate-parking-availability',
     {
-      body: {
-        bounds: {
-          minLat: requestBounds.minLat,
-          minLng: requestBounds.minLng,
-          maxLat: requestBounds.maxLat,
-          maxLng: requestBounds.maxLng,
-        },
-        destination: input.destination,
-        origin: input.origin ?? null,
-        requestedAt: (input.requestedAt ?? new Date()).toISOString(),
-        timezone: 'Europe/Berlin',
-        includeTraffic: input.includeTraffic ?? false,
-      },
-      signal: input.signal,
+      body: request,
+      signal,
       timeout: ESTIMATOR_REQUEST_TIMEOUT_MS,
     },
   );
   if (error) {
-    throw new Error('Unable to refresh parking estimates.');
+    throw serviceError(error);
   }
   if (!isRecord(data) || data.ok !== true) {
-    throw new Error('Parking estimator returned an invalid response.');
+    throw new ParkingEstimatorServiceError(
+      'invalid-response',
+      'Parking estimator returned an invalid response.',
+    );
   }
   const contextHash =
     typeof data.contextHash === 'string' ? data.contextHash : null;
   const estimatorVersion =
     typeof data.estimatorVersion === 'string' ? data.estimatorVersion : null;
-  if (contextHash === null || estimatorVersion === null || !Array.isArray(data.estimates)) {
-    throw new Error('Parking estimator response is incomplete.');
+  const normalizedProviderStatus = providerStatus(data.providerStatus);
+  if (
+    contextHash === null ||
+    estimatorVersion === null ||
+    !Array.isArray(data.estimates) ||
+    normalizedProviderStatus === null
+  ) {
+    throw new ParkingEstimatorServiceError(
+      'invalid-response',
+      'Parking estimator response is incomplete.',
+    );
   }
-  const response = {
+  return {
     contextHash,
     estimatorVersion,
     estimates: data.estimates.flatMap((estimate) => {
@@ -160,13 +214,20 @@ export async function requestParkingAvailabilityEstimates(input: {
       typeof data.reusedCount === 'number' ? data.reusedCount : 0,
     generatedCount:
       typeof data.generatedCount === 'number' ? data.generatedCount : 0,
+    providerStatus: normalizedProviderStatus,
   };
-  estimateCache.set(cacheKey, {
-    expiresAt: Date.now() + ESTIMATOR_CLIENT_CACHE_MS,
-    response,
-  });
-  if (estimateCache.size > 16) {
-    estimateCache.delete(estimateCache.keys().next().value!);
-  }
-  return response;
+}
+
+export function requestParkingAvailabilityEstimates(
+  request: ParkingEstimatorRequest,
+  options?: { signal?: AbortSignal },
+): Promise<ParkingAvailabilityEstimateResponse> {
+  const key = parkingEstimatorRequestKey(request);
+  return requestCoordinator.run(key, () =>
+    invokeEstimator(request, options?.signal).catch((error) => {
+      throw error instanceof ParkingEstimatorServiceError
+        ? error
+        : serviceError(error);
+    }),
+  );
 }

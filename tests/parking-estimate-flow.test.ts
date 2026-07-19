@@ -78,3 +78,46 @@ test('unknown availability stays null and uses a neutral marker state', () => {
   assert.equal(marker.colorStatus, 'neutral');
   assert.equal(marker.availabilityStatus, 'unknown');
 });
+
+test('an estimated zero remains distinct from unknown availability', () => {
+  const [segment] = mergeParkingAvailabilityEstimates(
+    [inventorySegment()],
+    [{
+      segmentId: 'segment-1',
+      availableSpaces: 0,
+      availabilityPercent: 0,
+      status: 'estimated',
+      confidence: 'medium',
+      generatedAt: '2026-07-18T10:00:00Z',
+      validUntil: '2026-07-18T10:15:00Z',
+      estimatorVersion: 'heuristic-v1',
+      factors: [],
+    }],
+  );
+  assert.equal(segment.availability.status, 'estimated');
+  assert.equal(segment.availability.percent, 0);
+  assert.equal(segment.availability.availableSpaces, 0);
+});
+
+test('a context merge clears estimates that are missing from that context', () => {
+  const [segment] = mergeParkingAvailabilityEstimates(
+    [{
+      ...inventorySegment(),
+      availability: {
+        status: 'estimated',
+        availableSpaces: 4,
+        totalSpaces: 20,
+        percent: 20,
+        confidence: 'medium',
+        generatedAt: '2026-07-18T10:00:00Z',
+        validUntil: '2026-07-18T10:15:00Z',
+        factors: [],
+      },
+    }],
+    [],
+    { unknownWhenMissing: true },
+  );
+  assert.equal(segment.availability.status, 'unknown');
+  assert.equal(segment.availability.percent, null);
+  assert.equal(segment.availability.availableSpaces, null);
+});

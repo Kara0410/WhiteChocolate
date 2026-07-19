@@ -182,6 +182,7 @@ type CameraFocusOptions = {
 };
 
 type SearchSpotsSnapshot = {
+  contextHash: string | null;
   placeId: string;
   /** Parking request the snapshot was computed for; a new key (e.g. from
    * "Search this area") invalidates the snapshot without dropping it, so
@@ -253,17 +254,24 @@ export function ParkingMap({
     );
   const [selectedSearchPlace, setSelectedSearchPlace] =
     useState<PlaceSearchResult | null>(null);
-  const estimateDestination = selectedSearchPlace
-    ? {
-        latitude: selectedSearchPlace.latitude,
-        longitude: selectedSearchPlace.longitude,
-        placeId: selectedSearchPlace.placeId,
-      }
-    : destination
-      ? { ...destination, placeId: null }
-      : undefined;
+  const estimateDestination = useMemo(
+    () =>
+      selectedSearchPlace
+        ? {
+            latitude: selectedSearchPlace.latitude,
+            longitude: selectedSearchPlace.longitude,
+            placeId: selectedSearchPlace.placeId,
+          }
+        : destination
+          ? { ...destination, placeId: null }
+          : undefined,
+    [destination, selectedSearchPlace],
+  );
   const { polygons: parkingZonePolygons } = useParkingZones();
   const {
+    activeContextHash,
+    availabilityMessage,
+    availabilityStatus,
     clearParkingData,
     currentRegion,
     displayCamera,
@@ -272,6 +280,7 @@ export function ParkingMap({
     loadedRequestVersion,
     onCameraMove,
     requestParkingForCamera,
+    refreshParkingAvailabilityForCamera,
     retryLatest,
     layerState,
     semanticStage,
@@ -365,6 +374,7 @@ export function ParkingMap({
     // place invalidates it.
     const snapshotSatisfiesActiveRequest =
       snapshotMatchesPlace &&
+      searchSpotsSnapshot.contextHash === activeContextHash &&
       (activeRequestKey === null ||
         searchSpotsSnapshot.requestKey === activeRequestKey);
     if (snapshotSatisfiesActiveRequest) {
@@ -441,11 +451,13 @@ export function ParkingMap({
     // An empty curated list still becomes a snapshot: the sheet must show
     // its real empty state instead of loading forever.
     setSearchSpotsSnapshot({
+      contextHash: activeContextHash,
       placeId: selectedSearchPlace.placeId,
       requestKey: activeRequestKey ?? `loaded:v${loadedRequestVersion}`,
       spots: curatedNearbyResults,
     });
   }, [
+    activeContextHash,
     loadedRequestBounds,
     loadedRequestKey,
     loadedRequestVersion,
@@ -463,12 +475,15 @@ export function ParkingMap({
       : EMPTY_SEARCH_SPOTS;
   const isSearchParkingLoading =
     selectedSearchPlace !== null &&
-    searchSpotsSnapshot?.placeId !== selectedSearchPlace.placeId &&
+    (availabilityStatus === 'loading' ||
+      searchSpotsSnapshot?.placeId !== selectedSearchPlace.placeId ||
+      searchSpotsSnapshot?.contextHash !== activeContextHash) &&
     layerState.status !== 'error';
   const searchParkingError =
-    selectedSearchPlace !== null && layerState.status === 'error'
-      ? layerState.error
-      : null;
+    selectedSearchPlace === null
+      ? null
+      : availabilityMessage ??
+        (layerState.status === 'error' ? layerState.error : null);
   // Only the top recommendations become map markers. While a new place's
   // results load, the previous snapshot keeps its markers on screen so the
   // layer crossfades instead of blanking out.
@@ -957,10 +972,10 @@ export function ParkingMap({
 
   const handleMarkerPress = useCallback(
     (item: ParkingClusterResponse) => {
-      setSelectedSearchPlace(null);
       setSearchParkingRequest(null);
       setSearchSpotsSnapshot(null);
       if (item.type === 'cluster') {
+        setSelectedSearchPlace(null);
         expandClusterSafely(item);
         return;
       }
@@ -1077,10 +1092,13 @@ export function ParkingMap({
   );
 
   const closeSearchResults = useCallback(() => {
+    if (selectedParkingItem !== null) {
+      return;
+    }
     setSelectedSearchPlace(null);
     setSearchParkingRequest(null);
     setSearchSpotsSnapshot(null);
-  }, []);
+  }, [selectedParkingItem]);
 
   const handleSearchThisAreaPress = useCallback(() => {
     if (selectedSearchPlace === null) {
@@ -1097,7 +1115,7 @@ export function ParkingMap({
       longitudeDelta: displayCamera.longitudeDelta,
     };
     const startedAtVersion = loadedRequestVersion;
-    const key = requestParkingForCamera(camera);
+    const key = refreshParkingAvailabilityForCamera(camera);
     // A new request key invalidates the snapshot; the effect above rebuilds
     // recommendations from the freshly fetched area and ranks them from the
     // visible map center, matching the action label.
@@ -1116,13 +1134,12 @@ export function ParkingMap({
     displayCamera.longitudeDelta,
     displayCamera.zoom,
     loadedRequestVersion,
-    requestParkingForCamera,
+    refreshParkingAvailabilityForCamera,
     selectedSearchPlace,
   ]);
 
   const handleSearchSpotPress = useCallback(
     (item: ParkingClusterResponse) => {
-      setSelectedSearchPlace(null);
       setSearchParkingRequest(null);
       setSearchSpotsSnapshot(null);
       selectParkingItem(item, { source: 'search', focusCamera: true });
@@ -1132,6 +1149,9 @@ export function ParkingMap({
 
   const clearSelection = useCallback(() => {
     setSelectedParkingItem(null);
+    setSelectedSearchPlace(null);
+    setSearchParkingRequest(null);
+    setSearchSpotsSnapshot(null);
   }, []);
 
   const prepareForLocationFocus = useCallback(() => {
@@ -1673,7 +1693,7 @@ export function ParkingMap({
           onClose={closeSearchResults}
           onRetry={retryLatest}
           onSpotPress={handleSearchSpotPress}
-          searchPlace={selectedSearchPlace}
+          searchPlace={selectedParkingItem === null ? selectedSearchPlace : null}
           spots={nearestSearchSpots}
         />
 

@@ -4,11 +4,13 @@ import {
   useEffect,
   useMemo,
   useRef,
+  useState,
 } from 'react';
 import {
   ActivityIndicator,
   FlatList,
   Keyboard,
+  type LayoutChangeEvent,
   Pressable,
   Text,
   TextInput,
@@ -35,6 +37,11 @@ import {
   type PlaceSearchSuggestion,
   useGooglePlaceSearch,
 } from '@/hooks/use-google-place-search';
+import {
+  getSearchNavbarLayout,
+  SEARCH_INPUT_HEIGHT,
+  SEARCH_NAVBAR_HEIGHT,
+} from '@/utils/search-navbar-layout';
 import Animated, {
   Easing,
   Extrapolation,
@@ -67,8 +74,6 @@ type NavItem = {
 const ACTIVE_COLOR = '#FFFFFF';
 const INACTIVE_COLOR = 'rgba(255,255,255,0.64)';
 const MORPH_DURATION = 320;
-const SEARCH_BAR_HEIGHT = 54;
-const NAVBAR_HEIGHT = 66;
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const SearchResultRow = memo(function SearchResultRow({
@@ -195,6 +200,7 @@ export default function BottomNavBar({
 }: BottomNavBarProps) {
   const insets = useSafeAreaInsets();
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
+  const [overlayHeight, setOverlayHeight] = useState(windowHeight);
   const inputRef = useRef<TextInput>(null);
   const focusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const morphProgress = useSharedValue(isSearchActive ? 1 : 0);
@@ -211,16 +217,18 @@ export default function BottomNavBar({
     selectSuggestion,
     setQuery,
   } = useGooglePlaceSearch();
-  const normalWidth = Math.min(windowWidth - 48, 336);
-  const searchWidth = Math.min(windowWidth - 32, 420);
-  const bottomOffset = Math.max(insets.bottom, 8) + 12;
-  const normalTop = windowHeight - bottomOffset - NAVBAR_HEIGHT;
-  const searchTop = insets.top + 12;
-  const searchTranslateY = searchTop - normalTop;
-  const suggestionMaxHeight = Math.max(
-    120,
-    Math.min(360, windowHeight - searchTop - SEARCH_BAR_HEIGHT - 28),
-  );
+  const {
+    normalTop,
+    normalWidth,
+    searchTop,
+    searchWidth,
+    suggestionMaxHeight,
+  } = getSearchNavbarLayout({
+    containerHeight: overlayHeight,
+    insetBottom: insets.bottom,
+    insetTop: insets.top,
+    windowWidth,
+  });
   const items = useMemo<NavItem[]>(
     () => [
       { key: 'search', label: 'SEARCH', icon: Search, onPress: onSearchPress },
@@ -287,6 +295,14 @@ export default function BottomNavBar({
     onSearchCancel?.();
   }, [onSearchCancel]);
 
+  const handleOverlayLayout = useCallback((event: LayoutChangeEvent) => {
+    const nextHeight = event.nativeEvent.layout.height;
+
+    setOverlayHeight((currentHeight) =>
+      currentHeight === nextHeight ? currentHeight : nextHeight,
+    );
+  }, []);
+
   const handleSelectPlace = useCallback(
     async (suggestion: PlaceSearchSuggestion) => {
       Keyboard.dismiss();
@@ -315,7 +331,7 @@ export default function BottomNavBar({
         translateY: interpolate(
           morphProgress.value,
           [0, 1],
-          [0, searchTranslateY],
+          [0, searchTop - normalTop],
           Extrapolation.CLAMP,
         ),
       },
@@ -331,13 +347,13 @@ export default function BottomNavBar({
     height: interpolate(
       morphProgress.value,
       [0, 1],
-      [NAVBAR_HEIGHT, SEARCH_BAR_HEIGHT],
+      [SEARCH_NAVBAR_HEIGHT, SEARCH_INPUT_HEIGHT],
       Extrapolation.CLAMP,
     ),
     borderRadius: interpolate(
       morphProgress.value,
       [0, 1],
-      [32, SEARCH_BAR_HEIGHT / 2],
+      [32, SEARCH_INPUT_HEIGHT / 2],
       Extrapolation.CLAMP,
     ),
     backgroundColor: interpolateColor(
@@ -435,15 +451,28 @@ export default function BottomNavBar({
         pointerEvents={isSearchActive ? 'auto' : 'none'}
         style={[{ elevation: MAP_ELEVATIONS.navBackdrop, zIndex: MAP_LAYERS.navBackdrop }, backdropStyle]}
       />
-      <Animated.View
-        className="absolute left-0 right-0 h-[84px] items-center"
+      <View
+        className="absolute inset-0"
+        onLayout={handleOverlayLayout}
         pointerEvents="box-none"
-        style={[{ bottom: bottomOffset, elevation: MAP_ELEVATIONS.navBar, zIndex: MAP_LAYERS.navBar }, wrapperStyle]}
+        style={{ zIndex: MAP_LAYERS.navBar }}
       >
         <Animated.View
-          className="overflow-hidden rounded-[30px] border border-white/10 shadow-nav"
-          style={[{ borderCurve: 'continuous' }, surfaceStyle]}
+          className="absolute left-0 right-0 h-[84px] items-center"
+          pointerEvents="box-none"
+          style={[
+            {
+              elevation: MAP_ELEVATIONS.navBar,
+              top: normalTop,
+              zIndex: MAP_LAYERS.navBar,
+            },
+            wrapperStyle,
+          ]}
         >
+          <Animated.View
+            className="overflow-hidden rounded-[30px] border border-white/10 shadow-nav"
+            style={[{ borderCurve: 'continuous' }, surfaceStyle]}
+          >
           <BlurView
             intensity={34}
             pointerEvents="none"
@@ -520,16 +549,20 @@ export default function BottomNavBar({
               <Search color="#64748B" size={20} strokeWidth={2.3} />
             )}
           </Animated.View>
-        </Animated.View>
+          </Animated.View>
 
-        <Animated.View
-          className="absolute top-[56px] overflow-hidden rounded-[24px] border border-white/80 bg-white/98 shadow-overlay"
-          pointerEvents={isSearchActive ? 'auto' : 'none'}
-          style={[
-            { maxHeight: suggestionMaxHeight, width: searchWidth, borderCurve: 'continuous' },
-            suggestionsStyle,
-          ]}
-        >
+          <Animated.View
+            className="absolute top-[56px] overflow-hidden rounded-[24px] border border-white/80 bg-white/98 shadow-overlay"
+            pointerEvents={isSearchActive ? 'auto' : 'none'}
+            style={[
+              {
+                borderCurve: 'continuous',
+                maxHeight: suggestionMaxHeight,
+                width: searchWidth,
+              },
+              suggestionsStyle,
+            ]}
+          >
           <FlatList
             data={results}
             initialNumToRender={6}
@@ -575,8 +608,9 @@ export default function BottomNavBar({
             updateCellsBatchingPeriod={50}
             windowSize={5}
           />
+          </Animated.View>
         </Animated.View>
-      </Animated.View>
+      </View>
     </>
   );
 }

@@ -14,6 +14,7 @@ import {
   normalizeParkingZoneSummaryRow,
   parkingStringValue,
 } from '@/utils/parking-map-data-normalizers';
+import { buildParkingCellRpcCall } from '@/utils/parking-cell-rpc';
 
 const MAX_SEGMENT_SUMMARIES = 2_000;
 
@@ -54,20 +55,11 @@ export async function fetchParkingCells(input: {
   signal?: AbortSignal;
 }): Promise<ParkingCellSummary[]> {
   assertBounds(input.bounds);
-  const rpcArguments = {
-    p_min_lng: input.bounds.minLng,
-    p_min_lat: input.bounds.minLat,
-    p_max_lng: input.bounds.maxLng,
-    p_max_lat: input.bounds.maxLat,
-    p_resolution: input.resolution,
-  };
+  const rpcCall = buildParkingCellRpcCall(input);
   let query =
-    input.contextHash === null
-      ? supabase.rpc('fetch_parking_cells', rpcArguments)
-      : supabase.rpc('fetch_parking_cells', {
-          ...rpcArguments,
-          p_context_hash: input.contextHash,
-        });
+    rpcCall.mode === 'legacy'
+      ? supabase.rpc('fetch_parking_cells', rpcCall.arguments)
+      : supabase.rpc('fetch_parking_cells', rpcCall.arguments);
   if (input.signal) {
     query = query.abortSignal(input.signal);
   }

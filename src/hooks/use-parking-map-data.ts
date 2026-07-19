@@ -15,7 +15,9 @@ import {
 import { useParkingSemanticZoomStage } from '@/hooks/use-map-detail-level';
 import { clusterParkingSegmentFeatures } from '@/services/parking-feature-clustering';
 import {
+  buildParkingEstimatorRequest,
   mergeParkingAvailabilityEstimates,
+  ParkingEstimatorServiceError,
   requestParkingAvailabilityEstimates,
 } from '@/services/parkingAvailabilityEstimator';
 import {
@@ -54,6 +56,7 @@ import {
 import { parkingSegmentToSummary } from '@/utils/parking-segments';
 import { createParkingZoneMatcher } from '@/utils/parking-zones';
 import { logAppError, normalizeAppError } from '@/utils/app-errors';
+import { LatestParkingEstimatorRequest } from '@/utils/parking-estimator-request';
 
 const CAMERA_DEBOUNCE_MS = 350;
 const LAYER_TRANSITION_MS = 200;
@@ -62,6 +65,7 @@ const CELL_TTL_MS = 60 * 1000;
 const SEGMENT_TTL_MS = 30 * 1000;
 const TRAFFIC_ESTIMATES_ENABLED =
   process.env.EXPO_PUBLIC_PARKING_TRAFFIC_ESTIMATES === 'true';
+const REQUESTED_AT_REUSE_MS = 30_000;
 
 type CameraMoveEvent = {
   coordinates: { latitude?: number; longitude?: number };
@@ -75,6 +79,11 @@ type CachedStageData = {
   segments: ParkingSegmentSummary[];
   bounds: ParkingBoundingBox | null;
   truncated: boolean;
+};
+
+type ActiveParkingEstimate = {
+  destinationKey: string;
+  response: Awaited<ReturnType<typeof requestParkingAvailabilityEstimates>>;
 };
 
 export function useParkingMapData(
@@ -94,6 +103,13 @@ export function useParkingMapData(
   const [loadedSegments, setLoadedSegments] = useState<ParkingSegmentSummary[]>(
     [],
   );
+  const [activeEstimate, setActiveEstimate] =
+    useState<ActiveParkingEstimate | null>(null);
+  const [availabilityStatus, setAvailabilityStatus] =
+    useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [availabilityMessage, setAvailabilityMessage] =
+    useState<string | null>(null);
+  const [estimationRefreshVersion, setEstimationRefreshVersion] = useState(0);
   const semanticStage = useParkingSemanticZoomStage(currentRegion);
   const [layerState, dispatch] = useReducer(parkingLayerReducer, {
     activeStage: semanticStage,
@@ -110,11 +126,31 @@ export function useParkingMapData(
   const displayCameraFrameRef = useRef<number | null>(null);
   const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const estimatorAbortControllerRef = useRef<AbortController | null>(null);
+  const latestEstimatorRequestRef = useRef(new LatestParkingEstimatorRequest());
+  const requestedAtByContextRef = useRef(
+    new Map<string, { expiresAt: number; requestedAt: Date }>(),
+  );
   const activeRequestKeyRef = useRef<string | null>(null);
   const parkingZoneMatcher = useMemo(
     () => createParkingZoneMatcher(parkingZonePolygons),
     [parkingZonePolygons],
   );
+  const destinationKey = useMemo(
+    () =>
+      destination
+        ? JSON.stringify({
+            latitude: destination.latitude,
+            longitude: destination.longitude,
+            placeId: destination.placeId?.trim() || null,
+          })
+        : null,
+    [destination],
+  );
+  const estimateResponse =
+    activeEstimate?.destinationKey === destinationKey
+      ? activeEstimate.response
+      : null;
 
   const createRequest = useCallback(
     (camera: ParkingCameraState) =>
@@ -134,6 +170,115 @@ export function useParkingMapData(
     [],
   );
 
+  useEffect(() => {
+    const requestId = latestEstimatorRequestRef.current.begin();
+    estimatorAbortControllerRef.current?.abort();
+    estimatorAbortControllerRef.current = null;
+
+    if (!destination || destinationKey === null) {
+      setActiveEstimate(null);
+      setAvailabilityStatus('idle');
+      setAvailabilityMessage(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    estimatorAbortControllerRef.current = controller;
+    const parkingRequest = createRequest(latestCameraRef.current);
+    const trafficEnabled = TRAFFIC_ESTIMATES_ENABLED && origin !== null;
+    const requestedAtKey = JSON.stringify({
+      bounds: parkingRequest.bbox,
+      destination: destinationKey,
+      origin: origin
+        ? [origin.latitude.toFixed(4), origin.longitude.toFixed(4)]
+        : null,
+      trafficEnabled,
+    });
+    const now = Date.now();
+    const previousRequestedAt = requestedAtByContextRef.current.get(requestedAtKey);
+    const requestedAt =
+      previousRequestedAt && previousRequestedAt.expiresAt > now
+        ? previousRequestedAt.requestedAt
+        : new Date(now);
+    requestedAtByContextRef.current.set(requestedAtKey, {
+      expiresAt: now + REQUESTED_AT_REUSE_MS,
+      requestedAt,
+    });
+    if (requestedAtByContextRef.current.size > 16) {
+      requestedAtByContextRef.current.delete(
+        requestedAtByContextRef.current.keys().next().value!,
+      );
+    }
+
+    setAvailabilityStatus('loading');
+    setAvailabilityMessage(null);
+
+    let estimatorRequest;
+    try {
+      estimatorRequest = buildParkingEstimatorRequest({
+        bounds: parkingRequest.bbox,
+        destination,
+        origin,
+        includeTraffic: trafficEnabled,
+        requestedAt,
+      });
+    } catch (error) {
+      if (latestEstimatorRequestRef.current.isCurrent(requestId)) {
+        setAvailabilityStatus('error');
+        setAvailabilityMessage(
+          error instanceof ParkingEstimatorServiceError
+            ? error.userMessage
+            : 'Move closer to the destination and try again.',
+        );
+      }
+      return;
+    }
+
+    void requestParkingAvailabilityEstimates(estimatorRequest, {
+      signal: controller.signal,
+    })
+      .then((response) => {
+        if (
+          controller.signal.aborted ||
+          !latestEstimatorRequestRef.current.isCurrent(requestId)
+        ) {
+          return;
+        }
+        setActiveEstimate({ destinationKey, response });
+        setAvailabilityStatus('ready');
+        setAvailabilityMessage(
+          trafficEnabled && response.providerStatus.routes !== 'ok'
+            ? 'Traffic information is unavailable, but parking estimates can still be shown.'
+            : null,
+        );
+      })
+      .catch((error) => {
+        if (
+          controller.signal.aborted ||
+          !latestEstimatorRequestRef.current.isCurrent(requestId)
+        ) {
+          return;
+        }
+        setAvailabilityStatus('error');
+        setAvailabilityMessage(
+          error instanceof ParkingEstimatorServiceError
+            ? error.userMessage
+            : 'Parking availability could not be updated right now.',
+        );
+        logAppError('parking-data', error, { source: 'estimator' });
+      });
+
+    return () => {
+      controller.abort();
+    };
+  }, [
+    createRequest,
+    destination,
+    destinationKey,
+    estimationRefreshVersion,
+    origin,
+  ]);
+
   const fetchStageData = useCallback(
     async (
       stage: ParkingSemanticZoomStage,
@@ -149,24 +294,6 @@ export function useParkingMapData(
           bounds: null,
           truncated: false,
         };
-      }
-
-      let estimateResponse: Awaited<
-        ReturnType<typeof requestParkingAvailabilityEstimates>
-      > | null = null;
-      if (destination) {
-        try {
-          estimateResponse = await requestParkingAvailabilityEstimates({
-            bounds: request.bbox,
-            destination,
-            origin,
-            includeTraffic: TRAFFIC_ESTIMATES_ENABLED && origin !== null,
-            signal,
-          });
-        } catch (error) {
-          if (signal.aborted) throw error;
-          logAppError('parking-data', error, { stage, source: 'estimator' });
-        }
       }
 
       if (stage === 'cell') {
@@ -197,6 +324,7 @@ export function useParkingMapData(
           segments = mergeParkingAvailabilityEstimates(
             segments,
             estimateResponse.estimates,
+            { unknownWhenMissing: true },
           );
         }
         truncated = response.truncated;
@@ -291,7 +419,7 @@ export function useParkingMapData(
 
       return { features, segments, bounds: request.bbox, truncated };
     },
-    [destination, origin, parkingZoneMatcher, parkingZonePolygons.length],
+    [estimateResponse, parkingZoneMatcher, parkingZonePolygons.length],
   );
 
   const loadForCamera = useCallback(
@@ -307,7 +435,7 @@ export function useParkingMapData(
       const requestKey =
         requestedStage === 'city' || requestedStage === 'zone'
           ? `parking:${requestedStage}:zones:v1`
-          : `parking:${requestedStage}:${resolution}:${request.tileKey}:v1`;
+          : `parking:${requestedStage}:${resolution}:${request.tileKey}:ctx:${estimateResponse?.contextHash ?? 'legacy'}:v1`;
       const ttlMs =
         requestedStage === 'city' || requestedStage === 'zone'
           ? STATIC_ZONE_TTL_MS
@@ -404,7 +532,7 @@ export function useParkingMapData(
         });
       }
     },
-    [createRequest, fetchStageData, markLoaded],
+    [createRequest, estimateResponse?.contextHash, fetchStageData, markLoaded],
   );
 
   const retryLatest = useCallback(() => {
@@ -444,6 +572,8 @@ export function useParkingMapData(
   useEffect(
     () => () => {
       abortControllerRef.current?.abort();
+      estimatorAbortControllerRef.current?.abort();
+      latestEstimatorRequestRef.current.invalidate();
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
       }
@@ -533,6 +663,15 @@ export function useParkingMapData(
     [createRequest, loadForCamera],
   );
 
+  const refreshParkingAvailabilityForCamera = useCallback(
+    (camera: ParkingCameraState) => {
+      const key = requestParkingForCamera(camera);
+      setEstimationRefreshVersion((version) => version + 1);
+      return key;
+    },
+    [requestParkingForCamera],
+  );
+
   const clearParkingData = useCallback(() => {
     activeRequestKeyRef.current = null;
     abortControllerRef.current?.abort();
@@ -577,6 +716,9 @@ export function useParkingMapData(
   );
 
   return {
+    activeContextHash: estimateResponse?.contextHash ?? null,
+    availabilityMessage,
+    availabilityStatus,
     clearParkingData,
     currentRegion,
     displayCamera,
@@ -586,6 +728,7 @@ export function useParkingMapData(
     loadedRequestVersion,
     onCameraMove,
     requestParkingForCamera,
+    refreshParkingAvailabilityForCamera,
     retryLatest,
     semanticStage,
     visibleSpots,
