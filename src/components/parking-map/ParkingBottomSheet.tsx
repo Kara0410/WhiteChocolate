@@ -25,6 +25,7 @@ import { useFavoriteParking } from '@/context/FavoriteParkingContext';
 import type { ParkingClusterResponse } from '@/types/parking-map';
 import { logAppError, normalizeAppError } from '@/utils/app-errors';
 import { openParkingNavigation } from '@/utils/openParkingNavigation';
+import { normalizeParkingAvailabilityPercentage } from '@/utils/parking-estimates';
 
 import { ParkingDetailHeader } from './ParkingDetailHeader';
 import { ParkingDetailSection } from './ParkingDetailSection';
@@ -55,12 +56,6 @@ const UNKNOWN_THEME: AvailabilityTheme = {
   border: '#CBD5E1',
   movingFill: '#94A3B8',
 };
-
-function normalizedPercentage(value: number | null) {
-  return value === null || !Number.isFinite(value)
-    ? null
-    : Math.max(0, Math.min(100, Math.round(value)));
-}
 
 function formatDistance(distance?: number) {
   if (distance === undefined) return 'Distance unavailable';
@@ -114,7 +109,9 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
   item: ParkingClusterResponse;
   onClose: () => void;
 }) {
-  const percentage = normalizedPercentage(item.availabilityPercent);
+  const percentage = normalizeParkingAvailabilityPercentage(
+    item.availabilityPercent,
+  );
   const theme = useMemo(
     () => (percentage === null ? UNKNOWN_THEME : getAvailabilityTheme(percentage)),
     [percentage],
@@ -244,6 +241,7 @@ export const ParkingBottomSheet = forwardRef<
     overshootClamping: true,
     stiffness: 360,
   });
+  const selectedItemId = item?.id ?? null;
 
   useImperativeHandle(ref, () => ({
     compact: () => {
@@ -253,9 +251,9 @@ export const ParkingBottomSheet = forwardRef<
   }), [onCompact]);
 
   useEffect(() => {
-    if (item) sheetRef.current?.snapToIndex(1);
+    if (selectedItemId !== null) sheetRef.current?.snapToIndex(1);
     else sheetRef.current?.close();
-  }, [item]);
+  }, [selectedItemId]);
 
   return (
     <BottomSheet

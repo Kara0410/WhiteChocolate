@@ -117,6 +117,7 @@ test('normalizes a percentage-only estimate without fabricating space counts', (
     availability_confidence: 'low',
     estimate_generated_at: '2026-07-19T10:00:00.000Z',
     estimate_valid_until: '2026-07-19T10:15:00.000Z',
+    estimator_version: 'heuristic-v2.1-pessimistic',
     estimate_factors: [],
     pricing_status: 'unknown',
     hourly_rate: null,
@@ -127,6 +128,10 @@ test('normalizes a percentage-only estimate without fabricating space counts', (
   assert.equal(segment?.availability.percent, 18);
   assert.equal(segment?.availability.availableSpaces, null);
   assert.equal(segment?.availability.totalSpaces, null);
+  assert.equal(
+    segment?.availability.estimatorVersion,
+    'heuristic-v2.1-pessimistic',
+  );
 });
 
 test('invalid service rows are rejected instead of fabricated', () => {

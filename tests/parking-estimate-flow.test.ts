@@ -66,6 +66,7 @@ test('destination estimate reaches marker/detail compatibility data with metadat
   assert.equal(marker.availabilityStatus, 'estimated');
   assert.equal(marker.availabilityConfidence, 'medium');
   assert.equal(marker.estimateGeneratedAt, '2026-07-18T10:00:00Z');
+  assert.equal(marker.estimatorVersion, 'heuristic-v1');
 });
 
 test('unknown availability stays null and uses a neutral marker state', () => {
@@ -118,6 +119,16 @@ test('a percentage-only estimate remains visible when capacity is unavailable', 
   assert.equal(segment.availability.percent, 18);
   assert.equal(segment.availability.availableSpaces, null);
   assert.equal(segment.availability.totalSpaces, null);
+  assert.equal(
+    segment.availability.estimatorVersion,
+    'heuristic-v2.1-pessimistic',
+  );
+
+  const marker = parkingMapFeatureToLegacyResponse(
+    parkingSegmentToMapFeature(segment),
+  );
+  assert.equal(marker?.availabilityPercent, 18);
+  assert.equal(marker?.availableSpots, null);
 });
 
 test('a context merge clears estimates that are missing from that context', () => {

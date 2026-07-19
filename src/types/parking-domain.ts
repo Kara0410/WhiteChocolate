@@ -29,6 +29,7 @@ export type ParkingAvailability =
       confidence: 'low' | 'medium';
       generatedAt: string;
       validUntil: string;
+      estimatorVersion?: string | null;
       factors: ParkingEstimateFactor[];
     }
   | {
@@ -39,6 +40,7 @@ export type ParkingAvailability =
       confidence: null;
       generatedAt: null;
       validUntil: null;
+      estimatorVersion?: null;
       factors: ParkingEstimateFactor[];
     };
 

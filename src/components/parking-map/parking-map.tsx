@@ -63,6 +63,12 @@ import {
   SEARCH_NEARBY_RESULT_LIMIT,
   type ParkingSpotWithDistance,
 } from '@/utils/parkingSearch';
+import {
+  isParkingContextCurrent,
+  parkingSnapshotMatchesAvailableSpots,
+  resolveCurrentParkingSelection,
+  type ParkingSelectionSource,
+} from '@/utils/parking-selection';
 
 const LABEL_FREE_MAP_STYLE = JSON.stringify([
   {
@@ -167,7 +173,6 @@ type ParkingMapProps = {
   userLocation?: ParkingCoordinates | null;
 };
 
-type ParkingSelectionSource = 'marker' | 'favorite' | 'search';
 type ParkingMapMode = 'focusedArea' | 'munichOverview' | 'userLocation';
 
 type SelectParkingItemOptions = {
@@ -275,6 +280,7 @@ export function ParkingMap({
     clearParkingData,
     currentRegion,
     displayCamera,
+    loadedContextHash,
     loadedRequestBounds,
     loadedRequestKey,
     loadedRequestVersion,
@@ -338,6 +344,8 @@ export function ParkingMap({
     useRef<ReturnType<typeof setTimeout> | null>(null);
   const [selectedParkingItem, setSelectedParkingItem] =
     useState<ParkingClusterResponse | null>(null);
+  const [selectedParkingSource, setSelectedParkingSource] =
+    useState<ParkingSelectionSource | null>(null);
   const [searchParkingRequest, setSearchParkingRequest] =
     useState<SearchParkingRequest | null>(null);
   const [searchSpotsSnapshot, setSearchSpotsSnapshot] =
@@ -356,6 +364,28 @@ export function ParkingMap({
   const lastSearchFocusKeyRef = useRef<string | null>(null);
   const lastSearchSelectionIdRef = useRef<number | null>(null);
   const lastLocationFocusKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    setSelectedParkingItem((currentItem) =>
+      resolveCurrentParkingSelection({
+        activeContextHash,
+        favoriteItems,
+        loadedContextHash,
+        searchSnapshot: searchSpotsSnapshot,
+        selectedItem: currentItem,
+        source: selectedParkingSource,
+        visibleSpots,
+      }),
+    );
+  }, [
+    activeContextHash,
+    favoriteItems,
+    loadedContextHash,
+    searchSpotsSnapshot,
+    selectedParkingSource,
+    visibleSpots,
+  ]);
+
   useEffect(() => {
     if (selectedSearchPlace === null) {
       return;
@@ -376,8 +406,19 @@ export function ParkingMap({
       snapshotMatchesPlace &&
       searchSpotsSnapshot.contextHash === activeContextHash &&
       (activeRequestKey === null ||
-        searchSpotsSnapshot.requestKey === activeRequestKey);
+        searchSpotsSnapshot.requestKey === activeRequestKey) &&
+      parkingSnapshotMatchesAvailableSpots(
+        searchSpotsSnapshot.spots,
+        visibleSpots,
+      );
     if (snapshotSatisfiesActiveRequest) {
+      return;
+    }
+
+    // Keep the previous snapshot visible while the context-specific segment
+    // request is in flight. It must not be relabelled with the new hash while
+    // visibleSpots still contains legacy or previous-context objects.
+    if (!isParkingContextCurrent(activeContextHash, loadedContextHash)) {
       return;
     }
 
@@ -404,27 +445,6 @@ export function ParkingMap({
       !loadedEquivalentCameraArea &&
       !hasSpotsNearDestination
     ) {
-      if (__DEV__) {
-        // Temporary diagnostics for the stuck "Finding nearby spots" state.
-        console.debug('[parking-map] Search snapshot waiting', {
-          loadedBoundsExist: loadedRequestBounds !== null,
-          loadedRequestKey,
-          loadedRequestVersion,
-          placeId: selectedSearchPlace.placeId,
-          placeInsideLoadedBounds:
-            loadedRequestBounds !== null &&
-            isCoordinateInsideBounds(searchOrigin, loadedRequestBounds),
-          reason:
-            searchParkingRequest === null
-              ? 'no active parking request yet'
-              : loadedRequestVersion <= searchParkingRequest.startedAtVersion
-                ? 'no fetch completed since the search started'
-                : 'loaded data does not cover the destination',
-          searchRequestKey: activeRequestKey,
-          startedAtVersion: searchParkingRequest?.startedAtVersion ?? null,
-          visibleSpots: visibleSpots.length,
-        });
-      }
       return;
     }
 
@@ -433,20 +453,6 @@ export function ParkingMap({
       spots: visibleSpots,
       limit: SEARCH_NEARBY_RESULT_LIMIT,
     });
-
-    if (__DEV__) {
-      // Temporary diagnostics for the stuck "Finding nearby spots" state.
-      console.debug('[parking-map] Search snapshot created', {
-        acceptedBy: loadedExpectedRequest
-          ? 'exact request key'
-          : loadedEquivalentCameraArea
-            ? 'equivalent camera area'
-            : 'spots near destination',
-        curatedNearbyResults: curatedNearbyResults.length,
-        placeId: selectedSearchPlace.placeId,
-        visibleSpots: visibleSpots.length,
-      });
-    }
 
     // An empty curated list still becomes a snapshot: the sheet must show
     // its real empty state instead of loading forever.
@@ -459,6 +465,7 @@ export function ParkingMap({
   }, [
     activeContextHash,
     loadedRequestBounds,
+    loadedContextHash,
     loadedRequestKey,
     loadedRequestVersion,
     searchParkingRequest,
@@ -904,6 +911,7 @@ export function ParkingMap({
 
       setMapMode('focusedArea');
       setSelectedParkingItem(item);
+      setSelectedParkingSource(source);
       if (!focusCamera) {
         cancelPendingCameraFocus();
         return;
@@ -972,17 +980,22 @@ export function ParkingMap({
 
   const handleMarkerPress = useCallback(
     (item: ParkingClusterResponse) => {
-      setSearchParkingRequest(null);
-      setSearchSpotsSnapshot(null);
       if (item.type === 'cluster') {
+        setSearchParkingRequest(null);
+        setSearchSpotsSnapshot(null);
         setSelectedSearchPlace(null);
         expandClusterSafely(item);
         return;
       }
 
-      selectParkingItem(item);
+      const source = selectedSearchPlace === null ? 'marker' : 'search';
+      if (source === 'marker') {
+        setSearchParkingRequest(null);
+        setSearchSpotsSnapshot(null);
+      }
+      selectParkingItem(item, { source });
     },
-    [expandClusterSafely, selectParkingItem],
+    [expandClusterSafely, selectParkingItem, selectedSearchPlace],
   );
 
   const handleZoneSummaryPress = useCallback(
@@ -1073,6 +1086,7 @@ export function ParkingMap({
       setMapMode('focusedArea');
       setAutomaticParkingFetchEnabled(true);
       setSelectedParkingItem(null);
+      setSelectedParkingSource(null);
       cancelPendingCameraFocus();
       clearParkingData();
       setSearchParkingRequest(null);
@@ -1141,7 +1155,6 @@ export function ParkingMap({
   const handleSearchSpotPress = useCallback(
     (item: ParkingClusterResponse) => {
       setSearchParkingRequest(null);
-      setSearchSpotsSnapshot(null);
       selectParkingItem(item, { source: 'search', focusCamera: true });
     },
     [selectParkingItem],
@@ -1149,6 +1162,7 @@ export function ParkingMap({
 
   const clearSelection = useCallback(() => {
     setSelectedParkingItem(null);
+    setSelectedParkingSource(null);
     setSelectedSearchPlace(null);
     setSearchParkingRequest(null);
     setSearchSpotsSnapshot(null);

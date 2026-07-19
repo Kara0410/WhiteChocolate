@@ -29,6 +29,7 @@ export type ParkingClusterResponse = {
   availabilityConfidence?: 'low' | 'medium' | null;
   estimateGeneratedAt?: string | null;
   estimateValidUntil?: string | null;
+  estimatorVersion?: string | null;
   count: number;
   zoneCount?: number;
   spotCount?: number;

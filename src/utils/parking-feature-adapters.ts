@@ -73,6 +73,10 @@ export function parkingMapFeatureToLegacyResponse(
       segment?.availability.status === 'estimated'
         ? segment.availability.validUntil
         : null,
+    estimatorVersion:
+      segment?.availability.status === 'estimated'
+        ? segment.availability.estimatorVersion ?? null
+        : null,
     count: feature.stats.segmentCount,
     zoneCount: feature.parentId === null ? 0 : 1,
     spotCount: feature.stats.segmentCount,

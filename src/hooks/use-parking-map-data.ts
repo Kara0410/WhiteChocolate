@@ -78,6 +78,7 @@ type CachedStageData = {
   features: ParkingMapFeature[];
   segments: ParkingSegmentSummary[];
   bounds: ParkingBoundingBox | null;
+  contextHash: string | null;
   truncated: boolean;
 };
 
@@ -99,6 +100,9 @@ export function useParkingMapData(
   const [loadedRequestKey, setLoadedRequestKey] = useState<string | null>(null);
   const [loadedRequestBounds, setLoadedRequestBounds] =
     useState<ParkingBoundingBox | null>(null);
+  const [loadedContextHash, setLoadedContextHash] = useState<string | null>(
+    null,
+  );
   const [loadedRequestVersion, setLoadedRequestVersion] = useState(0);
   const [loadedSegments, setLoadedSegments] = useState<ParkingSegmentSummary[]>(
     [],
@@ -164,6 +168,7 @@ export function useParkingMapData(
     (request: ParkingClusterRequest, data: CachedStageData) => {
       setLoadedRequestKey(request.tileKey);
       setLoadedRequestBounds(data.bounds);
+      setLoadedContextHash(data.contextHash);
       setLoadedSegments(data.segments);
       setLoadedRequestVersion((version) => version + 1);
     },
@@ -292,6 +297,7 @@ export function useParkingMapData(
           features: summaries.map(zoneSummaryToMapFeature),
           segments: [],
           bounds: null,
+          contextHash: null,
           truncated: false,
         };
       }
@@ -308,6 +314,7 @@ export function useParkingMapData(
           features: cells.map(cellSummaryToMapFeature),
           segments: [],
           bounds: request.bbox,
+          contextHash: estimateResponse?.contextHash ?? null,
           truncated: cells.length >= 400,
         };
       }
@@ -320,13 +327,6 @@ export function useParkingMapData(
           signal,
         });
         segments = response.segments;
-        if (estimateResponse) {
-          segments = mergeParkingAvailabilityEstimates(
-            segments,
-            estimateResponse.estimates,
-            { unknownWhenMissing: true },
-          );
-        }
         truncated = response.truncated;
         if (__DEV__ && parkingZonePolygons.length > 0) {
           const sample = segments.slice(0, 100);
@@ -382,6 +382,14 @@ export function useParkingMapData(
         }
       }
 
+      if (estimateResponse) {
+        segments = mergeParkingAvailabilityEstimates(
+          segments,
+          estimateResponse.estimates,
+          { unknownWhenMissing: true },
+        );
+      }
+
       const features =
         stage === 'segment'
           ? segments.map((segment) => ({
@@ -417,7 +425,13 @@ export function useParkingMapData(
               zoom: camera.zoom,
             });
 
-      return { features, segments, bounds: request.bbox, truncated };
+      return {
+        features,
+        segments,
+        bounds: request.bbox,
+        contextHash: estimateResponse?.contextHash ?? null,
+        truncated,
+      };
     },
     [estimateResponse, parkingZoneMatcher, parkingZonePolygons.length],
   );
@@ -676,6 +690,7 @@ export function useParkingMapData(
     activeRequestKeyRef.current = null;
     abortControllerRef.current?.abort();
     setLoadedRequestBounds(null);
+    setLoadedContextHash(null);
     setLoadedRequestKey(null);
     setLoadedSegments([]);
   }, []);
@@ -724,6 +739,7 @@ export function useParkingMapData(
     displayCamera,
     layerState,
     loadedRequestBounds,
+    loadedContextHash,
     loadedRequestKey,
     loadedRequestVersion,
     onCameraMove,

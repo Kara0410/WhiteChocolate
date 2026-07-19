@@ -15,6 +15,12 @@ export type ParkingAvailabilityEstimateResult = {
   factors: ParkingEstimateFactor[];
 };
 
+export function normalizeParkingAvailabilityPercentage(value: number | null) {
+  return value === null || !Number.isFinite(value)
+    ? null
+    : Math.max(0, Math.min(100, Math.round(value)));
+}
+
 export function mergeParkingAvailabilityEstimates(
   segments: ParkingSegmentSummary[],
   estimates: ParkingAvailabilityEstimateResult[],
@@ -36,6 +42,7 @@ export function mergeParkingAvailabilityEstimates(
           confidence: null,
           generatedAt: null,
           validUntil: null,
+          estimatorVersion: null,
           factors: [],
         },
       };
@@ -56,6 +63,7 @@ export function mergeParkingAvailabilityEstimates(
               confidence: null,
               generatedAt: null,
               validUntil: null,
+              estimatorVersion: null,
               factors: estimate.factors,
             },
           }
@@ -76,6 +84,7 @@ export function mergeParkingAvailabilityEstimates(
         confidence: estimate.confidence,
         generatedAt: estimate.generatedAt,
         validUntil: estimate.validUntil,
+        estimatorVersion: estimate.estimatorVersion,
         factors: estimate.factors,
       },
     };

@@ -222,6 +222,7 @@ export function normalizeParkingSegmentSummaryRow(
           confidence: normalizedConfidence,
           generatedAt,
           validUntil,
+          estimatorVersion: parkingStringValue(value.estimator_version),
           factors: normalizeEstimateFactors(value.estimate_factors),
         }
       : {
@@ -232,6 +233,7 @@ export function normalizeParkingSegmentSummaryRow(
           confidence: null,
           generatedAt: null,
           validUntil: null,
+          estimatorVersion: null,
           factors: normalizeEstimateFactors(value.estimate_factors),
         };
   const pricing =
