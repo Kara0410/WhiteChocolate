@@ -207,16 +207,16 @@ export function normalizeParkingSegmentSummaryRow(
   const validUntil = parkingStringValue(value.estimate_valid_until);
   const availability: ParkingAvailability =
     value.availability_status === 'estimated' &&
-    capacity !== null &&
-    capacity > 0 &&
-    availableSpaces !== null &&
     percent !== null &&
     normalizedConfidence !== null &&
     generatedAt !== null &&
     validUntil !== null
       ? {
           status: 'estimated' as const,
-          availableSpaces,
+          availableSpaces:
+            capacity !== null && availableSpaces !== null
+              ? Math.min(capacity, availableSpaces)
+              : null,
           totalSpaces: capacity,
           percent,
           confidence: normalizedConfidence,

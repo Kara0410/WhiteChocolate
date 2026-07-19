@@ -23,8 +23,8 @@ export type GeoJsonMultiPolygon = {
 export type ParkingAvailability =
   | {
       status: 'estimated';
-      availableSpaces: number;
-      totalSpaces: number;
+      availableSpaces: number | null;
+      totalSpaces: number | null;
       percent: number;
       confidence: 'low' | 'medium';
       generatedAt: string;

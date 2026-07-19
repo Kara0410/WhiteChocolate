@@ -99,6 +99,27 @@ test('an estimated zero remains distinct from unknown availability', () => {
   assert.equal(segment.availability.availableSpaces, 0);
 });
 
+test('a percentage-only estimate remains visible when capacity is unavailable', () => {
+  const [segment] = mergeParkingAvailabilityEstimates(
+    [{ ...inventorySegment(), capacity: null }],
+    [{
+      segmentId: 'segment-1',
+      availableSpaces: null,
+      availabilityPercent: 18,
+      status: 'estimated',
+      confidence: 'low',
+      generatedAt: '2026-07-18T10:00:00Z',
+      validUntil: '2026-07-18T10:15:00Z',
+      estimatorVersion: 'heuristic-v2.1-pessimistic',
+      factors: [],
+    }],
+  );
+  assert.equal(segment.availability.status, 'estimated');
+  assert.equal(segment.availability.percent, 18);
+  assert.equal(segment.availability.availableSpaces, null);
+  assert.equal(segment.availability.totalSpaces, null);
+});
+
 test('a context merge clears estimates that are missing from that context', () => {
   const [segment] = mergeParkingAvailabilityEstimates(
     [{

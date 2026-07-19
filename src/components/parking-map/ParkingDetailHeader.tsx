@@ -138,7 +138,7 @@ export const ParkingDetailHeader = memo(function ParkingDetailHeader({
               className="ml-3 text-[14px] font-semibold"
               style={{ color: theme.text }}
             >
-              {percentage === null ? 'Not enough data' : 'Estimated availability'}
+              {percentage === null ? 'Estimate unavailable' : 'Estimated availability'}
             </Text>
           </View>
 

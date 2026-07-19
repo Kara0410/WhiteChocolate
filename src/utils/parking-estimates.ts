@@ -43,9 +43,6 @@ export function mergeParkingAvailabilityEstimates(
     if (
       !estimate ||
       estimate.status !== 'estimated' ||
-      segment.capacity === null ||
-      segment.capacity <= 0 ||
-      estimate.availableSpaces === null ||
       estimate.availabilityPercent === null
     ) {
       return estimate?.status === 'unknown'
@@ -68,7 +65,12 @@ export function mergeParkingAvailabilityEstimates(
       ...segment,
       availability: {
         status: 'estimated' as const,
-        availableSpaces: Math.min(segment.capacity, estimate.availableSpaces),
+        availableSpaces:
+          segment.capacity !== null &&
+          segment.capacity >= 0 &&
+          estimate.availableSpaces !== null
+            ? Math.min(segment.capacity, estimate.availableSpaces)
+            : null,
         totalSpaces: segment.capacity,
         percent: estimate.availabilityPercent,
         confidence: estimate.confidence,

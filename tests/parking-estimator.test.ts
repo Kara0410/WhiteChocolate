@@ -112,18 +112,41 @@ test('known rules and a Google demand signal produce medium confidence only', ()
   assert.notEqual(estimate.confidence, 'high');
 });
 
-test('missing, zero, invalid, and restricted capacity remain unknown and null', () => {
-  for (const capacity of [null, 0, -1, 2.5]) {
+test('missing capacity receives a pessimistic percentage-only estimate', () => {
+  for (const capacity of [null, 2.5]) {
     const estimate = estimateParkingAvailability(input({ capacity }));
-    assert.equal(estimate.status, 'unknown');
-    assert.equal(estimate.availabilityPercent, null);
+    assert.equal(estimate.status, 'estimated');
+    assert.equal(estimate.confidence, 'low');
+    assert.ok(estimate.availabilityPercent! >= 0);
     assert.equal(estimate.availableSpaces, null);
+    assert.ok(
+      estimate.factors.some(
+        (item) => item.code === 'capacity-unknown-conservative',
+      ),
+    );
   }
-  const restricted = estimateParkingAvailability(
-    input({ regulationDescription: 'Nur mit Bewohnerausweis' }),
-  );
-  assert.equal(restricted.status, 'unknown');
-  assert.equal(restricted.availableSpaces, null);
+});
+
+test('zero capacity and restricted parking are conservatively unavailable', () => {
+  for (const capacity of [0, -1]) {
+    const estimate = estimateParkingAvailability(input({ capacity }));
+    assert.equal(estimate.status, 'estimated');
+    assert.equal(estimate.availabilityPercent, 0);
+    assert.equal(estimate.availableSpaces, capacity === 0 ? 0 : null);
+  }
+  for (const regulationDescription of [
+    'Nur mit Bewohnerausweis',
+    'Behindertenparken',
+    'Carsharing Stellplatz',
+    'Absolutes Halteverbot 0-24 Uhr',
+  ]) {
+    const restricted = estimateParkingAvailability(
+      input({ regulationDescription }),
+    );
+    assert.equal(restricted.status, 'estimated');
+    assert.equal(restricted.availabilityPercent, 0);
+    assert.equal(restricted.availableSpaces, 0);
+  }
 });
 
 test('small-capacity estimates round available spaces conservatively downward', () => {

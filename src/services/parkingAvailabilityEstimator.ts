@@ -85,9 +85,12 @@ function normalizedEstimate(value: unknown): ParkingAvailabilityEstimateResult |
     value.availabilityPercent <= 100
       ? value.availabilityPercent
       : null;
+  if (status === 'estimated' && availabilityPercent === null) {
+    return null;
+  }
   if (
-    status === 'estimated' &&
-    (availableSpaces === null || availabilityPercent === null)
+    status === 'unknown' &&
+    (availableSpaces !== null || availabilityPercent !== null)
   ) {
     return null;
   }

@@ -86,7 +86,7 @@ function priceLabel(item: ParkingClusterResponse) {
     return `€${rate.toFixed(2)} / hr`;
   }
   if (item.pricingStatus === 'paid') return 'Paid · rate unavailable';
-  return 'Not enough pricing data';
+  return 'Pricing unavailable';
 }
 
 function shareMessage(
@@ -96,7 +96,7 @@ function shareMessage(
 ) {
   const availability =
     percentage === null
-      ? 'Estimated availability: not enough data'
+      ? 'Estimated availability: unavailable'
       : `Estimated availability: ${percentage}%`;
   const query = encodeURIComponent(`${item.latitude},${item.longitude}`);
   return [
@@ -186,7 +186,7 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
       >
         <ParkingDetailSection title="Estimated availability">
           <Text className="text-[22px] font-extrabold text-slate-950">
-            {percentage === null ? 'Not enough data' : `${percentage}% available`}
+            {percentage === null ? 'Estimate unavailable' : `${percentage}% available`}
           </Text>
           <Text className="mt-2 text-[13px] font-semibold leading-5 text-slate-600">
             Estimate based on time, parking rules and area demand
@@ -199,7 +199,7 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
                   ? 'Medium confidence'
                   : item.availabilityConfidence === 'low'
                     ? 'Low confidence'
-                    : 'Not enough data'
+                    : 'Estimate unavailable'
               }
             />
             <ParkingInfoRow
@@ -215,7 +215,7 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
             label="Estimated spaces"
             value={
               item.availableSpots === null
-                ? 'Not enough data'
+                ? 'Capacity unavailable'
                 : `${item.availableSpots} of ${item.totalCapacity}`
             }
           />
@@ -224,7 +224,7 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
             value={
               item.totalCapacity > 0
                 ? `${item.totalCapacity} spaces`
-                : 'Not enough data'
+                : 'No public spaces listed'
             }
           />
         </ParkingDetailSection>

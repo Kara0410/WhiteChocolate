@@ -1,4 +1,4 @@
-export const PARKING_ESTIMATOR_VERSION = 'heuristic-v1';
+export const PARKING_ESTIMATOR_VERSION = 'heuristic-v2.1-pessimistic';
 export const PARKING_ESTIMATOR_TIME_ZONE = 'Europe/Berlin';
 
 export type ParkingPricingStatus = 'free' | 'paid' | 'unknown';
@@ -65,6 +65,7 @@ export type ParkingTimeBucket =
 export const PARKING_ESTIMATOR_CONSTANTS = Object.freeze({
   baseOccupancy: 0.64,
   conservativeMargin: 0.05,
+  unknownCapacityMargin: 0.08,
   minimumOccupancy: 0.35,
   maximumOccupancy: 0.98,
   dynamicTtlMinutes: 15,
@@ -136,7 +137,7 @@ const CATEGORY_PRIORITY: readonly ParkingDemandCategory[] = [
 ];
 
 const RESTRICTED_REGULATION_PATTERN =
-  /\b(bewohner|resident|anlieger|sonderberechtigung|restricted|nur\s+mit)\b/i;
+  /\b(bewohner|resident|anlieger|sonderberechtigung|restricted|nur\s+mit|behinderten(?:parken)?|disabled|handicap|carsharing|baustelle|construction|halteverbot|no[ -]?parking)\b/i;
 const SHORT_STAY_PATTERN = /\b(kurzzeit|short[ -]?stay|max(?:imal)?\s*\d+\s*h)\b/i;
 
 function clamp(value: number, minimum: number, maximum: number) {
@@ -224,16 +225,21 @@ function weekdayAdjustment(date: Date, bucket: ParkingTimeBucket) {
   return factor('weekday-working-day', 0.02);
 }
 
-function unknownEstimate(
+function unavailableEstimate(
   input: ParkingEstimateInput,
   generatedAt: Date,
   code: string,
 ): ParkingAvailabilityEstimate {
   return {
     segmentId: input.segmentId,
-    availableSpaces: null,
-    availabilityPercent: null,
-    status: 'unknown',
+    availableSpaces:
+      input.capacity !== null &&
+      Number.isInteger(input.capacity) &&
+      input.capacity >= 0
+        ? 0
+        : null,
+    availabilityPercent: 0,
+    status: 'estimated',
     confidence: 'low',
     generatedAt: generatedAt.toISOString(),
     validUntil: new Date(
@@ -249,14 +255,6 @@ export function estimateParkingAvailability(
   input: ParkingEstimateInput,
 ): ParkingAvailabilityEstimate {
   const generatedAt = input.generatedAt ?? input.localDateTime;
-  if (
-    input.capacity === null ||
-    !Number.isInteger(input.capacity) ||
-    input.capacity <= 0
-  ) {
-    return unknownEstimate(input, generatedAt, 'capacity-unavailable');
-  }
-
   const regulationText = [
     input.regulationGroup,
     input.regulationName,
@@ -265,8 +263,22 @@ export function estimateParkingAvailability(
     .filter((value): value is string => Boolean(value?.trim()))
     .join(' ');
   if (RESTRICTED_REGULATION_PATTERN.test(regulationText)) {
-    return unknownEstimate(input, generatedAt, 'regulation-restricted');
+    return unavailableEstimate(input, generatedAt, 'regulation-not-public');
   }
+  if (
+    input.capacity !== null &&
+    Number.isInteger(input.capacity) &&
+    input.capacity <= 0
+  ) {
+    return unavailableEstimate(input, generatedAt, 'capacity-no-public-spaces');
+  }
+
+  const reliableCapacity =
+    input.capacity !== null &&
+    Number.isInteger(input.capacity) &&
+    input.capacity > 0
+      ? input.capacity
+      : null;
 
   const timeBucket = getParkingTimeBucket(input.localDateTime);
   const destinationCategory = mapGoogleTypesToDemandCategory(
@@ -282,8 +294,18 @@ export function estimateParkingAvailability(
     weekdayAdjustment(input.localDateTime, timeBucket),
   ];
 
-  if (input.capacity <= 4) factors.push(factor('capacity-very-small', 0.04));
-  else if (input.capacity >= 50) factors.push(factor('capacity-large', -0.02));
+  if (reliableCapacity === null) {
+    factors.push(
+      factor(
+        'capacity-unknown-conservative',
+        PARKING_ESTIMATOR_CONSTANTS.unknownCapacityMargin,
+      ),
+    );
+  } else if (reliableCapacity <= 4) {
+    factors.push(factor('capacity-very-small', 0.04));
+  } else if (reliableCapacity >= 50) {
+    factors.push(factor('capacity-large', -0.02));
+  }
 
   if (input.pricingStatus === 'free') {
     factors.push(factor('pricing-free', 0.06));
@@ -372,14 +394,14 @@ export function estimateParkingAvailability(
     PARKING_ESTIMATOR_CONSTANTS.minimumOccupancy,
     PARKING_ESTIMATOR_CONSTANTS.maximumOccupancy,
   );
-  const availableSpaces = clamp(
-    Math.floor(input.capacity * (1 - occupancy)),
-    0,
-    input.capacity,
-  );
-  const availabilityPercent = Math.round(
-    (availableSpaces / input.capacity) * 100,
-  );
+  const availabilityPercent = Math.round((1 - occupancy) * 100);
+  const availableSpaces = reliableCapacity !== null
+    ? clamp(
+        Math.floor(reliableCapacity * availabilityPercent / 100),
+        0,
+        reliableCapacity,
+      )
+    : null;
   const hasGoogleDemandSignal =
     destinationCategory !== 'unknown' &&
     (input.destinationIsOpen !== null ||
@@ -387,7 +409,9 @@ export function estimateParkingAvailability(
       input.nearbyPoiCount !== null ||
       input.trafficRatio !== null);
   const confidence: ParkingEstimateConfidence =
-    regulationText && hasGoogleDemandSignal ? 'medium' : 'low';
+    reliableCapacity !== null && regulationText && hasGoogleDemandSignal
+      ? 'medium'
+      : 'low';
   const hasDynamicSignal =
     input.destinationIsOpen !== null ||
     input.trafficRatio !== null ||

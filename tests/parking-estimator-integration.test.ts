@@ -85,6 +85,28 @@ test('migration has snapshot selection, weighted coverage, and no hash fallback'
   assert.doesNotMatch(migration, /hashtextextended|mod\s*\(\s*hash/i);
 });
 
+test('percentage-only migration keeps unknown rows null without requiring a fake count', async () => {
+  const migration = await readFile(
+    resolve(
+      dirname(fileURLToPath(import.meta.url)),
+      '../supabase/migrations/20260719000100_allow_percentage_only_parking_estimates.sql',
+    ),
+    'utf8',
+  );
+  assert.match(
+    migration,
+    /status = 'estimated'[\s\S]*availability_percent is not null/,
+  );
+  assert.match(
+    migration,
+    /status = 'unknown'[\s\S]*availability_percent is null[\s\S]*available_spaces is null/,
+  );
+  assert.doesNotMatch(
+    migration,
+    /status = 'estimated'[\s\S]{0,120}available_spaces is not null/,
+  );
+});
+
 test('pending migration chain preserves UUID joins and explicitly changes the view contract', async () => {
   const migrationDirectory = resolve(
     dirname(fileURLToPath(import.meta.url)),

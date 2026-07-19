@@ -102,6 +102,41 @@ test('aggregate availability is capacity weighted', () => {
   assert.equal(stats.totalCapacity, 100);
 });
 
+test('percentage-only estimates use an unweighted fallback when no capacity exists', () => {
+  const stats = aggregateParkingSegments([
+    segment('first', {
+      capacity: null,
+      availability: {
+        status: 'estimated',
+        availableSpaces: null,
+        totalSpaces: null,
+        percent: 12,
+        confidence: 'low',
+        generatedAt: '2026-07-13T10:00:00.000Z',
+        validUntil: '2026-07-13T10:15:00.000Z',
+        factors: [],
+      },
+    }),
+    segment('second', {
+      capacity: null,
+      availability: {
+        status: 'estimated',
+        availableSpaces: null,
+        totalSpaces: null,
+        percent: 20,
+        confidence: 'low',
+        generatedAt: '2026-07-13T10:00:00.000Z',
+        validUntil: '2026-07-13T10:15:00.000Z',
+        factors: [],
+      },
+    }),
+  ]);
+  assert.equal(stats.totalCapacity, null);
+  assert.equal(stats.availableCapacity, null);
+  assert.equal(stats.availabilityPercent, 16);
+  assert.equal(stats.availabilityStatus, 'estimated');
+});
+
 test('record count and physical capacity remain separate', () => {
   const stats = aggregateParkingSegments([
     segment('known', { capacity: 20 }),

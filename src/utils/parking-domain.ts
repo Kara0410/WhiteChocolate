@@ -11,6 +11,8 @@ export function aggregateParkingSegments(
   let totalCapacity = 0;
   let availableCapacity = 0;
   let availabilityCapacity = 0;
+  let percentageTotal = 0;
+  let percentageCount = 0;
   let hasKnownCapacity = false;
   let hasKnownAvailability = false;
   let minimumHourlyRate: number | null = null;
@@ -29,6 +31,10 @@ export function aggregateParkingSegments(
       hasKnownAvailability = true;
       availableCapacity += segment.availability.availableSpaces;
       availabilityCapacity += segment.availability.totalSpaces ?? 0;
+    }
+    if (segment.availability.status === 'estimated') {
+      percentageTotal += segment.availability.percent;
+      percentageCount += 1;
     }
     availabilityStatuses.add(segment.availability.status);
 
@@ -60,7 +66,9 @@ export function aggregateParkingSegments(
   const availabilityPercent =
     availabilityCapacity > 0 && knownAvailable !== null
       ? Math.round((knownAvailable / availabilityCapacity) * 100)
-      : null;
+      : percentageCount > 0
+        ? Math.round(percentageTotal / percentageCount)
+        : null;
   const availabilityStatus =
     availabilityStatuses.size === 0
       ? 'unknown'

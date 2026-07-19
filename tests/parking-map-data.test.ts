@@ -102,6 +102,33 @@ test('normalizes UUID-derived summary IDs without changing their text value', ()
   assert.equal(segment?.availability.status, 'estimated');
 });
 
+test('normalizes a percentage-only estimate without fabricating space counts', () => {
+  const segment = normalizeParkingSegmentSummaryRow({
+    id: '8c2a4d42-4f9c-4d26-8a85-0b1b5f3d2f10',
+    parking_zone_id: null,
+    street_name: 'Test Street',
+    source_area_name: null,
+    lat: 48.137,
+    lon: 11.575,
+    capacity: null,
+    estimated_available_capacity: null,
+    estimated_availability_percent: 18,
+    availability_status: 'estimated',
+    availability_confidence: 'low',
+    estimate_generated_at: '2026-07-19T10:00:00.000Z',
+    estimate_valid_until: '2026-07-19T10:15:00.000Z',
+    estimate_factors: [],
+    pricing_status: 'unknown',
+    hourly_rate: null,
+    updated_at: null,
+  });
+
+  assert.equal(segment?.availability.status, 'estimated');
+  assert.equal(segment?.availability.percent, 18);
+  assert.equal(segment?.availability.availableSpaces, null);
+  assert.equal(segment?.availability.totalSpaces, null);
+});
+
 test('invalid service rows are rejected instead of fabricated', () => {
   assert.equal(normalizeParkingZoneSummaryRow({ ...aggregateRow }), null);
   assert.equal(
