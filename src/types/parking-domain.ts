@@ -104,7 +104,7 @@ export type ParkingSpace = {
   updatedAt: string | null;
 };
 
-export type ParkingCellResolution = 'coarse' | 'fine';
+export type ParkingCellResolution = 'city' | 'coarse' | 'fine';
 
 export type ParkingCellSummary = {
   kind: 'cell-summary';

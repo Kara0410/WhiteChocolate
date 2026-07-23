@@ -80,3 +80,20 @@ test('forward SQL recreates only segment summaries and segment-derived cells', a
   assert.match(source, /drop table if exists public\.parking_zones/);
   assert.doesNotMatch(source, /drop table[^;]*cascade/i);
 });
+
+test('runtime repair keeps the cell RPC segment-derived and adds city resolution', async () => {
+  const source = await readFile(
+    resolve(
+      root,
+      'supabase/migrations/20260723000100_parking_runtime_regression_repair.sql',
+    ),
+    'utf8',
+  );
+  assert.match(
+    source,
+    /create or replace function public\.fetch_parking_cells/,
+  );
+  assert.match(source, /when 'city' then 5000\.0/);
+  assert.match(source, /join public\.parking_segments as segment/);
+  assert.doesNotMatch(source, /parking_zone|st_(?:covers|contains|within|intersects)\s*\(/i);
+});

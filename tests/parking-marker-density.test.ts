@@ -9,11 +9,13 @@ import {
   projectMapCoordinate,
   projectParkingMarkers,
   projectSelectedParkingMarkers,
+  selectSpatiallySeparatedCellSummaries,
   selectSpatiallySeparatedMarkers,
 } from '../src/components/parking-map/marker-density';
 import { getAvailabilityStatus } from '../src/components/parking-map/parking-availability-status';
 import { getMarkerDimensions } from '../src/components/parking-map/marker-visuals';
 import type { ParkingClusterResponse } from '../src/types/parking-map';
+import type { ParkingCellSummary } from '../src/types/parking-domain';
 import {
   createBufferedViewportBounds,
   createParkingRenderCircleBounds,
@@ -48,6 +50,38 @@ function marker(
       availableSpots: 1,
       availabilityPercent: 72,
       pricePerHour: 2,
+    },
+  };
+}
+
+function cellSummary(
+  id: string,
+  segmentCount: number,
+): ParkingCellSummary {
+  return {
+    kind: 'cell-summary',
+    id,
+    center: { latitude: 48.137, longitude: 11.575 },
+    bounds: {
+      minLng: 11.57,
+      minLat: 48.13,
+      maxLng: 11.58,
+      maxLat: 48.14,
+    },
+    resolution: 'coarse',
+    stats: {
+      segmentCount,
+      totalCapacity: null,
+      availableCapacity: null,
+      availabilityPercent: null,
+      pricing: {
+        minimumHourlyRate: null,
+        maximumHourlyRate: null,
+        hasFreeParking: false,
+        hasUnknownPricing: true,
+      },
+      availabilityStatus: 'unknown',
+      updatedAt: null,
     },
   };
 }
@@ -376,6 +410,47 @@ test('suppresses visually overlapping markers at the enlarged scale', () => {
   );
 
   assert.deepEqual(result.map((item) => item.id), ['large', 'separate']);
+});
+
+test('broad cell markers are collision-filtered and prioritize more segments', () => {
+  const result = selectSpatiallySeparatedCellSummaries(
+    [
+      { summary: cellSummary('small', 2), x: 100, y: 100 },
+      { summary: cellSummary('large', 50), x: 104, y: 105 },
+      { summary: cellSummary('separate', 10), x: 260, y: 100 },
+    ],
+    {
+      markerWidth: 112,
+      markerHeight: 44,
+      horizontalGap: 24,
+      verticalGap: 20,
+      maxItems: 24,
+    },
+  );
+
+  assert.deepEqual(
+    result.map(({ summary }) => summary.id),
+    ['large', 'separate'],
+  );
+});
+
+test('broad cell marker density obeys its explicit screen cap', () => {
+  const result = selectSpatiallySeparatedCellSummaries(
+    Array.from({ length: 30 }, (_, index) => ({
+      summary: cellSummary(`cell-${index}`, index),
+      x: index * 200,
+      y: 100,
+    })),
+    {
+      markerWidth: 112,
+      markerHeight: 44,
+      horizontalGap: 0,
+      verticalGap: 0,
+      maxItems: 12,
+    },
+  );
+
+  assert.equal(result.length, 12);
 });
 
 test('always prioritizes the selected marker during collision filtering', () => {

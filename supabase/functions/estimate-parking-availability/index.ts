@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.109.0';
 
 import { resolveParkingDemandContext } from '../_shared/parking-demand-context.ts';
+import { batchParkingEstimatorValues } from '../_shared/parking-estimator-batches.ts';
 import {
   distanceMeters,
   parkingEstimateContextHash,
@@ -147,24 +148,30 @@ Deno.serve(async (request) => {
     const contextHash = await parkingEstimateContextHash(input);
     const segmentIds = segments.map((segment) => segment.id);
     const now = new Date();
-    const { data: snapshots, error: snapshotError } = await admin
-      .from('parking_availability_estimates')
-      .select(
-        'segment_id,availability_percent,available_spaces,status,confidence,estimator_version,generated_at,valid_until,factor_summary,destination_category,traffic_ratio',
-      )
-      .eq('context_hash', contextHash)
-      .eq('estimator_version', PARKING_ESTIMATOR_VERSION)
-      .in('segment_id', segmentIds);
-    if (snapshotError) {
-      console.error('parking-estimator snapshot-read-failed', {
-        latencyMs: Math.round(performance.now() - startedAt),
-      });
-      return json({ ok: false, code: 'SNAPSHOT_READ_FAILED' }, 500);
+    const snapshots: SnapshotRow[] = [];
+    for (const segmentIdBatch of batchParkingEstimatorValues(segmentIds)) {
+      const { data, error } = await admin
+        .from('parking_availability_estimates')
+        .select(
+          'segment_id,availability_percent,available_spaces,status,confidence,estimator_version,generated_at,valid_until,factor_summary,destination_category,traffic_ratio',
+        )
+        .eq('context_hash', contextHash)
+        .eq('estimator_version', PARKING_ESTIMATOR_VERSION)
+        .in('segment_id', segmentIdBatch);
+      if (error) {
+        console.error('parking-estimator snapshot-read-failed', {
+          databaseCode: error.code,
+          segmentBatchSize: segmentIdBatch.length,
+          latencyMs: Math.round(performance.now() - startedAt),
+        });
+        return json({ ok: false, code: 'SNAPSHOT_READ_FAILED' }, 500);
+      }
+      snapshots.push(...((data ?? []) as SnapshotRow[]));
     }
     const { reusableBySegment: snapshotBySegment } =
       partitionParkingSnapshots(
         segmentIds,
-        (snapshots ?? []) as SnapshotRow[],
+        snapshots,
         PARKING_ESTIMATOR_VERSION,
         now,
       );
@@ -225,17 +232,21 @@ Deno.serve(async (request) => {
         destination_is_open: demand?.destinationIsOpen ?? null,
         traffic_ratio: demand?.trafficRatio ?? null,
       }));
-      const { error: writeError } = await admin
-        .from('parking_availability_estimates')
-        .upsert(rows, {
-          onConflict: 'segment_id,context_hash,estimator_version',
-        });
-      if (writeError) {
-        console.error('parking-estimator snapshot-write-failed', {
-          generatedCount: generated.length,
-          latencyMs: Math.round(performance.now() - startedAt),
-        });
-        return json({ ok: false, code: 'SNAPSHOT_WRITE_FAILED' }, 500);
+      for (const rowBatch of batchParkingEstimatorValues(rows)) {
+        const { error: writeError } = await admin
+          .from('parking_availability_estimates')
+          .upsert(rowBatch, {
+            onConflict: 'segment_id,context_hash,estimator_version',
+          });
+        if (writeError) {
+          console.error('parking-estimator snapshot-write-failed', {
+            databaseCode: writeError.code,
+            generatedCount: generated.length,
+            rowBatchSize: rowBatch.length,
+            latencyMs: Math.round(performance.now() - startedAt),
+          });
+          return json({ ok: false, code: 'SNAPSHOT_WRITE_FAILED' }, 500);
+        }
       }
     }
 

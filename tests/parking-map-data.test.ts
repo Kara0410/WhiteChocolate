@@ -3,7 +3,9 @@ import test from 'node:test';
 
 import {
   normalizeParkingCellSummaryRow,
+  normalizeParkingCellSummaryRows,
   normalizeParkingSegmentSummaryRow,
+  normalizeParkingSegmentSummaryRows,
 } from '../src/utils/parking-map-data-normalizers';
 import { ParkingMapDataCache } from '../src/utils/parking-map-data-cache';
 
@@ -34,6 +36,23 @@ test('cell rows retain stable server IDs without ownership metadata', () => {
   });
   assert.equal(cell?.id, 'coarse:123:456');
   assert.equal('parentZoneIds' in (cell ?? {}), false);
+});
+
+test('city rows are accepted as segment-derived broad aggregates', () => {
+  const [cell] = normalizeParkingCellSummaryRows([
+    {
+      ...aggregateRow,
+      id: 'city:228:122',
+      center_latitude: 48.137,
+      center_longitude: 11.575,
+      min_lng: 11.54,
+      min_lat: 48.1,
+      max_lng: 11.61,
+      max_lat: 48.17,
+      resolution: 'city',
+    },
+  ]);
+  assert.equal(cell.resolution, 'city');
 });
 
 test('segment rows preserve city and source metadata', () => {
@@ -124,6 +143,42 @@ test('invalid service rows are rejected instead of fabricated', () => {
       lon: 11,
     }),
     null,
+  );
+});
+
+test('old remote segment rows fail loudly instead of becoming an empty layer', () => {
+  assert.throws(
+    () =>
+      normalizeParkingSegmentSummaryRows([
+        {
+          id: 'old-remote-segment',
+          parking_zone_id: 'removed-ownership-id',
+          lat: 48.137,
+          lon: 11.575,
+        },
+      ]),
+    /Parking segment summary response is incompatible/,
+  );
+});
+
+test('a malformed row cannot silently disappear from an otherwise valid response', () => {
+  assert.throws(
+    () =>
+      normalizeParkingSegmentSummaryRows([
+        {
+          id: 'valid-segment',
+          city_code: 'munich',
+          lat: 48.137,
+          lon: 11.575,
+        },
+        {
+          id: 'malformed-segment',
+          city_code: 'munich',
+          lat: 200,
+          lon: 11.575,
+        },
+      ]),
+    /Parking segment summary response is incompatible/,
   );
 });
 

@@ -115,7 +115,9 @@ export function normalizeParkingCellSummaryRow(
     minLat === null ||
     maxLng === null ||
     maxLat === null ||
-    (resolution !== 'coarse' && resolution !== 'fine') ||
+    (resolution !== 'city' &&
+      resolution !== 'coarse' &&
+      resolution !== 'fine') ||
     stats === null ||
     minLng >= maxLng ||
     minLat >= maxLat
@@ -223,4 +225,39 @@ export function normalizeParkingSegmentSummaryRow(
     availability,
     updatedAt: parkingStringValue(value.updated_at),
   };
+}
+
+function normalizeResponseRows<T>(
+  rows: unknown[],
+  normalize: (row: unknown) => T | null,
+  responseName: string,
+) {
+  const normalized = rows.flatMap((row) => {
+    const value = normalize(row);
+    return value === null ? [] : [value];
+  });
+
+  if (normalized.length !== rows.length) {
+    throw new Error(
+      `${responseName} response is incompatible with the current client contract.`,
+    );
+  }
+
+  return normalized;
+}
+
+export function normalizeParkingCellSummaryRows(rows: unknown[]) {
+  return normalizeResponseRows(
+    rows,
+    normalizeParkingCellSummaryRow,
+    'Parking cell',
+  );
+}
+
+export function normalizeParkingSegmentSummaryRows(rows: unknown[]) {
+  return normalizeResponseRows(
+    rows,
+    normalizeParkingSegmentSummaryRow,
+    'Parking segment summary',
+  );
 }

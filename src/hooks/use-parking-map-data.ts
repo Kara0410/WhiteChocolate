@@ -281,9 +281,12 @@ export function useParkingMapData(
       signal: AbortSignal,
     ): Promise<CachedStageData> => {
       if (stage === 'city' || stage === 'cell') {
-        const resolution = stage === 'city' || camera.zoom < 14
-          ? 'coarse'
-          : 'fine';
+        const resolution =
+          stage === 'city'
+            ? 'city'
+            : camera.zoom < 14
+              ? 'coarse'
+              : 'fine';
         const cells = await fetchParkingCells({
           bounds: request.bbox,
           contextHash: estimateResponse?.contextHash ?? null,
@@ -368,9 +371,12 @@ export function useParkingMapData(
       preparedRequest?: ParkingClusterRequest,
     ) => {
       const request = preparedRequest ?? createRequest(camera);
-      const resolution = requestedStage === 'cell' && camera.zoom >= 14
-        ? 'fine'
-        : 'coarse';
+      const resolution =
+        requestedStage === 'city'
+          ? 'city'
+          : requestedStage === 'cell' && camera.zoom >= 14
+            ? 'fine'
+            : 'coarse';
       const requestKey = `parking:${requestedStage}:${resolution}:${request.tileKey}:ctx:${estimateResponse?.contextHash ?? 'none'}:v2`;
       const ttlMs =
         requestedStage === 'city'

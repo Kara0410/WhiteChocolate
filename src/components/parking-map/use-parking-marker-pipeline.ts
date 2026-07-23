@@ -7,6 +7,7 @@ import {
   getDisplayedParkingMarkerItems,
   projectMapCoordinate,
   projectSelectedParkingMarkers,
+  selectSpatiallySeparatedCellSummaries,
   selectSpatiallySeparatedMarkers,
 } from '@/components/parking-map/marker-density';
 import type { PlaceSearchResult } from '@/hooks/use-google-place-search';
@@ -25,6 +26,8 @@ import { parkingMapFeatureToResponse } from '@/utils/parking-feature-adapters';
 import { hasValidParkingCoordinates } from '@/utils/parking-map-geo';
 
 const EMPTY_CELL_SUMMARIES: ParkingCellSummary[] = [];
+const CITY_CELL_MARKER_LIMIT = 24;
+const DETAIL_CELL_MARKER_LIMIT = 48;
 
 type UseParkingMarkerPipelineOptions = {
   activeOverlay: string;
@@ -205,7 +208,7 @@ export function useParkingMarkerPipeline({
       return [];
     }
     const margin = CELL_SUMMARY_MARKER_SIZE.width;
-    return cellSummaries.flatMap((summary) => {
+    const projected = cellSummaries.flatMap((summary) => {
       const position = projectMapCoordinate(summary.center, {
         camera: displayCamera,
         height: mapSize.height,
@@ -220,6 +223,16 @@ export function useParkingMarkerPipeline({
         ? []
         : [{ summary, x: position.x, y: position.y }];
     });
+    return selectSpatiallySeparatedCellSummaries(projected, {
+      horizontalGap: semanticStage === 'city' ? 24 : 12,
+      markerHeight: CELL_SUMMARY_MARKER_SIZE.height,
+      markerWidth: CELL_SUMMARY_MARKER_SIZE.width,
+      maxItems:
+        semanticStage === 'city'
+          ? CITY_CELL_MARKER_LIMIT
+          : DETAIL_CELL_MARKER_LIMIT,
+      verticalGap: semanticStage === 'city' ? 20 : 10,
+    });
   }, [
     activeOverlay,
     cellSummaries,
@@ -227,6 +240,7 @@ export function useParkingMarkerPipeline({
     mapSize.height,
     mapSize.width,
     selectedParkingItem,
+    semanticStage,
   ]);
 
   useEffect(() => {

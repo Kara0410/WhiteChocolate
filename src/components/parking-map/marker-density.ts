@@ -1,3 +1,4 @@
+import type { ParkingCellSummary } from '@/types/parking-domain';
 import type {
   ParkingCameraState,
   ParkingClusterResponse,
@@ -32,6 +33,12 @@ export type ProjectedParkingMarker = {
   width: number;
   height: number;
   tier: MarkerSizeTier;
+};
+
+export type ProjectedParkingCellSummary = {
+  summary: ParkingCellSummary;
+  x: number;
+  y: number;
 };
 
 export type ParkingViewportFilterResult = {
@@ -325,6 +332,52 @@ export function selectSpatiallySeparatedMarkers(
   }
 
   return accepted.map(({ item }) => item);
+}
+
+/**
+ * Cell summaries are screen overlays, so the native map cannot resolve their
+ * collisions. Keep the highest-capacity segment-derived cells while
+ * guaranteeing a readable screen-space gap between aggregate markers.
+ */
+export function selectSpatiallySeparatedCellSummaries(
+  cells: ProjectedParkingCellSummary[],
+  options: {
+    horizontalGap: number;
+    markerHeight: number;
+    markerWidth: number;
+    maxItems: number;
+    verticalGap: number;
+  },
+) {
+  const sorted = [...cells].sort(
+    (first, second) =>
+      second.summary.stats.segmentCount -
+        first.summary.stats.segmentCount ||
+      first.summary.id.localeCompare(second.summary.id),
+  );
+  const accepted: ProjectedParkingCellSummary[] = [];
+  const minimumHorizontalDistance =
+    options.markerWidth + options.horizontalGap;
+  const minimumVerticalDistance =
+    options.markerHeight + options.verticalGap;
+
+  for (const candidate of sorted) {
+    if (accepted.length >= options.maxItems) {
+      break;
+    }
+    const overlaps = accepted.some(
+      (existing) =>
+        Math.abs(candidate.x - existing.x) <
+          minimumHorizontalDistance &&
+        Math.abs(candidate.y - existing.y) <
+          minimumVerticalDistance,
+    );
+    if (!overlaps) {
+      accepted.push(candidate);
+    }
+  }
+
+  return accepted;
 }
 
 export function projectParkingMarkers(

@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import {
+  batchParkingEstimatorValues,
+  PARKING_ESTIMATOR_DATABASE_BATCH_SIZE,
+} from '../supabase/functions/_shared/parking-estimator-batches';
 
 import { buildParkingCellRpcCall } from '../src/utils/parking-cell-rpc';
 import {
@@ -78,6 +82,22 @@ test('always builds the authoritative parking cell RPC arguments', () => {
   });
   assert.equal(context.arguments.p_context_hash, 'context-hash');
   assert.equal(withoutContext.arguments.p_context_hash, null);
+});
+
+test('estimator database requests are bounded below URL and payload limits', () => {
+  const values = Array.from({ length: 500 }, (_, index) => `segment-${index}`);
+  const batches = batchParkingEstimatorValues(values);
+
+  assert.equal(PARKING_ESTIMATOR_DATABASE_BATCH_SIZE, 100);
+  assert.deepEqual(
+    batches.map((batch) => batch.length),
+    [100, 100, 100, 100, 100],
+  );
+  assert.deepEqual(batches.flat(), values);
+  assert.throws(
+    () => batchParkingEstimatorValues(values, 0),
+    /positive integer/,
+  );
 });
 
 test('deduplicates identical in-flight requests and reuses the completed result', async () => {

@@ -7,8 +7,8 @@ import type {
 } from '@/types/parking-domain';
 import type { ParkingSegment } from '@/types/parking-segment';
 import {
-  normalizeParkingCellSummaryRow,
-  normalizeParkingSegmentSummaryRow,
+  normalizeParkingCellSummaryRows,
+  normalizeParkingSegmentSummaryRows,
   parkingStringValue,
 } from '@/utils/parking-map-data-normalizers';
 import { buildParkingCellRpcCall } from '@/utils/parking-cell-rpc';
@@ -44,10 +44,7 @@ export async function fetchParkingCells(input: {
   if (error) {
     throw new Error(`Unable to fetch parking cells: ${error.message}`);
   }
-  return (data ?? []).flatMap((row) => {
-    const summary = normalizeParkingCellSummaryRow(row);
-    return summary === null ? [] : [summary];
-  });
+  return normalizeParkingCellSummaryRows(data ?? []);
 }
 
 export async function fetchParkingSegmentSummaries(input: {
@@ -57,7 +54,7 @@ export async function fetchParkingSegmentSummaries(input: {
   assertBounds(input.bounds);
   let query = supabase
     .from('parking_segment_summaries')
-    .select('*')
+    .select('*', { count: 'exact' })
     .gte('lat', input.bounds.minLat)
     .lte('lat', input.bounds.maxLat)
     .gte('lon', input.bounds.minLng)
@@ -67,17 +64,18 @@ export async function fetchParkingSegmentSummaries(input: {
   if (input.signal) {
     query = query.abortSignal(input.signal);
   }
-  const { data, error } = await query;
+  const { count, data, error } = await query;
   if (error) {
     throw new Error(`Unable to fetch parking segments: ${error.message}`);
   }
   const rows = data ?? [];
   return {
-    segments: rows.slice(0, MAX_SEGMENT_SUMMARIES).flatMap((row) => {
-      const summary = normalizeParkingSegmentSummaryRow(row);
-      return summary === null ? [] : [summary];
-    }),
-    truncated: rows.length > MAX_SEGMENT_SUMMARIES,
+    segments: normalizeParkingSegmentSummaryRows(
+      rows.slice(0, MAX_SEGMENT_SUMMARIES),
+    ),
+    truncated:
+      (count !== null && count > rows.length) ||
+      rows.length > MAX_SEGMENT_SUMMARIES,
   };
 }
 
@@ -109,10 +107,7 @@ export async function fetchParkingSegmentDetails(
   if (data === null) {
     return null;
   }
-  const summary = normalizeParkingSegmentSummaryRow(data);
-  if (summary === null) {
-    return null;
-  }
+  const [summary] = normalizeParkingSegmentSummaryRows([data]);
   const description = parkingStringValue(data.regulation_description);
   return {
     ...summary,

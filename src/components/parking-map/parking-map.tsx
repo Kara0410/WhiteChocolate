@@ -59,6 +59,10 @@ import {
   type ParkingSpotWithDistance,
 } from '@/utils/parkingSearch';
 import {
+  canFocusParkingCamera,
+  shouldDeferParkingCameraCommand,
+} from '@/utils/parking-camera-readiness';
+import {
   isParkingContextCurrent,
   parkingSnapshotMatchesAvailableSpots,
   resolveCurrentParkingSelection,
@@ -332,6 +336,8 @@ export function ParkingMap({
   const locationActionRequestIdRef = useRef(0);
   const cameraAnimationUntilRef = useRef(0);
   const pendingCameraCommandRef = useRef<CameraAnimationCommand | null>(null);
+  const pendingUserCameraCommandRef =
+    useRef<CameraAnimationCommand | null>(null);
   const pendingCameraCommandTimerRef =
     useRef<ReturnType<typeof setTimeout> | null>(null);
   const [selectedParkingItem, setSelectedParkingItem] =
@@ -342,7 +348,7 @@ export function ParkingMap({
     useState<SearchParkingRequest | null>(null);
   const [searchSpotsSnapshot, setSearchSpotsSnapshot] =
     useState<SearchSpotsSnapshot | null>(null);
-  const [hasInitialCameraEvent, setHasInitialCameraEvent] = useState(false);
+  const [isNativeMapReady, setIsNativeMapReady] = useState(false);
   const [isMapMoving, setIsMapMoving] = useState(false);
   const { favoriteItems } = useFavoriteParking();
   const {
@@ -547,12 +553,15 @@ export function ParkingMap({
   });
   const canFocusCamera = useCallback(
     () =>
-      mapSize.width > 0 &&
-      mapSize.height > 0 &&
-      hasInitialCameraEvent &&
-      ((Platform.OS === 'android' && googleMapRef.current !== null) ||
-        (Platform.OS === 'ios' && appleMapRef.current !== null)),
-    [hasInitialCameraEvent, mapSize.height, mapSize.width],
+      canFocusParkingCamera({
+        platform: Platform.OS,
+        mapWidth: mapSize.width,
+        mapHeight: mapSize.height,
+        nativeMapReady: isNativeMapReady,
+        googleMapRefReady: googleMapRef.current !== null,
+        appleMapRefReady: appleMapRef.current !== null,
+      }),
+    [isNativeMapReady, mapSize.height, mapSize.width],
   );
 
   const cancelPendingCameraFocus = useCallback(() => {
@@ -563,6 +572,7 @@ export function ParkingMap({
     pendingCoordinateFocusRef.current = null;
     pendingLocationFocusRef.current = null;
     pendingCameraCommandRef.current = null;
+    pendingUserCameraCommandRef.current = null;
 
     if (pendingCameraCommandTimerRef.current) {
       clearTimeout(pendingCameraCommandTimerRef.current);
@@ -587,6 +597,16 @@ export function ParkingMap({
   const runOrQueueCameraCommand = useCallback(
     (command: CameraAnimationCommand) => {
       const run = (nextCommand: CameraAnimationCommand) => {
+        if (
+          shouldDeferParkingCameraCommand({
+            isMapMoving: isMapMovingRef.current,
+            isProgrammaticCameraMove: isProgrammaticCameraMoveRef.current,
+          })
+        ) {
+          pendingUserCameraCommandRef.current = nextCommand;
+          return;
+        }
+
         const now = Date.now();
         const waitMs = cameraAnimationUntilRef.current - now;
 
@@ -780,18 +800,18 @@ export function ParkingMap({
 
       runOrQueueCameraCommand({
         duration: 360,
-        execute: () => {
-          if (
-            !beginProgrammaticCameraMove(
+          execute: () => {
+            if (
+              !beginProgrammaticCameraMove(
               nextCamera.coordinates,
               nextCamera.zoom,
-            )
-          ) {
-            return;
-          }
+              )
+            ) {
+              return;
+            }
 
-          try {
-            const cameraUpdate =
+            try {
+              const cameraUpdate =
               Platform.OS === 'android'
                 ? googleMapRef.current!.setCameraPosition({
                     ...nextCamera,
@@ -1207,11 +1227,15 @@ export function ParkingMap({
         isMapMovingRef.current = false;
         setIsMapMoving(false);
         markerMovementSettleTimerRef.current = null;
+        const pendingCommand = pendingUserCameraCommandRef.current;
+        pendingUserCameraCommandRef.current = null;
+        if (pendingCommand !== null) {
+          runOrQueueCameraCommand(pendingCommand);
+        }
       }, MARKER_MOVEMENT_SETTLE_MS);
 
       if (!hasInitialCameraEventRef.current) {
         hasInitialCameraEventRef.current = true;
-        setHasInitialCameraEvent(true);
         initialCameraSettleTimerRef.current = setTimeout(() => {
           isInitialCameraSettledRef.current = true;
           initialCameraSettleTimerRef.current = null;
@@ -1235,8 +1259,19 @@ export function ParkingMap({
         mapDragSettleTimerRef.current = null;
       }, MAP_DRAG_SETTLE_MS);
     },
-    [onCameraMove, selectedParkingItem],
+    [onCameraMove, runOrQueueCameraCommand, selectedParkingItem],
   );
+
+  const handleAppleMapRef = useCallback((mapView: AppleMaps.MapView | null) => {
+    appleMapRef.current = mapView;
+    if (mapView !== null) {
+      setIsNativeMapReady(true);
+    }
+  }, []);
+
+  const handleGoogleMapLoaded = useCallback(() => {
+    setIsNativeMapReady(true);
+  }, []);
 
   useEffect(
     () => () => {
@@ -1262,6 +1297,7 @@ export function ParkingMap({
         clearTimeout(pendingCameraCommandTimerRef.current);
       }
       pendingCameraCommandRef.current = null;
+      pendingUserCameraCommandRef.current = null;
       pendingFocusItemRef.current = null;
       pendingCoordinateFocusRef.current = null;
       pendingLocationFocusRef.current = null;
@@ -1382,7 +1418,7 @@ export function ParkingMap({
     focusCoordinatesAboveSheetSafely,
     focusLocationSafely,
     focusMarkerAboveSheetSafely,
-    hasInitialCameraEvent,
+    isNativeMapReady,
     mapSize.height,
     mapSize.width,
   ]);
@@ -1404,7 +1440,7 @@ export function ParkingMap({
     <View className="flex-1 overflow-hidden" onLayout={handleLayout}>
       {Platform.OS === 'ios' ? (
         <AppleMaps.View
-          ref={appleMapRef}
+          ref={handleAppleMapRef}
           cameraPosition={cameraPosition}
           onCameraMove={handleCameraMove}
           onMapClick={handleMapPress}
@@ -1417,6 +1453,7 @@ export function ParkingMap({
           ref={googleMapRef}
           cameraPosition={cameraPosition}
           onCameraMove={handleCameraMove}
+          onMapLoaded={handleGoogleMapLoaded}
           onMapClick={handleMapPress}
           properties={GOOGLE_MAP_PROPERTIES}
           style={MAP_VIEW_STYLE}
