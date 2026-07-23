@@ -7,9 +7,11 @@ import type {
 
 export type ParkingSegment = {
   id: string;
-  zoneId: string | null;
+  cityCode: string;
+  sourceRecordId: string | null;
   streetName: string | null;
   sourceAreaName: string | null;
+  sourceGeometry: string | null;
   coordinates: ParkingCoordinates;
   capacity: number | null;
   pricing: ParkingPricing;

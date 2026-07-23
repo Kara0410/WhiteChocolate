@@ -41,7 +41,7 @@ src/
     (tabs)/       Map, Search, Track, Profile, Settings screens
     parking/      Parking detail screen
   components/     Reusable UI (maps, cards, nav bar, filters)
-  constants/      Theme and parking/zone constants
+  constants/      Theme and parking constants
   hooks/          Map and location hooks
   services/       Supabase parking data and clustering
   utils/          Geo + parking helpers

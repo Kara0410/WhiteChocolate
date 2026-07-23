@@ -298,8 +298,6 @@ module.exports = {
         nav: '0 14px 32px rgba(2,6,23,0.28)',
         'warm-panel': '0 12px 28px rgba(25,42,47,0.16)',
         'marker-cell': '0 7px 16px rgba(30,64,175,0.18)',
-        'marker-zone': '0 8px 18px rgba(15,23,42,0.2)',
-        'marker-zone-pressed': '0 9px 20px rgba(37,99,235,0.24)',
         // Map floating controls use these stronger elevations than the base floating recipe.
         'floating-strong': '0 4px 14px rgba(15,23,42,0.16)',
         'floating-deep': '0 4px 14px rgba(15,23,42,0.2)',

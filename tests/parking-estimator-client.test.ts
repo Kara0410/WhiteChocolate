@@ -65,24 +65,19 @@ test('normalizes blank place IDs and enables traffic only with a valid origin', 
   assert.equal(request.includeTraffic, true);
 });
 
-test('selects context-aware and legacy parking cell RPC arguments', () => {
+test('always builds the authoritative parking cell RPC arguments', () => {
   const context = buildParkingCellRpcCall({
     bounds,
     contextHash: ' context-hash ',
     resolution: 'fine',
   });
-  const legacy = buildParkingCellRpcCall({
+  const withoutContext = buildParkingCellRpcCall({
     bounds,
     contextHash: '  ',
     resolution: 'coarse',
   });
-  assert.equal(context.mode, 'context');
-  assert.equal(
-    context.mode === 'context' ? context.arguments.p_context_hash : null,
-    'context-hash',
-  );
-  assert.equal(legacy.mode, 'legacy');
-  assert.equal('p_context_hash' in legacy.arguments, false);
+  assert.equal(context.arguments.p_context_hash, 'context-hash');
+  assert.equal(withoutContext.arguments.p_context_hash, null);
 });
 
 test('deduplicates identical in-flight requests and reuses the completed result', async () => {

@@ -36,7 +36,6 @@ function marker(
     longitude,
     availabilityPercent: 72,
     count,
-    zoneCount: 4,
     spotCount: count,
     totalCapacity: count,
     availableSpots: Math.round(count * 0.72),
@@ -45,7 +44,7 @@ function marker(
     avgPrice: 2,
     bestSpot: {
       id,
-      zoneName: id,
+      label: id,
       availableSpots: 1,
       availabilityPercent: 72,
       pricePerHour: 2,

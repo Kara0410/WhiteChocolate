@@ -119,7 +119,7 @@ const NearestSpotRow = memo(function NearestSpotRow({
     item.availabilityPercent !== null
       ? clampPercentage(item.availabilityPercent)
       : null;
-  const title = item.bestSpot.zoneName || 'Parking Area';
+  const title = item.bestSpot.label || 'Parking Area';
 
   return (
     <Pressable

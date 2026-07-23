@@ -30,7 +30,6 @@ export type ParkingAvailabilityBubbleProps = {
   type: BubbleType;
   percentage: number | null;
   count?: number;
-  zoneCount?: number;
   size?: BubbleSize;
   state?: BubbleState;
   performanceMode?: 'normal' | 'moving';
@@ -133,7 +132,6 @@ function ParkingAvailabilityBubble({
   type,
   percentage,
   count,
-  zoneCount = 0,
   size = 'medium',
   state = 'default',
   performanceMode = 'normal',
@@ -163,7 +161,7 @@ function ParkingAvailabilityBubble({
       : 1;
   const scale = useSharedValue(restingScale);
   const selectionProgress = useSharedValue(selected && !moving ? 1 : 0);
-  const clusterCount = normalizeClusterCount(count ?? zoneCount);
+  const clusterCount = normalizeClusterCount(count ?? 0);
   const label = isCluster
     ? `${formatParkingAreaCount(clusterCount)} parking areas`
     : availabilityKnown

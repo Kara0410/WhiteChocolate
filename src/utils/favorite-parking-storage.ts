@@ -17,7 +17,7 @@ export type StoredFavoriteParkingItem = {
 };
 
 export type StoredFavoriteParkingState = {
-  version: 2;
+  version: 3;
   favorites: StoredFavoriteParkingItem[];
 };
 
@@ -52,7 +52,7 @@ function normalizeStoredBestSpot(value: unknown): ParkingBestSpot | null {
 
   if (
     !isNonEmptyString(value.id) ||
-    typeof value.zoneName !== 'string' ||
+    typeof value.label !== 'string' ||
     !isFiniteNumber(value.availableSpots) ||
     !isFiniteNumber(value.availabilityPercent)
   ) {
@@ -61,7 +61,7 @@ function normalizeStoredBestSpot(value: unknown): ParkingBestSpot | null {
 
   return {
     id: value.id,
-    zoneName: value.zoneName,
+    label: value.label,
     availableSpots: value.availableSpots,
     availabilityPercent: value.availabilityPercent,
     pricePerHour: toNullablePrice(value.pricePerHour),
@@ -123,20 +123,8 @@ export function normalizeStoredFavorite(
     favorite.pricingStatus = value.pricingStatus;
   }
 
-  if (isFiniteNumber(value.zoneCount)) {
-    favorite.zoneCount = value.zoneCount;
-  }
-
   if (isFiniteNumber(value.spotCount)) {
     favorite.spotCount = value.spotCount;
-  }
-
-  if (typeof value.zoneId === 'string' || value.zoneId === null) {
-    favorite.zoneId = value.zoneId;
-  }
-
-  if (typeof value.zoneName === 'string' || value.zoneName === null) {
-    favorite.zoneName = value.zoneName;
   }
 
   if (isFiniteNumber(value.expansionZoom)) {
@@ -198,7 +186,9 @@ export function normalizeStoredFavoriteState(
   value: unknown,
 ): StoredFavoriteParkingState {
   const entries =
-    isRecord(value) && value.version === 2 && Array.isArray(value.favorites)
+    isRecord(value) &&
+    (value.version === 2 || value.version === 3) &&
+    Array.isArray(value.favorites)
       ? value.favorites
       : Array.isArray(value)
         ? value
@@ -210,16 +200,17 @@ export function normalizeStoredFavoriteState(
     const explicitReference = isRecord(entry)
       ? normalizeReference(entry.reference)
       : null;
-    const legacyItem = explicitReference
-      ? normalizeStoredFavorite(
-          isRecord(entry) ? entry.cachedItem : null,
-        )
-      : normalizeStoredFavorite(entry);
+    const cachedItem =
+      explicitReference && isRecord(value) && value.version === 3
+        ? normalizeStoredFavorite(isRecord(entry) ? entry.cachedItem : null)
+        : explicitReference
+          ? null
+          : normalizeStoredFavorite(entry);
     const reference =
       explicitReference ??
-      (legacyItem
+      (cachedItem
         ? {
-            entityId: legacyItem.id,
+            entityId: cachedItem.id,
             entityType: 'segment' as const,
             createdAt: new Date(0).toISOString(),
           }
@@ -228,10 +219,10 @@ export function normalizeStoredFavoriteState(
       continue;
     }
     seenIds.add(reference.entityId);
-    favorites.push({ reference, cachedItem: legacyItem });
+    favorites.push({ reference, cachedItem });
   }
 
-  return { version: 2, favorites };
+  return { version: 3, favorites };
 }
 
 export async function loadStoredFavoriteState(
@@ -239,12 +230,12 @@ export async function loadStoredFavoriteState(
 ): Promise<StoredFavoriteParkingState> {
   const storedValue = await storage.getItem(FAVORITES_STORAGE_KEY);
   if (storedValue === null) {
-    return { version: 2, favorites: [] };
+    return { version: 3, favorites: [] };
   }
   try {
     return normalizeStoredFavoriteState(JSON.parse(storedValue));
   } catch {
-    return { version: 2, favorites: [] };
+    return { version: 3, favorites: [] };
   }
 }
 
@@ -274,7 +265,7 @@ export async function saveFavorites(
 ): Promise<void> {
   await saveFavoriteState(
     {
-      version: 2,
+      version: 3,
       favorites: favorites.map((favorite) => ({
         reference: {
           entityId: favorite.id,

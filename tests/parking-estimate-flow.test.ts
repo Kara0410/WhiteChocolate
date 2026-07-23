@@ -3,15 +3,18 @@ import test from 'node:test';
 
 import { parkingSegmentToMapFeature } from '../src/services/parking-feature-clustering';
 import type { ParkingSegmentSummary } from '../src/types/parking-domain';
-import { parkingMapFeatureToLegacyResponse } from '../src/utils/parking-feature-adapters';
+import { parkingMapFeatureToResponse } from '../src/utils/parking-feature-adapters';
 import { mergeParkingAvailabilityEstimates } from '../src/utils/parking-estimates';
 
 function inventorySegment(): ParkingSegmentSummary {
   return {
     id: 'segment-1',
-    zoneId: '7',
+    cityCode: 'munich',
+    sourceRecordId: 'source-1',
     streetName: 'Test Street',
     sourceAreaName: 'Altstadt',
+    sourceClassification: 'street-parking',
+    sourceGeometry: 'LINESTRING (0 0, 1 1)',
     coordinates: { latitude: 48.137, longitude: 11.575 },
     capacity: 20,
     pricing: {
@@ -34,7 +37,7 @@ function inventorySegment(): ParkingSegmentSummary {
   };
 }
 
-test('destination estimate reaches marker/detail compatibility data with metadata', () => {
+test('destination estimate reaches marker and detail data with metadata', () => {
   const [segment] = mergeParkingAvailabilityEstimates(
     [inventorySegment()],
     [
@@ -57,7 +60,7 @@ test('destination estimate reaches marker/detail compatibility data with metadat
       },
     ],
   );
-  const marker = parkingMapFeatureToLegacyResponse(
+  const marker = parkingMapFeatureToResponse(
     parkingSegmentToMapFeature(segment),
   );
   assert.ok(marker);
@@ -70,7 +73,7 @@ test('destination estimate reaches marker/detail compatibility data with metadat
 });
 
 test('unknown availability stays null and uses a neutral marker state', () => {
-  const marker = parkingMapFeatureToLegacyResponse(
+  const marker = parkingMapFeatureToResponse(
     parkingSegmentToMapFeature(inventorySegment()),
   );
   assert.ok(marker);
@@ -124,7 +127,7 @@ test('a percentage-only estimate remains visible when capacity is unavailable', 
     'heuristic-v2.1-pessimistic',
   );
 
-  const marker = parkingMapFeatureToLegacyResponse(
+  const marker = parkingMapFeatureToResponse(
     parkingSegmentToMapFeature(segment),
   );
   assert.equal(marker?.availabilityPercent, 18);

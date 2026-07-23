@@ -29,7 +29,7 @@ function favorite(id: string): ParkingClusterResponse {
     avgPrice: 3,
     bestSpot: {
       id: `${id}-best`,
-      zoneName: 'Altstadt',
+      label: 'Altstadt',
       availableSpots: 12,
       availabilityPercent: 60,
       pricePerHour: 2.5,
@@ -81,7 +81,7 @@ test('omits invalid optional fields but keeps the favorite', () => {
       minPrice: 'free',
       walkingCategory: 'sprint',
       expansionZoom: 'high',
-      zoneName: 'Altstadt',
+      label: 'Altstadt',
       distanceToDestination: 250,
     },
   ]);
@@ -90,7 +90,7 @@ test('omits invalid optional fields but keeps the favorite', () => {
   assert.equal(result[0].minPrice, null);
   assert.equal(result[0].walkingCategory, undefined);
   assert.equal(result[0].expansionZoom, undefined);
-  assert.equal(result[0].zoneName, 'Altstadt');
+  assert.equal(result[0].bestSpot.label, 'Altstadt');
   assert.equal(result[0].distanceToDestination, 250);
 });
 
@@ -124,7 +124,7 @@ test('version 2 storage retains references without requiring cached data', async
   const storage = createMemoryStorage();
   await saveFavoriteState(
     {
-      version: 2,
+      version: 3,
       favorites: [
         {
           reference: {

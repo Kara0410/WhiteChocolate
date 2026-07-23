@@ -30,7 +30,7 @@ function sameBestSpot(
 ) {
   return (
     first.id === second.id &&
-    first.zoneName === second.zoneName &&
+    first.label === second.label &&
     first.availableSpots === second.availableSpots &&
     first.availabilityPercent === second.availabilityPercent &&
     first.pricePerHour === second.pricePerHour
@@ -53,7 +53,6 @@ export function hasSameParkingSelectionData(
     first.estimateValidUntil === second.estimateValidUntil &&
     first.estimatorVersion === second.estimatorVersion &&
     first.count === second.count &&
-    first.zoneCount === second.zoneCount &&
     first.spotCount === second.spotCount &&
     first.totalCapacity === second.totalCapacity &&
     first.availableSpots === second.availableSpots &&
@@ -61,8 +60,6 @@ export function hasSameParkingSelectionData(
     first.minPrice === second.minPrice &&
     first.avgPrice === second.avgPrice &&
     first.pricingStatus === second.pricingStatus &&
-    first.zoneId === second.zoneId &&
-    first.zoneName === second.zoneName &&
     first.expansionZoom === second.expansionZoom &&
     first.distanceToDestination === second.distanceToDestination &&
     first.walkingCategory === second.walkingCategory &&

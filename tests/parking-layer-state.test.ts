@@ -10,11 +10,29 @@ import type { ParkingMapFeature } from '../src/types/parking-domain';
 function feature(id: string): ParkingMapFeature {
   return {
     id,
-    kind: 'zone',
+    kind: 'cell',
     coordinates: { latitude: 48.13, longitude: 11.58 },
-    parentId: null,
-    zoneId: id,
-    zoneName: id,
+    cell: {
+      kind: 'cell-summary',
+      id,
+      center: { latitude: 48.13, longitude: 11.58 },
+      bounds: { minLng: 11.57, minLat: 48.12, maxLng: 11.59, maxLat: 48.14 },
+      resolution: 'coarse',
+      stats: {
+        segmentCount: 1,
+        totalCapacity: null,
+        availableCapacity: null,
+        availabilityPercent: null,
+        availabilityStatus: 'unknown',
+        pricing: {
+          minimumHourlyRate: null,
+          maximumHourlyRate: null,
+          hasFreeParking: false,
+          hasUnknownPricing: true,
+        },
+        updatedAt: null,
+      },
+    },
     stats: {
       segmentCount: 1,
       totalCapacity: null,
@@ -33,8 +51,8 @@ function feature(id: string): ParkingMapFeature {
 }
 
 const initial: ParkingLayerState = {
-  activeStage: 'zone',
-  visibleStage: 'zone',
+  activeStage: 'cell',
+  visibleStage: 'cell',
   visibleFeatures: [feature('old')],
   outgoingFeatures: [],
   status: 'idle',
@@ -45,11 +63,11 @@ const initial: ParkingLayerState = {
 test('outgoing features remain visible while the next stage loads', () => {
   const loading = parkingLayerReducer(initial, {
     type: 'request',
-    stage: 'cell',
-    requestKey: 'cell:new',
+    stage: 'segmentCluster',
+    requestKey: 'segment-cluster:new',
   });
   assert.deepEqual(loading.visibleFeatures, initial.visibleFeatures);
-  assert.equal(loading.visibleStage, 'zone');
+  assert.equal(loading.visibleStage, 'cell');
   assert.equal(loading.status, 'refreshing');
 });
 

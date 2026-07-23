@@ -10,16 +10,6 @@ export type ParkingBoundingBox = {
   maxLat: number;
 };
 
-export type GeoJsonPolygon = {
-  type: 'Polygon';
-  coordinates: number[][][];
-};
-
-export type GeoJsonMultiPolygon = {
-  type: 'MultiPolygon';
-  coordinates: number[][][][];
-};
-
 export type ParkingAvailability =
   | {
       status: 'estimated';
@@ -91,26 +81,14 @@ export type ParkingAggregateStats = {
   updatedAt: string | null;
 };
 
-export type ParkingAdministrativeZoneStatus =
-  | 'active'
-  | 'planned'
-  | 'inactive'
-  | 'unknown';
-
-export type ParkingAdministrativeZone = {
-  id: string;
-  name: string;
-  status: ParkingAdministrativeZoneStatus;
-  geometry: GeoJsonPolygon | GeoJsonMultiPolygon;
-  representativePoint: ParkingCoordinates;
-  updatedAt: string | null;
-};
-
 export type ParkingSegmentSummary = {
   id: string;
-  zoneId: string | null;
+  cityCode: string;
+  sourceRecordId: string | null;
   streetName: string | null;
   sourceAreaName: string | null;
+  sourceClassification: string | null;
+  sourceGeometry: string | null;
   coordinates: ParkingCoordinates;
   capacity: number | null;
   pricing: ParkingPricing;
@@ -126,20 +104,11 @@ export type ParkingSpace = {
   updatedAt: string | null;
 };
 
-export type ParkingZoneSummary = {
-  kind: 'zone-summary';
-  zoneId: string;
-  zoneName: string;
-  representativePoint: ParkingCoordinates;
-  stats: ParkingAggregateStats;
-};
-
 export type ParkingCellResolution = 'coarse' | 'fine';
 
 export type ParkingCellSummary = {
   kind: 'cell-summary';
   id: string;
-  parentZoneIds: string[];
   center: ParkingCoordinates;
   bounds: ParkingBoundingBox;
   resolution: ParkingCellResolution;
@@ -147,7 +116,6 @@ export type ParkingCellSummary = {
 };
 
 export type ParkingMapFeatureKind =
-  | 'zone'
   | 'cell'
   | 'segment-cluster'
   | 'segment'
@@ -158,13 +126,6 @@ export type ParkingMapFeatureBase = {
   kind: ParkingMapFeatureKind;
   coordinates: ParkingCoordinates;
   stats: ParkingAggregateStats;
-  parentId: string | null;
-};
-
-export type ParkingZoneMapFeature = ParkingMapFeatureBase & {
-  kind: 'zone';
-  zoneId: string;
-  zoneName: string;
 };
 
 export type ParkingCellMapFeature = ParkingMapFeatureBase & {
@@ -175,7 +136,6 @@ export type ParkingCellMapFeature = ParkingMapFeatureBase & {
 export type ParkingSegmentClusterMapFeature = ParkingMapFeatureBase & {
   kind: 'segment-cluster';
   expansionZoom: number;
-  zoneId: string | null;
 };
 
 export type ParkingSegmentMapFeature = ParkingMapFeatureBase & {
@@ -189,7 +149,6 @@ export type ParkingSpaceMapFeature = ParkingMapFeatureBase & {
 };
 
 export type ParkingMapFeature =
-  | ParkingZoneMapFeature
   | ParkingCellMapFeature
   | ParkingSegmentClusterMapFeature
   | ParkingSegmentMapFeature

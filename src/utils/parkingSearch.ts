@@ -14,17 +14,9 @@ type GetNearestParkingSpotsOptions = {
   limit?: number;
 };
 
-type GetCuratedNearbyParkingSpotsOptions = GetNearestParkingSpotsOptions & {
-  groupDuplicates?: boolean;
-};
+type GetCuratedNearbyParkingSpotsOptions = GetNearestParkingSpotsOptions;
 
 export const SEARCH_NEARBY_RESULT_LIMIT = 25;
-/**
- * Two spots this close together that share a zone (or both lack zone info)
- * are treated as segments of the same physical parking option; only the
- * best-ranked one is kept.
- */
-const DUPLICATE_GROUP_RADIUS_METERS = 30;
 /**
  * Spots whose distance from the destination differs by less than this are
  * considered "equally close", letting availability and price break the tie
@@ -68,10 +60,6 @@ export function getNearestParkingSpots({
     .slice(0, limit);
 }
 
-function getSpotGroupKey(spot: ParkingClusterResponse) {
-  return spot.zoneId ?? spot.zoneName ?? spot.bestSpot.zoneName ?? null;
-}
-
 function getEffectivePrice(spot: ParkingClusterResponse) {
   if (spot.pricingStatus === 'free') {
     return Number.NEGATIVE_INFINITY;
@@ -108,43 +96,22 @@ function compareCuratedSpots(
   return distanceGap;
 }
 
-function isDuplicateNearbyOption(
-  candidate: ParkingSpotWithDistance,
-  accepted: ParkingSpotWithDistance,
-) {
-  const candidateKey = getSpotGroupKey(candidate);
-  const acceptedKey = getSpotGroupKey(accepted);
-  if (
-    candidateKey !== null &&
-    acceptedKey !== null &&
-    candidateKey !== acceptedKey
-  ) {
-    return false;
-  }
-
-  return (
-    haversineDistanceMeters(candidate, accepted) <=
-    DUPLICATE_GROUP_RADIUS_METERS
-  );
-}
-
 /**
  * Ranks segments for the nearby parking-area experience: primarily by
  * distance to the destination, with availability and free/cheaper parking
- * breaking ties between equally close options, and near-identical street
- * segments collapsed to their best representative.
+ * breaking ties between equally close options. Every source segment remains
+ * independently selectable.
  *
  * TODO(server): the ideal implementation is a Supabase/PostGIS RPC —
  * ST_DWithin with a 300–500 m radius (expanding when too few rows match),
  * KNN ordering via the `<->` operator on the segment geometry, and
- * server-side grouping per zone. Client-side ranking over the viewport
- * fetch is sufficient while results stay within the 2000-segment cap.
+ * stable segment IDs. Client-side ranking over the viewport fetch is
+ * sufficient while results stay within the 2000-segment cap.
  */
 export function getCuratedNearbyParkingSpots({
   origin,
   spots,
   limit = SEARCH_NEARBY_RESULT_LIMIT,
-  groupDuplicates = true,
 }: GetCuratedNearbyParkingSpotsOptions): ParkingSpotWithDistance[] {
   if (!hasValidCoordinates(origin)) {
     return [];
@@ -160,23 +127,5 @@ export function getCuratedNearbyParkingSpots({
     }))
     .sort(compareCuratedSpots);
 
-  if (!groupDuplicates) {
-    return ranked.slice(0, limit);
-  }
-
-  const curated: ParkingSpotWithDistance[] = [];
-  for (const candidate of ranked) {
-    if (curated.length >= limit) {
-      break;
-    }
-    if (
-      !curated.some((accepted) =>
-        isDuplicateNearbyOption(candidate, accepted),
-      )
-    ) {
-      curated.push(candidate);
-    }
-  }
-
-  return curated;
+  return ranked.slice(0, limit);
 }

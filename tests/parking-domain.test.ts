@@ -11,9 +11,12 @@ function segment(
 ): ParkingSegmentSummary {
   return {
     id,
-    zoneId: 'zone-1',
+    cityCode: 'munich',
+    sourceRecordId: id,
     streetName: 'Test Street',
     sourceAreaName: null,
+    sourceClassification: null,
+    sourceGeometry: null,
     coordinates: { latitude: 48.13, longitude: 11.58 },
     capacity: 10,
     pricing: {

@@ -9,16 +9,13 @@ export type WalkingCategory = 'close' | 'acceptable' | 'far';
 
 export type ParkingBestSpot = {
   id: string;
-  zoneName: string;
+  label: string;
   availableSpots: number | null;
   availabilityPercent: number | null;
   pricePerHour: number | null;
 };
 
-/**
- * @deprecated Compatibility projection for legacy sheets and lists. New map
- * fetching and rendering use ParkingMapFeature discriminants instead.
- */
+/** Marker, list, and sheet projection for a parking segment or segment cluster. */
 export type ParkingClusterResponse = {
   id: string;
   type: 'cluster' | 'spot';
@@ -31,7 +28,6 @@ export type ParkingClusterResponse = {
   estimateValidUntil?: string | null;
   estimatorVersion?: string | null;
   count: number;
-  zoneCount?: number;
   spotCount?: number;
   totalCapacity: number;
   availableSpots: number | null;
@@ -40,8 +36,6 @@ export type ParkingClusterResponse = {
   avgPrice: number | null;
   pricingStatus?: 'free' | 'paid' | 'unknown';
   bestSpot: ParkingBestSpot;
-  zoneId?: string | null;
-  zoneName?: string | null;
   expansionZoom?: number;
   distanceToDestination?: number;
   walkingCategory?: WalkingCategory;

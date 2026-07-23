@@ -2,16 +2,13 @@ import type { ParkingCameraState } from '@/types/parking-map';
 
 export type ParkingSemanticZoomStage =
   | 'city'
-  | 'zone'
   | 'cell'
   | 'segmentCluster'
   | 'segment';
 
 export const PARKING_SEMANTIC_ZOOM_THRESHOLDS = {
-  zoneEnter: 11.8,
-  cityReturn: 11.4,
-  cellEnter: 13.2,
-  zoneReturn: 12.8,
+  cellEnter: 12.2,
+  cityReturn: 11.8,
   segmentClusterEnter: 14.7,
   cellReturn: 14.3,
   segmentEnter: 16.2,
@@ -45,7 +42,7 @@ function stageForZoom(zoom: number): ParkingSemanticZoomStage {
   if (zoom >= thresholds.cellEnter) {
     return 'cell';
   }
-  return zoom >= thresholds.zoneEnter ? 'zone' : 'city';
+  return 'city';
 }
 
 export function deriveParkingSemanticZoomStage(
@@ -63,15 +60,10 @@ export function deriveParkingSemanticZoomStage(
   const thresholds = PARKING_SEMANTIC_ZOOM_THRESHOLDS;
   switch (previousStage) {
     case 'city':
-      return zoom < thresholds.zoneEnter ? 'city' : stageForZoom(zoom);
-    case 'zone':
+      return zoom < thresholds.cellEnter ? 'city' : stageForZoom(zoom);
+    case 'cell':
       if (zoom <= thresholds.cityReturn) {
         return 'city';
-      }
-      return zoom < thresholds.cellEnter ? 'zone' : stageForZoom(zoom);
-    case 'cell':
-      if (zoom <= thresholds.zoneReturn) {
-        return zoom <= thresholds.cityReturn ? 'city' : 'zone';
       }
       return zoom < thresholds.segmentClusterEnter
         ? 'cell'
@@ -81,7 +73,7 @@ export function deriveParkingSemanticZoomStage(
         if (zoom <= thresholds.cityReturn) {
           return 'city';
         }
-        return zoom <= thresholds.zoneReturn ? 'zone' : 'cell';
+        return 'cell';
       }
       return zoom < thresholds.segmentEnter
         ? 'segmentCluster'
@@ -92,9 +84,6 @@ export function deriveParkingSemanticZoomStage(
       }
       if (zoom <= thresholds.cityReturn) {
         return 'city';
-      }
-      if (zoom <= thresholds.zoneReturn) {
-        return 'zone';
       }
       return zoom <= thresholds.cellReturn ? 'cell' : 'segmentCluster';
   }

@@ -1,17 +1,14 @@
 import { supabase } from '@/lib/supabase';
-import { fetchParkingSegmentById } from '@/services/parkingSegments';
 import type {
   ParkingBoundingBox,
   ParkingCellResolution,
   ParkingCellSummary,
   ParkingSegmentSummary,
-  ParkingZoneSummary,
 } from '@/types/parking-domain';
 import type { ParkingSegment } from '@/types/parking-segment';
 import {
   normalizeParkingCellSummaryRow,
   normalizeParkingSegmentSummaryRow,
-  normalizeParkingZoneSummaryRow,
   parkingStringValue,
 } from '@/utils/parking-map-data-normalizers';
 import { buildParkingCellRpcCall } from '@/utils/parking-cell-rpc';
@@ -31,23 +28,6 @@ function assertBounds(bounds: ParkingBoundingBox) {
   }
 }
 
-export async function fetchParkingZoneSummaries(options?: {
-  signal?: AbortSignal;
-}): Promise<ParkingZoneSummary[]> {
-  let query = supabase.from('parking_zone_summaries').select('*').order('zone_name');
-  if (options?.signal) {
-    query = query.abortSignal(options.signal);
-  }
-  const { data, error } = await query;
-  if (error) {
-    throw new Error(`Unable to fetch parking zone summaries: ${error.message}`);
-  }
-  return (data ?? []).flatMap((row) => {
-    const summary = normalizeParkingZoneSummaryRow(row);
-    return summary === null ? [] : [summary];
-  });
-}
-
 export async function fetchParkingCells(input: {
   bounds: ParkingBoundingBox;
   contextHash: string | null;
@@ -56,10 +36,7 @@ export async function fetchParkingCells(input: {
 }): Promise<ParkingCellSummary[]> {
   assertBounds(input.bounds);
   const rpcCall = buildParkingCellRpcCall(input);
-  let query =
-    rpcCall.mode === 'legacy'
-      ? supabase.rpc('fetch_parking_cells', rpcCall.arguments)
-      : supabase.rpc('fetch_parking_cells', rpcCall.arguments);
+  let query = supabase.rpc('fetch_parking_cells', rpcCall.arguments);
   if (input.signal) {
     query = query.abortSignal(input.signal);
   }
@@ -127,10 +104,6 @@ export async function fetchParkingSegmentDetails(
   }
   const { data, error } = await query.maybeSingle();
   if (error) {
-    // The detail path remains usable during a backend-first rollout.
-    if (error.code === '42P01' || error.code === 'PGRST205') {
-      return fetchParkingSegmentById(id);
-    }
     throw new Error(`Unable to fetch parking segment details: ${error.message}`);
   }
   if (data === null) {
@@ -149,6 +122,6 @@ export async function fetchParkingSegmentDetails(
       name: parkingStringValue(data.regulation_name),
       maximumStayMinutes: maximumStayMinutes(description),
     },
-    geoportalClass: parkingStringValue(data.geoportal_class),
+    geoportalClass: summary.sourceClassification,
   };
 }

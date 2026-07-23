@@ -9,6 +9,8 @@ import type { ParkingSegment } from '@/types/parking-segment';
 export type ParkingSegmentSelectRow = Pick<
   ParkingSegmentRow,
   | 'id'
+  | 'city_code'
+  | 'FID'
   | 'strasse'
   | 'angebot'
   | 'parkregel_beschreibung'
@@ -18,10 +20,9 @@ export type ParkingSegmentSelectRow = Pick<
   | 'geoportal_class'
   | 'lat'
   | 'lon'
+  | 'shape'
 > &
-  Partial<
-    Pick<ParkingSegmentRow, 'parking_zone_id' | 'updated_at'>
-  >;
+  Partial<Pick<ParkingSegmentRow, 'updated_at'>>;
 
 function cleanText(value: unknown) {
   const cleaned = typeof value === 'string' ? value.trim() : '';
@@ -73,20 +74,19 @@ export function parkingSegmentFromRow(
   row: ParkingSegmentSelectRow,
 ): ParkingSegment | null {
   const id = cleanText(row.id);
+  const cityCode = cleanText(row.city_code);
 
-  if (!id || !hasValidCoordinates(row)) {
+  if (!id || !cityCode || !hasValidCoordinates(row)) {
     return null;
   }
 
   return {
     id,
-    zoneId:
-      typeof row.parking_zone_id === 'number' &&
-      Number.isFinite(row.parking_zone_id)
-        ? String(row.parking_zone_id)
-        : null,
+    cityCode,
+    sourceRecordId: cleanText(row.FID),
     streetName: cleanText(row.strasse),
     sourceAreaName: cleanText(row.prm_name),
+    sourceGeometry: cleanText(row.shape),
     coordinates: { latitude: row.lat, longitude: row.lon },
     capacity:
       typeof row.angebot === 'number' && Number.isFinite(row.angebot)
@@ -180,9 +180,12 @@ export function parkingSegmentToSummary(
 ): ParkingSegmentSummary {
   return {
     id: segment.id,
-    zoneId: segment.zoneId,
+    cityCode: segment.cityCode,
+    sourceRecordId: segment.sourceRecordId,
     streetName: segment.streetName,
     sourceAreaName: segment.sourceAreaName,
+    sourceClassification: segment.geoportalClass,
+    sourceGeometry: segment.sourceGeometry,
     coordinates: segment.coordinates,
     capacity: segment.capacity,
     pricing: segment.pricing,

@@ -23,9 +23,7 @@ import {
 import {
   fetchParkingCells,
   fetchParkingSegmentSummaries,
-  fetchParkingZoneSummaries,
 } from '@/services/parkingMapData';
-import { fetchParkingSegments } from '@/services/parkingSegments';
 import type {
   ParkingBoundingBox,
   ParkingEstimateDestination,
@@ -39,7 +37,6 @@ import type {
   ParkingCoordinates,
   ParkingMapSize,
 } from '@/types/parking-map';
-import type { ParkingZonePolygon } from '@/types/parking-zone';
 import {
   deriveCameraViewportDeltas,
   getParkingClusterRequest,
@@ -50,17 +47,14 @@ import { parkingMapDataCache } from '@/utils/parking-map-data-cache';
 import { parkingLayerReducer } from '@/utils/parking-layer-state';
 import {
   cellSummaryToMapFeature,
-  parkingMapFeatureToLegacyResponse,
-  zoneSummaryToMapFeature,
+  parkingMapFeatureToResponse,
 } from '@/utils/parking-feature-adapters';
-import { parkingSegmentToSummary } from '@/utils/parking-segments';
-import { createParkingZoneMatcher } from '@/utils/parking-zones';
 import { logAppError, normalizeAppError } from '@/utils/app-errors';
 import { LatestParkingEstimatorRequest } from '@/utils/parking-estimator-request';
 
 const CAMERA_DEBOUNCE_MS = 350;
 const LAYER_TRANSITION_MS = 200;
-const STATIC_ZONE_TTL_MS = 10 * 60 * 1000;
+const CITY_CELL_TTL_MS = 2 * 60 * 1000;
 const CELL_TTL_MS = 60 * 1000;
 const SEGMENT_TTL_MS = 30 * 1000;
 const TRAFFIC_ESTIMATES_ENABLED =
@@ -93,7 +87,6 @@ export function useParkingMapData(
   origin?: ParkingCoordinates | null,
   mapSize?: ParkingMapSize,
   isAutomaticFetchEnabled = true,
-  parkingZonePolygons: ParkingZonePolygon[] = [],
 ) {
   const [currentRegion, setCurrentRegion] = useState(initialCamera);
   const [displayCamera, setDisplayCamera] = useState(initialCamera);
@@ -136,10 +129,6 @@ export function useParkingMapData(
     new Map<string, { expiresAt: number; requestedAt: Date }>(),
   );
   const activeRequestKeyRef = useRef<string | null>(null);
-  const parkingZoneMatcher = useMemo(
-    () => createParkingZoneMatcher(parkingZonePolygons),
-    [parkingZonePolygons],
-  );
   const destinationKey = useMemo(
     () =>
       destination
@@ -291,19 +280,10 @@ export function useParkingMapData(
       request: ParkingClusterRequest,
       signal: AbortSignal,
     ): Promise<CachedStageData> => {
-      if (stage === 'city' || stage === 'zone') {
-        const summaries = await fetchParkingZoneSummaries({ signal });
-        return {
-          features: summaries.map(zoneSummaryToMapFeature),
-          segments: [],
-          bounds: null,
-          contextHash: null,
-          truncated: false,
-        };
-      }
-
-      if (stage === 'cell') {
-        const resolution = camera.zoom < 14 ? 'coarse' : 'fine';
+      if (stage === 'city' || stage === 'cell') {
+        const resolution = stage === 'city' || camera.zoom < 14
+          ? 'coarse'
+          : 'fine';
         const cells = await fetchParkingCells({
           bounds: request.bbox,
           contextHash: estimateResponse?.contextHash ?? null,
@@ -321,66 +301,12 @@ export function useParkingMapData(
 
       let segments: ParkingSegmentSummary[];
       let truncated: boolean;
-      try {
-        const response = await fetchParkingSegmentSummaries({
-          bounds: request.bbox,
-          signal,
-        });
-        segments = response.segments;
-        truncated = response.truncated;
-        if (__DEV__ && parkingZonePolygons.length > 0) {
-          const sample = segments.slice(0, 100);
-          let matchingAssignments = 0;
-          let mismatchedAssignments = 0;
-          for (const segment of sample) {
-            const fallback = parkingZoneMatcher(
-              segment.coordinates,
-              segment.sourceAreaName,
-            );
-            if ((fallback?.zoneId ?? null) === segment.zoneId) {
-              matchingAssignments += 1;
-            } else {
-              mismatchedAssignments += 1;
-            }
-          }
-          console.debug('[parking-map] zone assignment audit', {
-            matchingAssignments,
-            mismatchedAssignments,
-            sampleSize: sample.length,
-            serverUnassigned: sample.filter(
-              (segment) => segment.zoneId === null,
-            ).length,
-          });
-        }
-      } catch (error) {
-        if (signal.aborted) {
-          throw error;
-        }
-        // Temporary deployment fallback until the server migration is applied.
-        // It is intentionally limited to detailed stages and logs assignment
-        // diagnostics without restoring point-in-polygon work at broad zooms.
-        const fallback = await fetchParkingSegments(request.bbox);
-        segments = fallback.segments.map((segment) => {
-          const summary = parkingSegmentToSummary(segment);
-          if (summary.zoneId !== null) {
-            return summary;
-          }
-          const match = parkingZoneMatcher(
-            summary.coordinates,
-            summary.sourceAreaName,
-          );
-          return { ...summary, zoneId: match?.zoneId ?? null };
-        });
-        truncated = fallback.truncated;
-        if (__DEV__) {
-          console.warn('[parking-map] using legacy segment assignment fallback', {
-            assigned: segments.filter((segment) => segment.zoneId !== null)
-              .length,
-            reason: error instanceof Error ? error.message : String(error),
-            segments: segments.length,
-          });
-        }
-      }
+      const response = await fetchParkingSegmentSummaries({
+        bounds: request.bbox,
+        signal,
+      });
+      segments = response.segments;
+      truncated = response.truncated;
 
       if (estimateResponse) {
         segments = mergeParkingAvailabilityEstimates(
@@ -416,7 +342,6 @@ export function useParkingMapData(
                 availabilityStatus: segment.availability.status,
                 updatedAt: segment.updatedAt,
               },
-              parentId: segment.zoneId,
               segment,
             }))
           : clusterParkingSegmentFeatures({
@@ -433,7 +358,7 @@ export function useParkingMapData(
         truncated,
       };
     },
-    [estimateResponse, parkingZoneMatcher, parkingZonePolygons.length],
+    [estimateResponse],
   );
 
   const loadForCamera = useCallback(
@@ -446,13 +371,10 @@ export function useParkingMapData(
       const resolution = requestedStage === 'cell' && camera.zoom >= 14
         ? 'fine'
         : 'coarse';
-      const requestKey =
-        requestedStage === 'city' || requestedStage === 'zone'
-          ? `parking:${requestedStage}:zones:v1`
-          : `parking:${requestedStage}:${resolution}:${request.tileKey}:ctx:${estimateResponse?.contextHash ?? 'legacy'}:v1`;
+      const requestKey = `parking:${requestedStage}:${resolution}:${request.tileKey}:ctx:${estimateResponse?.contextHash ?? 'none'}:v2`;
       const ttlMs =
-        requestedStage === 'city' || requestedStage === 'zone'
-          ? STATIC_ZONE_TTL_MS
+        requestedStage === 'city'
+          ? CITY_CELL_TTL_MS
           : requestedStage === 'cell'
             ? CELL_TTL_MS
             : SEGMENT_TTL_MS;
@@ -557,8 +479,7 @@ export function useParkingMapData(
   useEffect(() => {
     if (
       !isAutomaticFetchEnabled &&
-      semanticStage !== 'city' &&
-      semanticStage !== 'zone'
+      semanticStage !== 'city'
     ) {
       return;
     }
@@ -698,7 +619,7 @@ export function useParkingMapData(
   const visibleSpots = useMemo<ParkingClusterResponse[]>(
     () =>
       loadedSegments.flatMap((segment) => {
-        const legacy = parkingMapFeatureToLegacyResponse({
+        const response = parkingMapFeatureToResponse({
           id: segment.id,
           kind: 'segment',
           coordinates: segment.coordinates,
@@ -722,10 +643,9 @@ export function useParkingMapData(
             availabilityStatus: segment.availability.status,
             updatedAt: segment.updatedAt,
           },
-          parentId: segment.zoneId,
           segment,
         });
-        return legacy === null ? [] : [legacy];
+        return response === null ? [] : [response];
       }),
     [loadedSegments],
   );

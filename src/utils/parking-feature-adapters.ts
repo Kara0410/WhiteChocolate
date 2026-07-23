@@ -2,23 +2,8 @@ import type {
   ParkingCellSummary,
   ParkingMapFeature,
   ParkingSegmentSummary,
-  ParkingZoneSummary,
 } from '@/types/parking-domain';
 import type { ParkingClusterResponse } from '@/types/parking-map';
-
-export function zoneSummaryToMapFeature(
-  summary: ParkingZoneSummary,
-): ParkingMapFeature {
-  return {
-    id: `zone:${summary.zoneId}`,
-    kind: 'zone',
-    coordinates: summary.representativePoint,
-    stats: summary.stats,
-    parentId: null,
-    zoneId: summary.zoneId,
-    zoneName: summary.zoneName,
-  };
-}
 
 export function cellSummaryToMapFeature(
   cell: ParkingCellSummary,
@@ -28,7 +13,6 @@ export function cellSummaryToMapFeature(
     kind: 'cell',
     coordinates: cell.center,
     stats: cell.stats,
-    parentId: cell.parentZoneIds[0] ?? null,
     cell,
   };
 }
@@ -41,8 +25,8 @@ function segmentTitle(segment: ParkingSegmentSummary) {
   );
 }
 
-/** Compatibility adapter for sheets that have not yet moved off the legacy shape. */
-export function parkingMapFeatureToLegacyResponse(
+/** Projects a segment map feature into the marker and sheet response shape. */
+export function parkingMapFeatureToResponse(
   feature: ParkingMapFeature,
 ): ParkingClusterResponse | null {
   if (feature.kind !== 'segment' && feature.kind !== 'segment-cluster') {
@@ -78,7 +62,6 @@ export function parkingMapFeatureToLegacyResponse(
         ? segment.availability.estimatorVersion ?? null
         : null,
     count: feature.stats.segmentCount,
-    zoneCount: feature.parentId === null ? 0 : 1,
     spotCount: feature.stats.segmentCount,
     totalCapacity: feature.stats.totalCapacity ?? 0,
     availableSpots: feature.stats.availableCapacity,
@@ -99,13 +82,11 @@ export function parkingMapFeatureToLegacyResponse(
         : 'unknown',
     bestSpot: {
       id: segment?.id ?? feature.id,
-      zoneName: title,
+      label: title,
       availableSpots: feature.stats.availableCapacity,
       availabilityPercent: percentage,
       pricePerHour: minimumRate,
     },
-    zoneId: segment?.zoneId ?? feature.parentId,
-    zoneName: segment?.sourceAreaName ?? null,
     expansionZoom:
       feature.kind === 'segment-cluster' ? feature.expansionZoom : undefined,
   };

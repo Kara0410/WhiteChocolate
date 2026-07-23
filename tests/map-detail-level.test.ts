@@ -8,10 +8,9 @@ import {
   type ParkingSemanticZoomStage,
 } from '../src/components/parking-map/map-detail-level';
 
-test('classifies all five stages without previous state', () => {
+test('classifies all four segment-derived stages without previous state', () => {
   assert.equal(deriveParkingSemanticZoomStage({ zoom: 11 }), 'city');
-  assert.equal(deriveParkingSemanticZoomStage({ zoom: 12 }), 'zone');
-  assert.equal(deriveParkingSemanticZoomStage({ zoom: 13.5 }), 'cell');
+  assert.equal(deriveParkingSemanticZoomStage({ zoom: 12.5 }), 'cell');
   assert.equal(
     deriveParkingSemanticZoomStage({ zoom: 15 }),
     'segmentCluster',
@@ -45,15 +44,9 @@ test('every semantic boundary uses enter and return hysteresis', () => {
   }> = [
     {
       lower: 'city',
-      upper: 'zone',
-      enter: PARKING_SEMANTIC_ZOOM_THRESHOLDS.zoneEnter,
-      exit: PARKING_SEMANTIC_ZOOM_THRESHOLDS.cityReturn,
-    },
-    {
-      lower: 'zone',
       upper: 'cell',
       enter: PARKING_SEMANTIC_ZOOM_THRESHOLDS.cellEnter,
-      exit: PARKING_SEMANTIC_ZOOM_THRESHOLDS.zoneReturn,
+      exit: PARKING_SEMANTIC_ZOOM_THRESHOLDS.cityReturn,
     },
     {
       lower: 'cell',

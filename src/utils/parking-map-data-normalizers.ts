@@ -4,7 +4,6 @@ import type {
   ParkingCellSummary,
   ParkingEstimateFactor,
   ParkingSegmentSummary,
-  ParkingZoneSummary,
 } from '@/types/parking-domain';
 
 type UnknownRow = Record<string, unknown>;
@@ -93,40 +92,6 @@ function normalizeEstimateFactors(value: unknown): ParkingEstimateFactor[] {
   });
 }
 
-export function normalizeParkingZoneSummaryRow(
-  value: unknown,
-): ParkingZoneSummary | null {
-  if (!isRecord(value)) {
-    return null;
-  }
-  const zoneId = parkingStringValue(value.zone_id);
-  const zoneName = parkingStringValue(value.zone_name);
-  const latitude = numberValue(value.representative_latitude);
-  const longitude = numberValue(value.representative_longitude);
-  const stats = normalizeStats(value);
-  if (
-    zoneId === null ||
-    zoneName === null ||
-    latitude === null ||
-    longitude === null ||
-    stats === null ||
-    latitude < -90 ||
-    latitude > 90 ||
-    longitude < -180 ||
-    longitude > 180
-  ) {
-    return null;
-  }
-
-  return {
-    kind: 'zone-summary',
-    zoneId,
-    zoneName,
-    representativePoint: { latitude, longitude },
-    stats,
-  };
-}
-
 export function normalizeParkingCellSummaryRow(
   value: unknown,
 ): ParkingCellSummary | null {
@@ -161,12 +126,6 @@ export function normalizeParkingCellSummaryRow(
   return {
     kind: 'cell-summary',
     id,
-    parentZoneIds: Array.isArray(value.parent_zone_ids)
-      ? value.parent_zone_ids.filter(
-          (zoneId): zoneId is string =>
-            typeof zoneId === 'string' && zoneId.length > 0,
-        )
-      : [],
     center: { latitude: centerLatitude, longitude: centerLongitude },
     bounds: { minLng, minLat, maxLng, maxLat },
     resolution,
@@ -181,10 +140,12 @@ export function normalizeParkingSegmentSummaryRow(
     return null;
   }
   const id = parkingStringValue(value.id);
+  const cityCode = parkingStringValue(value.city_code);
   const latitude = numberValue(value.lat);
   const longitude = numberValue(value.lon);
   if (
     id === null ||
+    cityCode === null ||
     latitude === null ||
     longitude === null ||
     latitude < -90 ||
@@ -250,12 +211,12 @@ export function normalizeParkingSegmentSummaryRow(
 
   return {
     id,
-    zoneId:
-      numberValue(value.parking_zone_id) !== null
-        ? String(value.parking_zone_id)
-        : null,
+    cityCode,
+    sourceRecordId: parkingStringValue(value.source_record_id),
     streetName: parkingStringValue(value.street_name),
     sourceAreaName: parkingStringValue(value.source_area_name),
+    sourceClassification: parkingStringValue(value.source_classification),
+    sourceGeometry: parkingStringValue(value.source_geometry),
     coordinates: { latitude, longitude },
     capacity,
     pricing,

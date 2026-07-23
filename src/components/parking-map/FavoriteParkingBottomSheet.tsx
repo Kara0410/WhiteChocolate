@@ -140,7 +140,7 @@ const FavoriteSpotRow = memo(function FavoriteSpotRow({
     item.availabilityPercent === null
       ? null
       : clampPercentage(item.availabilityPercent);
-  const title = item.bestSpot.zoneName || 'Parking Area';
+  const title = item.bestSpot.label || 'Parking Area';
   const distanceLabel = formatDistance(item.distanceToDestination);
   const translateX = useSharedValue(0);
   const startX = useSharedValue(0);

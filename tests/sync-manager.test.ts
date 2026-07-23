@@ -34,7 +34,7 @@ test('getLocalSnapshot loads data and counts from storage', async () => {
         avgPrice: null,
         bestSpot: {
           id: 'fav-1-best',
-          zoneName: 'Altstadt',
+          label: 'Altstadt',
           availableSpots: 5,
           availabilityPercent: 50,
           pricePerHour: null,

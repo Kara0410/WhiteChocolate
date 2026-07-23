@@ -1,5 +1,10 @@
 # Phase 1 city-ownership implementation report
 
+> Historical report (2026-07-16). This records a superseded pre-migration
+> state and does not describe the current segment-centric architecture. See
+> `parking-data-and-prediction-readiness-audit.md` and migration
+> `20260722000100_remove_parking_zones.sql` for the active design.
+
 Date: 2026-07-16  
 Repository: WhiteChocolate  
 Branch: `master`

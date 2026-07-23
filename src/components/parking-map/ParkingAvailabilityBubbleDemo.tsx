@@ -31,19 +31,19 @@ export default function ParkingAvailabilityBubbleDemo() {
           percentage={72}
           size="large"
           type="cluster"
-          zoneCount={4}
+          count={4}
         />
         <ParkingAvailabilityBubble
           percentage={46}
           size="large"
           type="cluster"
-          zoneCount={3}
+          count={3}
         />
         <ParkingAvailabilityBubble
           percentage={28}
           size="large"
           type="cluster"
-          zoneCount={2}
+          count={2}
         />
       </DemoSection>
 
@@ -58,19 +58,19 @@ export default function ParkingAvailabilityBubbleDemo() {
           percentage={72}
           size="large"
           type="cluster"
-          zoneCount={4}
+          count={4}
         />
         <ParkingAvailabilityBubble
           percentage={72}
           size="medium"
           type="cluster"
-          zoneCount={4}
+          count={4}
         />
         <ParkingAvailabilityBubble
           percentage={72}
           size="small"
           type="cluster"
-          zoneCount={4}
+          count={4}
         />
       </DemoSection>
 
@@ -85,19 +85,19 @@ export default function ParkingAvailabilityBubbleDemo() {
           percentage={72}
           state="default"
           type="cluster"
-          zoneCount={4}
+          count={4}
         />
         <ParkingAvailabilityBubble
           percentage={72}
           state="pressed"
           type="cluster"
-          zoneCount={4}
+          count={4}
         />
         <ParkingAvailabilityBubble
           percentage={72}
           state="selected"
           type="cluster"
-          zoneCount={4}
+          count={4}
         />
         <ParkingAvailabilityBubble
           percentage={72}

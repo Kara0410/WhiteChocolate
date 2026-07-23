@@ -31,9 +31,12 @@ function segment(
 ): ParkingSegmentSummary {
   return {
     id,
-    zoneId: 'zone-a',
+    cityCode: 'munich',
+    sourceRecordId: id,
     streetName: `Street ${id}`,
     sourceAreaName: null,
+    sourceClassification: null,
+    sourceGeometry: null,
     coordinates: { latitude: 48.1351, longitude: 11.5824 },
     capacity: 10,
     pricing: {
@@ -124,26 +127,22 @@ test('derives provider-specific viewport deltas when native events omit them', (
   );
 });
 
-test('segment clusters never cross known administrative-zone boundaries', () => {
+test('nearby segments cluster directly from their representative points', () => {
   const features = clusterParkingSegmentFeatures({
     segments: [
-      segment('a', { zoneId: 'zone-a' }),
+      segment('a'),
       segment('b', {
-        zoneId: 'zone-b',
         coordinates: { latitude: 48.13511, longitude: 11.58241 },
       }),
     ],
     bounds: BOUNDS,
     zoom: 14.8,
   });
-  assert.equal(features.length, 2);
-  assert.deepEqual(
-    features.map((feature) => feature.parentId).sort(),
-    ['zone-a', 'zone-b'],
-  );
+  assert.equal(features.length, 1);
+  assert.equal(features[0].kind, 'segment-cluster');
 });
 
-test('same-zone segments form a stable aggregate with expansion zoom', () => {
+test('nearby segments form a stable aggregate with expansion zoom', () => {
   const features = clusterParkingSegmentFeatures({
     segments: [
       segment('a'),
@@ -186,7 +185,6 @@ test('individual segment projections retain stable identity', () => {
 test('dense clustered viewports stay within the marker safety cap', () => {
   const segments = Array.from({ length: 500 }, (_, index) =>
     segment(String(index), {
-      zoneId: null,
       coordinates: {
         latitude: 48.13 + (index % 25) * 0.0005,
         longitude: 11.57 + Math.floor(index / 25) * 0.0005,

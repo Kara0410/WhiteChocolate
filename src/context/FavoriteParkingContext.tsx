@@ -19,7 +19,7 @@ import {
   saveFavoriteState,
   type StoredFavoriteParkingItem,
 } from '@/utils/favorite-parking-storage';
-import { parkingMapFeatureToLegacyResponse } from '@/utils/parking-feature-adapters';
+import { parkingMapFeatureToResponse } from '@/utils/parking-feature-adapters';
 import { parkingSegmentToSummary } from '@/utils/parking-segments';
 import { logAppError, normalizeAppError } from '@/utils/app-errors';
 
@@ -87,7 +87,7 @@ export function FavoriteParkingProvider({ children }: PropsWithChildren) {
     }
 
     writeQueueRef.current = writeQueueRef.current
-      .then(() => saveFavoriteState({ version: 2, favorites }));
+      .then(() => saveFavoriteState({ version: 3, favorites }));
     const writeId = ++latestWriteRef.current;
     setPersistenceStatus('saving');
     setError(null);
@@ -225,7 +225,7 @@ export function FavoriteParkingProvider({ children }: PropsWithChildren) {
             return favorite;
           }
           const segment = parkingSegmentToSummary(detail);
-          const cachedItem = parkingMapFeatureToLegacyResponse({
+          const cachedItem = parkingMapFeatureToResponse({
             id: segment.id,
             kind: 'segment',
             coordinates: segment.coordinates,
@@ -249,7 +249,6 @@ export function FavoriteParkingProvider({ children }: PropsWithChildren) {
               availabilityStatus: segment.availability.status,
               updatedAt: segment.updatedAt,
             },
-            parentId: segment.zoneId,
             segment,
           });
           return { ...favorite, cachedItem };

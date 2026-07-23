@@ -107,18 +107,14 @@ test('percentage-only migration keeps unknown rows null without requiring a fake
   );
 });
 
-test('pending migration chain preserves UUID joins and explicitly changes the view contract', async () => {
+test('forward migration removes polygon ownership and preserves segment estimates', async () => {
   const migrationDirectory = resolve(
     dirname(fileURLToPath(import.meta.url)),
     '../supabase/migrations',
   );
-  const [semanticZoom, reconciliation, estimator] = await Promise.all([
+  const [removal, estimator] = await Promise.all([
     readFile(
-      resolve(migrationDirectory, '20260713000100_parking_semantic_zoom_backend.sql'),
-      'utf8',
-    ),
-    readFile(
-      resolve(migrationDirectory, '20260716000100_reconcile_parking_semantic_zoom_uuid.sql'),
+      resolve(migrationDirectory, '20260722000100_remove_parking_zones.sql'),
       'utf8',
     ),
     readFile(
@@ -127,25 +123,28 @@ test('pending migration chain preserves UUID joins and explicitly changes the vi
     ),
   ]);
 
-  assert.match(semanticZoom, /hashtextextended\(segment\.id::text, 0\)/);
-  assert.match(semanticZoom, /on segment\.id = assignment\.segment_id\b/);
-  assert.doesNotMatch(semanticZoom, /assignment\.segment_id::text/);
-
-  const dropFunction = reconciliation.indexOf('drop function public.fetch_parking_cells(');
-  const dropZoneView = reconciliation.indexOf('drop view public.parking_zone_summaries;');
-  const dropSegmentView = reconciliation.indexOf('drop view public.parking_segment_summaries;');
-  const createSegmentView = reconciliation.indexOf('create view public.parking_segment_summaries');
-  assert.ok(dropFunction >= 0 && dropFunction < dropZoneView);
-  assert.ok(dropZoneView < dropSegmentView);
-  assert.ok(dropSegmentView < createSegmentView);
-  assert.match(reconciliation, /segment\.id::text as id/);
-  assert.match(reconciliation, /segment\.id = assignment\.segment_id::text/);
+  const dropCellRpc = removal.indexOf('drop function if exists public.fetch_parking_cells(');
+  const dropSummary = removal.indexOf('drop view if exists public.parking_zone_summaries;');
+  const dropTrigger = removal.indexOf('drop trigger if exists assign_parking_segment_zone_trigger');
+  const dropColumn = removal.indexOf('drop column if exists parking_zone_id;');
+  const dropTable = removal.indexOf('drop table if exists public.parking_zones;');
+  const createSegmentView = removal.indexOf('create view public.parking_segment_summaries');
+  const createCellRpc = removal.indexOf('create function public.fetch_parking_cells(');
+  assert.ok(dropCellRpc >= 0 && dropCellRpc < dropSummary);
+  assert.ok(dropSummary < dropTrigger && dropTrigger < dropColumn);
+  assert.ok(dropColumn < dropTable && dropTable < createSegmentView);
+  assert.ok(createSegmentView < createCellRpc);
+  assert.match(removal, /create temporary table parking_zone_dependency_audit/);
+  assert.match(removal, /alter column city_code set not null/);
+  assert.match(removal, /segment\."FID" as source_record_id/);
+  assert.match(removal, /segment\.shape as source_geometry/);
+  assert.doesNotMatch(removal, /drop table[^;]*cascade/i);
+  assert.doesNotMatch(removal, /st_(covers|contains|within|intersects)\s*\(/i);
 
   assert.match(
     estimator,
     /segment_id uuid not null references public\.parking_segments\(id\)/,
   );
   assert.match(estimator, /snapshot\.segment_id = segment\.id/);
-  assert.match(estimator, /segment\.id = assignment\.segment_id/);
-  assert.doesNotMatch(estimator, /segment_id::text|segment\.id = .*::text/);
+  assert.doesNotMatch(estimator, /segment_id::text/);
 });

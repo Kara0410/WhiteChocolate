@@ -27,7 +27,7 @@ export default function ConsentModal({ visible, onContinue, onDismiss }: Props) 
             Before location access
           </Text>
           <Text className="mb-2.5 font-display text-[22px] font-bold tracking-[-0.4px] text-warm-text">
-            Use your location only to rank nearby zones.
+            Use your location only to rank nearby parking segments.
           </Text>
           <Text className="mb-3 text-[15px] leading-[21px] text-warm-body">
             Munich Parking can show the map without your location. If you allow it, we use coarse

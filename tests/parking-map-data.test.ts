@@ -4,7 +4,6 @@ import test from 'node:test';
 import {
   normalizeParkingCellSummaryRow,
   normalizeParkingSegmentSummaryRow,
-  normalizeParkingZoneSummaryRow,
 } from '../src/utils/parking-map-data-normalizers';
 import { ParkingMapDataCache } from '../src/utils/parking-map-data-cache';
 
@@ -21,26 +20,10 @@ const aggregateRow = {
   updated_at: '2026-07-13T10:00:00.000Z',
 };
 
-test('complete zone summary normalization has no viewport input', () => {
-  const row = {
-    ...aggregateRow,
-    zone_id: '7',
-    zone_name: 'Altstadt',
-    representative_latitude: 48.137,
-    representative_longitude: 11.575,
-  };
-  const first = normalizeParkingZoneSummaryRow(row);
-  const second = normalizeParkingZoneSummaryRow(structuredClone(row));
-  assert.deepEqual(first, second);
-  assert.equal(first?.stats.segmentCount, 12);
-  assert.equal(first?.stats.totalCapacity, 240);
-});
-
-test('cell rows retain stable server IDs and parent zones', () => {
+test('cell rows retain stable server IDs without ownership metadata', () => {
   const cell = normalizeParkingCellSummaryRow({
     ...aggregateRow,
     id: 'coarse:123:456',
-    parent_zone_ids: ['7', '8'],
     center_latitude: 48.137,
     center_longitude: 11.575,
     min_lng: 11.57,
@@ -50,15 +33,18 @@ test('cell rows retain stable server IDs and parent zones', () => {
     resolution: 'coarse',
   });
   assert.equal(cell?.id, 'coarse:123:456');
-  assert.deepEqual(cell?.parentZoneIds, ['7', '8']);
+  assert.equal('parentZoneIds' in (cell ?? {}), false);
 });
 
-test('segment rows support unassigned segments and unknown values', () => {
+test('segment rows preserve city and source metadata', () => {
   const segment = normalizeParkingSegmentSummaryRow({
     id: 'segment-1',
-    parking_zone_id: null,
+    city_code: 'vienna',
+    source_record_id: 'source-1',
     street_name: 'Test Street',
-    source_area_name: null,
+    source_area_name: 'District source label',
+    source_classification: 'street-parking',
+    source_geometry: 'LINESTRING (0 0, 1 1)',
     lat: 48.137,
     lon: 11.575,
     capacity: null,
@@ -69,19 +55,20 @@ test('segment rows support unassigned segments and unknown values', () => {
     hourly_rate: null,
     updated_at: null,
   });
-  assert.equal(segment?.zoneId, null);
-  assert.equal(segment?.capacity, null);
+  assert.equal(segment?.cityCode, 'vienna');
+  assert.equal(segment?.sourceRecordId, 'source-1');
+  assert.equal(segment?.sourceAreaName, 'District source label');
+  assert.equal('zoneId' in (segment ?? {}), false);
   assert.equal(segment?.availability.status, 'unknown');
-  assert.equal(segment?.pricing.status, 'unknown');
 });
 
-test('normalizes UUID-derived summary IDs without changing their text value', () => {
+test('normalizes UUID IDs and current availability without changing identity', () => {
   const uuid = '8c2a4d42-4f9c-4d26-8a85-0b1b5f3d2f10';
   const segment = normalizeParkingSegmentSummaryRow({
     id: uuid,
-    parking_zone_id: 7,
+    city_code: 'munich',
     street_name: 'Test Street',
-    source_area_name: 'Altstadt',
+    source_area_name: 'Raw source label',
     lat: 48.137,
     lon: 11.575,
     capacity: 4,
@@ -96,20 +83,18 @@ test('normalizes UUID-derived summary IDs without changing their text value', ()
     hourly_rate: 2.5,
     updated_at: '2026-07-16T10:00:00.000Z',
   });
-
   assert.equal(segment?.id, uuid);
-  assert.equal(segment?.zoneId, '7');
   assert.equal(segment?.availability.status, 'estimated');
 });
 
-test('normalizes a percentage-only estimate without fabricating space counts', () => {
+test('normalizes a percentage-only estimate without fabricating counts', () => {
   const segment = normalizeParkingSegmentSummaryRow({
     id: '8c2a4d42-4f9c-4d26-8a85-0b1b5f3d2f10',
-    parking_zone_id: null,
+    city_code: 'zurich',
     street_name: 'Test Street',
     source_area_name: null,
-    lat: 48.137,
-    lon: 11.575,
+    lat: 47.3769,
+    lon: 8.5417,
     capacity: null,
     estimated_available_capacity: null,
     estimated_availability_percent: 18,
@@ -123,34 +108,30 @@ test('normalizes a percentage-only estimate without fabricating space counts', (
     hourly_rate: null,
     updated_at: null,
   });
-
   assert.equal(segment?.availability.status, 'estimated');
   assert.equal(segment?.availability.percent, 18);
   assert.equal(segment?.availability.availableSpaces, null);
   assert.equal(segment?.availability.totalSpaces, null);
-  assert.equal(
-    segment?.availability.estimatorVersion,
-    'heuristic-v2.1-pessimistic',
-  );
 });
 
 test('invalid service rows are rejected instead of fabricated', () => {
-  assert.equal(normalizeParkingZoneSummaryRow({ ...aggregateRow }), null);
+  assert.equal(normalizeParkingCellSummaryRow({ ...aggregateRow, id: 'bad' }), null);
   assert.equal(
-    normalizeParkingCellSummaryRow({ ...aggregateRow, id: 'bad' }),
-    null,
-  );
-  assert.equal(
-    normalizeParkingSegmentSummaryRow({ id: 'bad', lat: 200, lon: 11 }),
+    normalizeParkingSegmentSummaryRow({
+      id: 'bad',
+      city_code: 'munich',
+      lat: 200,
+      lon: 11,
+    }),
     null,
   );
 });
 
 test('stage cache exposes freshness without discarding stale usable data', () => {
   const cache = new ParkingMapDataCache(2);
-  cache.set('zone', { count: 82 }, 1_000, 10_000);
-  assert.equal(cache.get<{ count: number }>('zone', 10_500)?.isFresh, true);
-  const stale = cache.get<{ count: number }>('zone', 11_001);
+  cache.set('city', { count: 82 }, 1_000, 10_000);
+  assert.equal(cache.get<{ count: number }>('city', 10_500)?.isFresh, true);
+  const stale = cache.get<{ count: number }>('city', 11_001);
   assert.equal(stale?.isFresh, false);
   assert.equal(stale?.value.count, 82);
 });

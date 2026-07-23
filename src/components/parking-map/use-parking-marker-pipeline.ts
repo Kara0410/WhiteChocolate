@@ -9,12 +9,10 @@ import {
   projectSelectedParkingMarkers,
   selectSpatiallySeparatedMarkers,
 } from '@/components/parking-map/marker-density';
-import { ZONE_SUMMARY_MARKER_SIZE } from '@/components/parking-map/zone-summary-marker';
 import type { PlaceSearchResult } from '@/hooks/use-google-place-search';
 import type {
   ParkingCellSummary,
   ParkingMapFeature,
-  ParkingZoneSummary,
 } from '@/types/parking-domain';
 import type {
   ParkingBoundingBox,
@@ -23,10 +21,9 @@ import type {
   ParkingCoordinates,
   ParkingMapSize,
 } from '@/types/parking-map';
-import { parkingMapFeatureToLegacyResponse } from '@/utils/parking-feature-adapters';
+import { parkingMapFeatureToResponse } from '@/utils/parking-feature-adapters';
 import { hasValidParkingCoordinates } from '@/utils/parking-map-geo';
 
-const EMPTY_ZONE_SUMMARIES: ParkingZoneSummary[] = [];
 const EMPTY_CELL_SUMMARIES: ParkingCellSummary[] = [];
 
 type UseParkingMarkerPipelineOptions = {
@@ -65,7 +62,7 @@ export function useParkingMarkerPipeline({
   const markerItems = useMemo(
     () =>
       layerFeatures.flatMap((feature) => {
-        const item = parkingMapFeatureToLegacyResponse(feature);
+        const item = parkingMapFeatureToResponse(feature);
         return item === null ? [] : [item];
       }),
     [layerFeatures],
@@ -187,78 +184,15 @@ export function useParkingMarkerPipeline({
     ],
   );
 
-  const zoneSummaries = useMemo(
-    () =>
-      semanticStage === 'zone' && mapMode !== 'munichOverview'
-        ? layerFeatures.flatMap((feature) =>
-            feature.kind === 'zone'
-              ? [
-                  {
-                    kind: 'zone-summary' as const,
-                    zoneId: feature.zoneId,
-                    zoneName: feature.zoneName,
-                    representativePoint: feature.coordinates,
-                    stats: feature.stats,
-                  },
-                ]
-              : [],
-          )
-        : EMPTY_ZONE_SUMMARIES,
-    [layerFeatures, mapMode, semanticStage],
-  );
-
   const cellSummaries = useMemo(
     () =>
-      semanticStage === 'cell' && mapMode !== 'munichOverview'
+      semanticStage === 'city' || semanticStage === 'cell'
         ? layerFeatures.flatMap((feature) =>
             feature.kind === 'cell' ? [feature.cell] : [],
           )
         : EMPTY_CELL_SUMMARIES,
-    [layerFeatures, mapMode, semanticStage],
+    [layerFeatures, semanticStage],
   );
-
-  const projectedZoneSummaries = useMemo(() => {
-    if (
-      zoneSummaries.length === 0 ||
-      mapSize.width <= 0 ||
-      mapSize.height <= 0 ||
-      activeOverlay !== 'none' ||
-      selectedSearchPlace !== null ||
-      selectedParkingItem !== null
-    ) {
-      return [];
-    }
-
-    const margin = ZONE_SUMMARY_MARKER_SIZE.width;
-    return zoneSummaries.flatMap((summary) => {
-      const position = projectMapCoordinate(summary.representativePoint, {
-        camera: displayCamera,
-        height: mapSize.height,
-        width: mapSize.width,
-      });
-
-      if (
-        !Number.isFinite(position.x) ||
-        !Number.isFinite(position.y) ||
-        position.x < -margin ||
-        position.x > mapSize.width + margin ||
-        position.y < -margin ||
-        position.y > mapSize.height + margin
-      ) {
-        return [];
-      }
-
-      return [{ summary, x: position.x, y: position.y }];
-    });
-  }, [
-    activeOverlay,
-    displayCamera,
-    mapSize.height,
-    mapSize.width,
-    selectedParkingItem,
-    selectedSearchPlace,
-    zoneSummaries,
-  ]);
 
   const projectedCellSummaries = useMemo(() => {
     if (
@@ -413,8 +347,6 @@ export function useParkingMarkerPipeline({
     projectedCellSummaries,
     projectedSearchDestination,
     projectedUserLocation,
-    projectedZoneSummaries,
     cellSummaries,
-    zoneSummaries,
   };
 }

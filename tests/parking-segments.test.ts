@@ -27,13 +27,13 @@ function row(overrides: Partial<ParkingSegmentRow> = {}): ParkingSegmentRow {
   return {
     FID: 'segment.1',
     angebot: 12,
+    city_code: 'munich',
     created_at: '2026-06-30T00:00:00.000Z',
     geoportal_class: 'Bewohnerparken',
     id: 'segment-id',
     lat: 48.13,
     location: null,
     lon: 11.58,
-    parking_zone_id: null,
     parkregel_beschreibung: 'Bewohnerparken 9-23 Uhr',
     parkregel_gruppe: 'Bewohnerparken',
     parkregel_id: 8,
@@ -50,6 +50,9 @@ test('maps Supabase columns to explicit domain fields', () => {
   const segment = parkingSegmentFromRow(row());
   assert.ok(segment);
   assert.equal(segment.id, 'segment-id');
+  assert.equal(segment.cityCode, 'munich');
+  assert.equal(segment.sourceRecordId, 'segment.1');
+  assert.match(segment.sourceGeometry ?? '', /^LINESTRING/);
   assert.equal(segment.streetName, 'Teststr.');
   assert.equal(segment.sourceAreaName, 'Southern Au');
   assert.equal(segment.capacity, 12);

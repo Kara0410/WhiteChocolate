@@ -23,7 +23,7 @@ function favorite(
     avgPrice: 3,
     bestSpot: {
       id: `${id}-best`,
-      zoneName: 'Altstadt',
+      label: 'Altstadt',
       availableSpots: 12,
       availabilityPercent: 60,
       pricePerHour: 2.5,

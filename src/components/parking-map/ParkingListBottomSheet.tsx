@@ -60,7 +60,7 @@ const ParkingListRow = memo(function ParkingListRow({
 
   return (
     <Pressable
-      accessibilityLabel={`Open ${item.bestSpot.zoneName || 'parking area'}`}
+      accessibilityLabel={`Open ${item.bestSpot.label || 'parking area'}`}
       accessibilityRole="button"
       className="mb-3 flex-row items-center rounded-3xl border border-white/80 bg-white px-4 py-4 shadow-floating active:bg-slate-50"
       onPress={() => onPress(item)}
@@ -74,7 +74,7 @@ const ParkingListRow = memo(function ParkingListRow({
           className="text-[16px] font-extrabold text-slate-950"
           numberOfLines={1}
         >
-          {item.bestSpot.zoneName || 'Parking area'}
+          {item.bestSpot.label || 'Parking area'}
         </Text>
         <View className="mt-1 flex-row items-center">
           <Text

@@ -1,5 +1,10 @@
 # Phase 1A semantic-zoom reconciliation report
 
+> Historical report (2026-07-16). The administrative-boundary design recorded
+> below was superseded by the segment-centric migration
+> `20260722000100_remove_parking_zones.sql`. Referenced rollback and diagnostic
+> scripts were intentionally removed to prevent use against the active model.
+
 Date: 2026-07-16  
 Repository: WhiteChocolate  
 Branch: `feat/phase-1a-semantic-zoom-reconciliation`

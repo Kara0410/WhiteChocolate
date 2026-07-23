@@ -40,12 +40,8 @@ import {
   MUNICH_CENTER,
   MUNICH_OVERVIEW_CAMERA,
 } from '@/hooks/use-map-location';
-import { useParkingZones } from '@/hooks/use-parking-zones';
 import type { PlaceSearchResult } from '@/hooks/use-google-place-search';
-import type {
-  ParkingCellSummary,
-  ParkingZoneSummary,
-} from '@/types/parking-domain';
+import type { ParkingCellSummary } from '@/types/parking-domain';
 import type {
   ParkingCameraState,
   ParkingClusterResponse,
@@ -57,7 +53,6 @@ import {
   haversineDistanceMeters,
   isCoordinateInsideBounds,
 } from '@/utils/parking-map-geo';
-import { getZoneFocusZoom } from '@/utils/parking-zones';
 import {
   getCuratedNearbyParkingSpots,
   SEARCH_NEARBY_RESULT_LIMIT,
@@ -272,7 +267,6 @@ export function ParkingMap({
           : undefined,
     [destination, selectedSearchPlace],
   );
-  const { polygons: parkingZonePolygons } = useParkingZones();
   const {
     activeContextHash,
     availabilityMessage,
@@ -289,7 +283,6 @@ export function ParkingMap({
     refreshParkingAvailabilityForCamera,
     retryLatest,
     layerState,
-    semanticStage,
     visibleSpots,
   } = useParkingMapData(
     initialCamera,
@@ -297,7 +290,6 @@ export function ParkingMap({
     userLocation,
     mapSize,
     isAutomaticParkingFetchEnabled,
-    parkingZonePolygons,
   );
   const googleMapRef = useRef<GoogleMaps.MapView | null>(null);
   const appleMapRef = useRef<AppleMaps.MapView | null>(null);
@@ -417,7 +409,7 @@ export function ParkingMap({
 
     // Keep the previous snapshot visible while the context-specific segment
     // request is in flight. It must not be relabelled with the new hash while
-    // visibleSpots still contains legacy or previous-context objects.
+    // visibleSpots can still contain stale or previous-context objects.
     if (!isParkingContextCurrent(activeContextHash, loadedContextHash)) {
       return;
     }
@@ -537,7 +529,6 @@ export function ParkingMap({
     projectedMarkers,
     projectedSearchDestination,
     projectedUserLocation,
-    projectedZoneSummaries,
   } = useParkingMarkerPipeline({
     activeOverlay,
     currentRegion,
@@ -554,22 +545,6 @@ export function ParkingMap({
     selectedSearchPlace,
     userLocation,
   });
-  const nativeZonePolygons = useMemo(
-    () =>
-      mapMode === 'munichOverview' ||
-      semanticStage === 'city' ||
-      semanticStage === 'zone'
-        ? parkingZonePolygons.map((polygon) => ({
-            id: polygon.id,
-            coordinates: polygon.coordinates,
-            color: '#2563EB20',
-            lineColor: '#1D4ED8B8',
-            lineWidth: 1,
-          }))
-        : [],
-    [mapMode, parkingZonePolygons, semanticStage],
-  );
-
   const canFocusCamera = useCallback(
     () =>
       mapSize.width > 0 &&
@@ -998,39 +973,6 @@ export function ParkingMap({
     [expandClusterSafely, selectParkingItem, selectedSearchPlace],
   );
 
-  const handleZoneSummaryPress = useCallback(
-    (summary: ParkingZoneSummary) => {
-      cancelPendingCameraFocus();
-      const targetZoom = getZoneFocusZoom(
-        parkingZonePolygons,
-        summary.zoneId,
-        mapSize.width,
-        PARKING_SEMANTIC_ZOOM_THRESHOLDS.cellEnter + 0.15,
-        PARKING_SEMANTIC_ZOOM_THRESHOLDS.segmentClusterEnter - 0.2,
-      );
-      const coordinates = {
-        latitude: summary.representativePoint.latitude,
-        longitude: summary.representativePoint.longitude,
-      };
-
-      setMapMode('focusedArea');
-      setAutomaticParkingFetchEnabled(true);
-      requestParkingForCamera({ ...coordinates, zoom: targetZoom });
-      focusLocationSafely(
-        coordinates,
-        'Unable to focus the parking zone',
-        targetZoom,
-      );
-    },
-    [
-      cancelPendingCameraFocus,
-      focusLocationSafely,
-      mapSize.width,
-      parkingZonePolygons,
-      requestParkingForCamera,
-    ],
-  );
-
   const handleCellSummaryPress = useCallback(
     (summary: ParkingCellSummary) => {
       cancelPendingCameraFocus();
@@ -1050,31 +992,6 @@ export function ParkingMap({
       focusLocationSafely,
       requestParkingForCamera,
     ],
-  );
-
-  const handleZonePolygonPress = useCallback(
-    (polygon: { id?: string }) => {
-      if (!polygon.id) {
-        return;
-      }
-      const zoneId = polygon.id.split(':')[0];
-      const feature = layerState.visibleFeatures.find(
-        (candidate) =>
-          candidate.kind === 'zone' && candidate.zoneId === zoneId,
-      );
-      if (!feature || feature.kind !== 'zone') {
-        return;
-      }
-      const targetZoom = PARKING_SEMANTIC_ZOOM_THRESHOLDS.zoneEnter + 0.2;
-      setMapMode('focusedArea');
-      setAutomaticParkingFetchEnabled(true);
-      focusLocationSafely(
-        feature.coordinates,
-        'Unable to focus the parking zone',
-        targetZoom,
-      );
-    },
-    [focusLocationSafely, layerState.visibleFeatures],
   );
 
   const handleSelectSearchPlace = useCallback(
@@ -1491,8 +1408,6 @@ export function ParkingMap({
           cameraPosition={cameraPosition}
           onCameraMove={handleCameraMove}
           onMapClick={handleMapPress}
-          onPolygonClick={handleZonePolygonPress}
-          polygons={nativeZonePolygons}
           properties={APPLE_MAP_PROPERTIES}
           style={MAP_VIEW_STYLE}
           uiSettings={APPLE_MAP_UI_SETTINGS}
@@ -1503,8 +1418,6 @@ export function ParkingMap({
           cameraPosition={cameraPosition}
           onCameraMove={handleCameraMove}
           onMapClick={handleMapPress}
-          onPolygonClick={handleZonePolygonPress}
-          polygons={nativeZonePolygons}
           properties={GOOGLE_MAP_PROPERTIES}
           style={MAP_VIEW_STYLE}
           uiSettings={GOOGLE_MAP_UI_SETTINGS}
@@ -1521,10 +1434,8 @@ export function ParkingMap({
         isSearchRecommendationMode={isSearchRecommendationMode}
         onMarkerPress={handleMarkerPress}
         onCellSummaryPress={handleCellSummaryPress}
-        onZoneSummaryPress={handleZoneSummaryPress}
         projectedMarkers={projectedMarkers}
         projectedCellSummaries={projectedCellSummaries}
-        projectedZoneSummaries={projectedZoneSummaries}
         selectedParkingItemId={selectedParkingItem?.id}
       />
 
@@ -1671,8 +1582,8 @@ export function ParkingMap({
             )}
           </Pressable>
           <Pressable
-            accessibilityHint="Returns to the full Munich parking zone map"
-            accessibilityLabel="Show Munich parking zone overview"
+            accessibilityHint="Returns to the full Munich parking map"
+            accessibilityLabel="Show Munich parking overview"
             accessibilityRole="button"
             accessibilityState={{
               selected: mapMode === 'munichOverview',

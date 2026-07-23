@@ -14,7 +14,6 @@ import { aggregateParkingSegments } from '@/utils/parking-domain';
 
 const MAX_CLUSTER_ZOOM = 16;
 const MAX_CLUSTER_FEATURES = 180;
-const OUTSIDE_ZONE_GROUP = '__unassigned__';
 
 type PointProperties = { segment: ParkingSegmentSummary };
 type ClusterProperties = {
@@ -33,7 +32,6 @@ export function parkingSegmentToMapFeature(
     kind: 'segment',
     coordinates: segment.coordinates,
     stats: segmentStats(segment),
-    parentId: segment.zoneId,
     segment,
   };
 }
@@ -82,17 +80,6 @@ export function clusterParkingSegmentFeatures(input: {
   bounds: ParkingBoundingBox;
   zoom: number;
 }): ParkingMapFeature[] {
-  const grouped = new Map<string, ParkingSegmentSummary[]>();
-  for (const segment of input.segments) {
-    const key = segment.zoneId ?? OUTSIDE_ZONE_GROUP;
-    const group = grouped.get(key);
-    if (group) {
-      group.push(segment);
-    } else {
-      grouped.set(key, [segment]);
-    }
-  }
-
   const radius = getClusterRadiusForZoom(input.zoom);
   const bbox: [number, number, number, number] = [
     input.bounds.minLng,
@@ -101,33 +88,29 @@ export function clusterParkingSegmentFeatures(input: {
     input.bounds.maxLat,
   ];
   const features: ParkingMapFeature[] = [];
+  const index = createIndex(input.segments, radius);
 
-  for (const [zoneKey, segments] of grouped) {
-    const index = createIndex(segments, radius);
-    for (const feature of index.getClusters(bbox, Math.round(input.zoom))) {
-      if (!isCluster(feature)) {
-        features.push(parkingSegmentToMapFeature(feature.properties.segment));
-        continue;
-      }
-
-      const clusterSegments = feature.properties.segments;
-      const coordinates: ParkingCoordinates = {
-        longitude: feature.geometry.coordinates[0],
-        latitude: feature.geometry.coordinates[1],
-      };
-      const cluster: ParkingSegmentClusterMapFeature = {
-        id: `segment-cluster:${zoneKey}:${radius}:${feature.properties.cluster_id}`,
-        kind: 'segment-cluster',
-        coordinates,
-        stats: aggregateParkingSegments(clusterSegments),
-        parentId: zoneKey === OUTSIDE_ZONE_GROUP ? null : zoneKey,
-        zoneId: zoneKey === OUTSIDE_ZONE_GROUP ? null : zoneKey,
-        expansionZoom: index.getClusterExpansionZoom(
-          feature.properties.cluster_id,
-        ),
-      };
-      features.push(cluster);
+  for (const feature of index.getClusters(bbox, Math.round(input.zoom))) {
+    if (!isCluster(feature)) {
+      features.push(parkingSegmentToMapFeature(feature.properties.segment));
+      continue;
     }
+
+    const clusterSegments = feature.properties.segments;
+    const coordinates: ParkingCoordinates = {
+      longitude: feature.geometry.coordinates[0],
+      latitude: feature.geometry.coordinates[1],
+    };
+    const cluster: ParkingSegmentClusterMapFeature = {
+      id: `segment-cluster:${radius}:${feature.properties.cluster_id}`,
+      kind: 'segment-cluster',
+      coordinates,
+      stats: aggregateParkingSegments(clusterSegments),
+      expansionZoom: index.getClusterExpansionZoom(
+        feature.properties.cluster_id,
+      ),
+    };
+    features.push(cluster);
   }
 
   return features.slice(0, MAX_CLUSTER_FEATURES);

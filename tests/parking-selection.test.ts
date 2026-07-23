@@ -39,13 +39,11 @@ function spot(
     pricingStatus: 'unknown',
     bestSpot: {
       id: SEGMENT_ID,
-      zoneName: 'Elvirastr.',
+      label: 'Elvirastr.',
       availableSpots,
       availabilityPercent,
       pricePerHour: null,
     },
-    zoneId: null,
-    zoneName: null,
     ...overrides,
   };
 }

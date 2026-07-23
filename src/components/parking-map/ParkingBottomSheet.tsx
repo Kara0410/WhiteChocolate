@@ -116,7 +116,7 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
     () => (percentage === null ? UNKNOWN_THEME : getAvailabilityTheme(percentage)),
     [percentage],
   );
-  const title = item.bestSpot.zoneName || 'Parking area';
+  const title = item.bestSpot.label || 'Parking area';
   const account = useAccount();
   const { showCreateAccountSheet } = useAuthSheet();
   const { error: favoriteError, isFavorite, refreshFavorites, toggleFavorite } =

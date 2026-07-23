@@ -145,6 +145,7 @@ export type Database = {
       parking_segments: {
         Row: {
           angebot: number | null
+          city_code: string
           created_at: string | null
           FID: string | null
           geoportal_class: string | null
@@ -152,7 +153,6 @@ export type Database = {
           lat: number | null
           location: unknown
           lon: number | null
-          parking_zone_id: number | null
           parkregel_beschreibung: string | null
           parkregel_gruppe: string | null
           parkregel_id: number | null
@@ -164,6 +164,7 @@ export type Database = {
         }
         Insert: {
           angebot?: number | null
+          city_code: string
           created_at?: string | null
           FID?: string | null
           geoportal_class?: string | null
@@ -171,7 +172,6 @@ export type Database = {
           lat?: number | null
           location?: unknown
           lon?: number | null
-          parking_zone_id?: number | null
           parkregel_beschreibung?: string | null
           parkregel_gruppe?: string | null
           parkregel_id?: number | null
@@ -183,6 +183,7 @@ export type Database = {
         }
         Update: {
           angebot?: number | null
+          city_code?: string
           created_at?: string | null
           FID?: string | null
           geoportal_class?: string | null
@@ -190,7 +191,6 @@ export type Database = {
           lat?: number | null
           location?: unknown
           lon?: number | null
-          parking_zone_id?: number | null
           parkregel_beschreibung?: string | null
           parkregel_gruppe?: string | null
           parkregel_id?: number | null
@@ -199,86 +199,6 @@ export type Database = {
           shape?: string | null
           strasse?: string | null
           updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "parking_segments_parking_zone_id_fkey"
-            columns: ["parking_zone_id"]
-            isOneToOne: false
-            referencedRelation: "parking_zones"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      parking_zone_raw: {
-        Row: {
-          einzeluebersicht_link: string | null
-          eroeffnung: string | null
-          FID: string | null
-          massnahme: string | null
-          name: string | null
-          shape: string | null
-          status: string | null
-          ueberwachung: string | null
-        }
-        Insert: {
-          einzeluebersicht_link?: string | null
-          eroeffnung?: string | null
-          FID?: string | null
-          massnahme?: string | null
-          name?: string | null
-          shape?: string | null
-          status?: string | null
-          ueberwachung?: string | null
-        }
-        Update: {
-          einzeluebersicht_link?: string | null
-          eroeffnung?: string | null
-          FID?: string | null
-          massnahme?: string | null
-          name?: string | null
-          shape?: string | null
-          status?: string | null
-          ueberwachung?: string | null
-        }
-        Relationships: []
-      }
-      parking_zones: {
-        Row: {
-          einzeluebersicht_link: string | null
-          eroeffnung: string | null
-          fid: string | null
-          geojson: Json | null
-          geom: unknown
-          id: number
-          massnahme: string | null
-          name: string | null
-          status: string | null
-          ueberwachung: string | null
-        }
-        Insert: {
-          einzeluebersicht_link?: string | null
-          eroeffnung?: string | null
-          fid?: string | null
-          geojson?: Json | null
-          geom?: unknown
-          id?: never
-          massnahme?: string | null
-          name?: string | null
-          status?: string | null
-          ueberwachung?: string | null
-        }
-        Update: {
-          einzeluebersicht_link?: string | null
-          eroeffnung?: string | null
-          fid?: string | null
-          geojson?: Json | null
-          geom?: unknown
-          id?: never
-          massnahme?: string | null
-          name?: string | null
-          status?: string | null
-          ueberwachung?: string | null
         }
         Relationships: []
       }
@@ -451,58 +371,28 @@ export type Database = {
           availability_confidence: string | null
           availability_status: string | null
           capacity: number | null
+          city_code: string | null
           estimate_factors: Json | null
           estimate_generated_at: string | null
           estimate_valid_until: string | null
           estimated_availability_percent: number | null
           estimated_available_capacity: number | null
           estimator_version: string | null
-          geoportal_class: string | null
           hourly_rate: number | null
           id: string | null
           lat: number | null
           lon: number | null
-          parking_zone_id: number | null
           pricing_status: string | null
           regulation_description: string | null
           regulation_group_name: string | null
           regulation_name: string | null
+          regulation_source_id: number | null
           source_area_name: string | null
+          source_classification: string | null
+          source_geometry: string | null
+          source_record_id: string | null
           street_name: string | null
           updated_at: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "parking_segments_parking_zone_id_fkey"
-            columns: ["parking_zone_id"]
-            isOneToOne: false
-            referencedRelation: "parking_zones"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      parking_zone_summaries: {
-        Row: {
-          availability_percent: number | null
-          availability_status: string | null
-          available_capacity: number | null
-          estimate_coverage_ratio: number | null
-          estimated_segment_count: number | null
-          has_free_parking: boolean | null
-          has_unknown_pricing: boolean | null
-          maximum_hourly_rate: number | null
-          minimum_hourly_rate: number | null
-          newest_estimate_generated_at: string | null
-          oldest_estimate_generated_at: string | null
-          representative_latitude: number | null
-          representative_longitude: number | null
-          segment_count: number | null
-          source_status: string | null
-          total_capacity: number | null
-          unknown_segment_count: number | null
-          updated_at: string | null
-          zone_id: string | null
-          zone_name: string | null
         }
         Relationships: []
       }
@@ -668,78 +558,41 @@ export type Database = {
         | { Args: { table_name: string }; Returns: string }
       enablelongtransactions: { Args: never; Returns: string }
       equals: { Args: { geom1: unknown; geom2: unknown }; Returns: boolean }
-      fetch_parking_cells:
-        | {
-            Args: {
-              p_max_lat: number
-              p_max_lng: number
-              p_min_lat: number
-              p_min_lng: number
-              p_resolution: string
-            }
-            Returns: {
-              availability_percent: number
-              availability_status: string
-              available_capacity: number
-              center_latitude: number
-              center_longitude: number
-              estimate_coverage_ratio: number
-              estimated_segment_count: number
-              has_free_parking: boolean
-              has_unknown_pricing: boolean
-              id: string
-              max_lat: number
-              max_lng: number
-              maximum_hourly_rate: number
-              min_lat: number
-              min_lng: number
-              minimum_hourly_rate: number
-              newest_estimate_generated_at: string
-              oldest_estimate_generated_at: string
-              parent_zone_ids: string[]
-              resolution: string
-              segment_count: number
-              total_capacity: number
-              unknown_segment_count: number
-              updated_at: string
-            }[]
-          }
-        | {
-            Args: {
-              p_context_hash: string
-              p_max_lat: number
-              p_max_lng: number
-              p_min_lat: number
-              p_min_lng: number
-              p_resolution: string
-            }
-            Returns: {
-              availability_percent: number
-              availability_status: string
-              available_capacity: number
-              center_latitude: number
-              center_longitude: number
-              estimate_coverage_ratio: number
-              estimated_segment_count: number
-              has_free_parking: boolean
-              has_unknown_pricing: boolean
-              id: string
-              max_lat: number
-              max_lng: number
-              maximum_hourly_rate: number
-              min_lat: number
-              min_lng: number
-              minimum_hourly_rate: number
-              newest_estimate_generated_at: string
-              oldest_estimate_generated_at: string
-              parent_zone_ids: string[]
-              resolution: string
-              segment_count: number
-              total_capacity: number
-              unknown_segment_count: number
-              updated_at: string
-            }[]
-          }
+      fetch_parking_cells: {
+        Args: {
+          p_context_hash: string | null
+          p_max_lat: number
+          p_max_lng: number
+          p_min_lat: number
+          p_min_lng: number
+          p_resolution: string
+        }
+        Returns: {
+          availability_percent: number
+          availability_status: string
+          available_capacity: number
+          center_latitude: number
+          center_longitude: number
+          estimate_coverage_ratio: number
+          estimated_segment_count: number
+          has_free_parking: boolean
+          has_unknown_pricing: boolean
+          id: string
+          max_lat: number
+          max_lng: number
+          maximum_hourly_rate: number
+          min_lat: number
+          min_lng: number
+          minimum_hourly_rate: number
+          newest_estimate_generated_at: string
+          oldest_estimate_generated_at: string
+          resolution: string
+          segment_count: number
+          total_capacity: number
+          unknown_segment_count: number
+          updated_at: string
+        }[]
+      }
       geometry: { Args: { "": string }; Returns: unknown }
       geometry_above: {
         Args: { geom1: unknown; geom2: unknown }

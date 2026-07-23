@@ -18,21 +18,8 @@ import {
 } from '@/components/parking-map/map-layers';
 import type { ProjectedParkingMarker } from '@/components/parking-map/marker-density';
 import { ParkingMarkerCard } from '@/components/parking-map/parking-marker-card';
-import {
-  ZONE_SUMMARY_MARKER_SIZE,
-  ZoneSummaryMarker,
-} from '@/components/parking-map/zone-summary-marker';
 import type { ParkingClusterResponse } from '@/types/parking-map';
-import type {
-  ParkingCellSummary,
-  ParkingZoneSummary,
-} from '@/types/parking-domain';
-
-type ProjectedZoneSummary = {
-  summary: ParkingZoneSummary;
-  x: number;
-  y: number;
-};
+import type { ParkingCellSummary } from '@/types/parking-domain';
 
 type ParkingMarkerOverlayProps = {
   semanticStage: ParkingSemanticZoomStage;
@@ -40,14 +27,12 @@ type ParkingMarkerOverlayProps = {
   isSearchRecommendationMode: boolean;
   onMarkerPress: (item: ParkingClusterResponse) => void;
   onCellSummaryPress: (summary: ParkingCellSummary) => void;
-  onZoneSummaryPress: (summary: ParkingZoneSummary) => void;
   projectedMarkers: ProjectedParkingMarker[];
   projectedCellSummaries: {
     summary: ParkingCellSummary;
     x: number;
     y: number;
   }[];
-  projectedZoneSummaries: ProjectedZoneSummary[];
   selectedParkingItemId?: string;
 };
 
@@ -70,10 +55,8 @@ export const ParkingMarkerOverlay = memo(function ParkingMarkerOverlay({
   isSearchRecommendationMode,
   onMarkerPress,
   onCellSummaryPress,
-  onZoneSummaryPress,
   projectedMarkers,
   projectedCellSummaries,
-  projectedZoneSummaries,
   selectedParkingItemId,
 }: ParkingMarkerOverlayProps) {
   const performanceMode = isMapMoving ? 'moving' : 'normal';
@@ -193,43 +176,6 @@ export const ParkingMarkerOverlay = memo(function ParkingMarkerOverlay({
           zIndex: MAP_LAYERS.markers,
         }}
       >
-        {projectedZoneSummaries.length > 0 ? (
-          <Animated.View
-            entering={DETAIL_LAYER_ENTERING}
-            exiting={DETAIL_LAYER_EXITING}
-            pointerEvents="box-none"
-            style={{ flex: 1 }}
-          >
-            {projectedZoneSummaries.map(({ summary, x, y }) => (
-              <View
-                key={summary.zoneId}
-                pointerEvents="box-none"
-                style={{
-                  position: 'absolute',
-                  left: 0,
-                  top: 0,
-                  transform: [
-                    {
-                      translateX:
-                        x - ZONE_SUMMARY_MARKER_SIZE.width / 2,
-                    },
-                    {
-                      translateY:
-                        y - ZONE_SUMMARY_MARKER_SIZE.height / 2,
-                    },
-                  ],
-                  width: ZONE_SUMMARY_MARKER_SIZE.width,
-                  height: ZONE_SUMMARY_MARKER_SIZE.height,
-                }}
-              >
-                <ZoneSummaryMarker
-                  onPress={onZoneSummaryPress}
-                  summary={summary}
-                />
-              </View>
-            ))}
-          </Animated.View>
-        ) : null}
       </View>
     </>
   );
