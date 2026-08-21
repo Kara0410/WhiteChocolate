@@ -15,8 +15,10 @@ import {
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
+  Easing,
   interpolateColor,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withSpring,
   withTiming,
@@ -35,6 +37,7 @@ type BottomNavBarProps = {
   onLocationPress?: () => void;
   onProfilePress?: () => void;
   onFavoritePress?: () => void;
+  visible?: boolean;
 };
 
 type NavItem = {
@@ -50,6 +53,7 @@ type NavItem = {
 
 const ACTIVE_COLOR = '#FFFFFF';
 const INACTIVE_COLOR = 'rgba(255,255,255,0.64)';
+const NAVBAR_VISIBILITY_EASING = Easing.bezier(0.23, 1, 0.32, 1);
 
 const NavigationItem = memo(function NavigationItem({
   item,
@@ -133,9 +137,12 @@ export default function BottomNavBar({
   onLocationPress,
   onProfilePress,
   onFavoritePress,
+  visible = true,
 }: BottomNavBarProps) {
   const insets = useSafeAreaInsets();
+  const reduceMotion = useReducedMotion();
   const { width: windowWidth } = useWindowDimensions();
+  const visibilityProgress = useSharedValue(visible ? 1 : 0);
   const items = useMemo<NavItem[]>(
     () => [
       {
@@ -171,15 +178,43 @@ export default function BottomNavBar({
     ],
   );
 
+  useEffect(() => {
+    visibilityProgress.set(
+      withTiming(visible ? 1 : 0, {
+        duration: reduceMotion ? 120 : visible ? 220 : 180,
+        easing: NAVBAR_VISIBILITY_EASING,
+      }),
+    );
+  }, [reduceMotion, visibilityProgress, visible]);
+
+  const visibilityStyle = useAnimatedStyle(() => {
+    const progress = visibilityProgress.get();
+
+    return {
+      opacity: progress,
+      transform: [
+        {
+          translateY: reduceMotion ? 0 : (1 - progress) * 84,
+        },
+      ],
+    };
+  }, [reduceMotion]);
+
   return (
-    <View
+    <Animated.View
+      accessibilityElementsHidden={!visible}
+      aria-hidden={!visible}
       className="absolute left-0 right-0 h-[66px] items-center"
-      pointerEvents="box-none"
-      style={{
-        bottom: Math.max(insets.bottom, 8) + 12,
-        elevation: MAP_ELEVATIONS.navBar,
-        zIndex: MAP_LAYERS.navBar,
-      }}
+      importantForAccessibility={visible ? 'auto' : 'no-hide-descendants'}
+      pointerEvents={visible ? 'box-none' : 'none'}
+      style={[
+        {
+          bottom: Math.max(insets.bottom, 8) + 12,
+          elevation: MAP_ELEVATIONS.navBar,
+          zIndex: MAP_LAYERS.navBar,
+        },
+        visibilityStyle,
+      ]}
     >
       <View
         className="h-[66px] overflow-hidden rounded-[32px] border border-white/10 shadow-nav"
@@ -208,6 +243,6 @@ export default function BottomNavBar({
           ))}
         </View>
       </View>
-    </View>
+    </Animated.View>
   );
 }

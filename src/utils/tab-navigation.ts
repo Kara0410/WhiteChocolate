@@ -1,10 +1,22 @@
 import type { NavItemKey } from '@/components/BottomNavBar';
-import type { MapOverlayMode } from '@/context/MapOverlayContext';
+import type {
+  FocusedMapSurface,
+  MapOverlayMode,
+} from '@/context/MapOverlayContext';
 
 type ActiveNavItemOptions = {
   activeOverlay: MapOverlayMode;
   isAccountRoute: boolean;
 };
+
+type BottomNavVisibilityOptions = ActiveNavItemOptions & {
+  focusedMapSurface: FocusedMapSurface;
+  isMapRoute: boolean;
+};
+
+export function isAccountPathname(pathname: string) {
+  return pathname.endsWith('/account') || pathname.includes('/account/');
+}
 
 export function getActiveNavItemKey({
   activeOverlay,
@@ -19,6 +31,19 @@ export function getActiveNavItemKey({
   }
 
   return 'location';
+}
+
+export function shouldShowBottomNav({
+  activeOverlay,
+  focusedMapSurface,
+  isAccountRoute,
+  isMapRoute,
+}: BottomNavVisibilityOptions) {
+  if (isAccountRoute || !isMapRoute) {
+    return false;
+  }
+
+  return activeOverlay === 'none' && focusedMapSurface === 'none';
 }
 
 export function createLocationFocusKey(

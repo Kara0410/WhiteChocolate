@@ -255,6 +255,10 @@ export const ParkingBottomSheet = forwardRef<
     else sheetRef.current?.close();
   }, [selectedItemId]);
 
+  const closeSheet = useCallback(() => {
+    sheetRef.current?.close();
+  }, []);
+
   return (
     <BottomSheet
       animationConfigs={animationConfigs}
@@ -268,7 +272,7 @@ export const ParkingBottomSheet = forwardRef<
       snapPoints={snapPoints}
       style={styles.sheet}
     >
-      {item ? <ParkingDetailContent item={item} onClose={onClose} /> : null}
+      {item ? <ParkingDetailContent item={item} onClose={closeSheet} /> : null}
     </BottomSheet>
   );
 });

@@ -16,6 +16,8 @@ import { useAccount } from '@/hooks/use-account';
 import {
   createLocationFocusKey,
   getActiveNavItemKey,
+  isAccountPathname,
+  shouldShowBottomNav,
 } from '@/utils/tab-navigation';
 
 function TabNavigation() {
@@ -26,13 +28,13 @@ function TabNavigation() {
   const {
     activeOverlay,
     closeOverlay,
+    focusedMapSurface,
     isLocationLoading,
     toggleOverlay,
   } = useMapOverlay();
   const locationFocusSequenceRef = useRef(0);
   const isMapRoute = pathname.endsWith('/map');
-  const isAccountRoute =
-    pathname.endsWith('/account') || pathname.includes('/account/');
+  const isAccountRoute = isAccountPathname(pathname);
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener(
@@ -79,6 +81,12 @@ function TabNavigation() {
     activeOverlay,
     isAccountRoute,
   });
+  const isBottomNavVisible = shouldShowBottomNav({
+    activeOverlay,
+    focusedMapSurface,
+    isAccountRoute,
+    isMapRoute,
+  });
 
   return (
     <View className="flex-1 bg-warm-bg">
@@ -106,6 +114,7 @@ function TabNavigation() {
 
           showOverlay('favorites');
         }}
+        visible={isBottomNavVisible}
       />
     </View>
   );
