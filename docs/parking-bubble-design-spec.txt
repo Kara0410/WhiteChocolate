@@ -1,0 +1,569 @@
+PARKING BUBBLE & MAP MARKER DESIGN SPECIFICATION
+WhiteChocolate current implementation audit
+Generated: 2026-08-21
+Repository: Kara0410/WhiteChocolate
+Branch: master
+Commit: 16735a680013145ebb2395196d5e54b4ff8f64a6
+
+This is a source-of-truth snapshot of what the application renders today. It is
+not a redesign proposal. The Markdown document beside this file contains full
+tables, source traceability, and deeper analysis.
+
+==================================================
+DESIGNER QUICK REFERENCE
+==================================================
+
+High: #22C55E / rgb(34, 197, 94)
+Medium: #FF9500 / rgb(255, 149, 0)
+Low: #FF2D2D / rgb(255, 45, 45)
+Unknown spot: #F8FAFC fill, #64748B text, #CBD5E1 border
+
+Production spot canvas: 78 x 50 px
+Production spot pill: 68 x 36 px
+Production spot type: 18 px / 20 px, system sans, weight 900
+
+Cluster large: 132 x 52 canvas; min 86 x 44 pill
+Cluster medium: 124 x 50 canvas; min 80 x 42 pill
+Cluster small: 116 x 48 canvas; min 74 x 40 pill
+
+Spot border: 3 px default; 3.5 px selected
+Cluster border: 1 px #DBEAFE; selected 2 px #2563EB
+Spot selected scale: 1.12
+Cluster selected scale: 1.05
+Spot touch-down scale: 0.95
+Cluster touch-down scale: 0.97
+Press spring: damping 18, stiffness 260, mass 0.65
+Selection duration: 160 ms
+Thresholds after round/clamp: high >=66; medium 33-65; low 0-32
+
+==================================================
+VISUAL MODEL
+==================================================
+
+Individual parking markers are compact, fully rounded status-color pills with
+bold availability text. Known states use white text and a white outline.
+Selection enlarges the pill, adds a colored aura and strong status glow, and
+reveals a downward pointer. Unknown uses a near-white/slate treatment.
+
+Clusters are white pills with a dark area-count label, status-color dot, and
+pale-blue outline. Selected clusters use a blue border and blue shadow. They do
+not use an aura or pointer.
+
+At wider zoom levels, separate cell-summary pills replace availability bubbles.
+Search destination and user location are separate red-pin and blue-dot families.
+
+==================================================
+COMPONENT CHAIN
+==================================================
+
+ParkingMap
+  -> ParkingMarkerOverlay: projection, layer, transitions
+    -> ParkingMarkerCard: data/status/tier adapter and entry animation
+      -> ParkingAvailabilityBubble: body, text, aura, pointer, touch motion
+
+Other marker families:
+  CellSummaryMarker: semantic zoom aggregate
+  SearchDestinationMarker: searched location
+  UserLocationMarker: current device position
+
+Visual sources:
+  src/components/parking-map/ParkingAvailabilityBubble.tsx
+  src/components/parking-map/parking-availability-status.ts
+  src/components/parking-map/marker-visuals.ts
+  src/components/parking-map/parking-marker-card.tsx
+  src/components/parking-map/parking-marker-overlay.tsx
+  src/components/parking-map/cell-summary-marker.tsx
+  src/components/parking-map/search-destination-marker.tsx
+  src/components/parking-map/user-location-marker.tsx
+
+==================================================
+ACTIVE COLORS
+==================================================
+
+HIGH
+Fill/ring/tint/moving fill: #22C55E / rgb(34, 197, 94)
+Ring track: rgba(34, 197, 94, 0.20)
+Glow/aura: rgba(34, 197, 94, 0.42)
+Strong selected glow: rgba(34, 197, 94, 0.58)
+
+MEDIUM
+Fill/ring/tint/moving fill: #FF9500 / rgb(255, 149, 0)
+Ring track: rgba(255, 149, 0, 0.20)
+Glow/aura: rgba(255, 149, 0, 0.42)
+Strong selected glow: rgba(255, 149, 0, 0.58)
+
+LOW
+Fill/ring/tint/moving fill: #FF2D2D / rgb(255, 45, 45)
+Ring track: rgba(255, 45, 45, 0.20)
+Glow/aura: rgba(255, 45, 45, 0.42)
+Strong selected glow: rgba(255, 45, 45, 0.58)
+
+UNKNOWN THEME
+Theme fill/ring/tint/moving fill: #64748B / rgb(100, 116, 139)
+Theme ring: #94A3B8 / rgb(148, 163, 184)
+Ring track: rgba(148, 163, 184, 0.24)
+Glow: rgba(100, 116, 139, 0.26)
+Strong selected glow: rgba(100, 116, 139, 0.34)
+Visible spot fill: #F8FAFC / rgb(248, 250, 252)
+Visible spot text: #64748B / rgb(100, 116, 139)
+Visible spot border: #CBD5E1 / rgb(203, 213, 225)
+
+SHARED / CLUSTER
+Known spot text and border: #FFFFFF / rgb(255, 255, 255)
+Cluster body: #FFFFFF / rgb(255, 255, 255)
+Cluster text: #0F172A / rgb(15, 23, 42)
+Cluster default border: #DBEAFE / rgb(219, 234, 254)
+Cluster selected border: #2563EB / rgb(37, 99, 235)
+Cluster selected shadow color: rgba(37, 99, 235, 0.26)
+Cluster fallback glow argument: rgba(15, 23, 42, 0.28); currently unreachable
+
+OTHER MARKERS
+Cell border brand-300: #93C5FD / rgb(147, 197, 253)
+Cell background brand-50: #EFF6FF / rgb(239, 246, 255)
+Cell dot brand-500: #3B82F6 / rgb(59, 130, 246)
+Cell text brand-950: #172554 / rgb(23, 37, 84)
+Cell shadow: rgba(30, 64, 175, 0.18)
+Destination fill: #EF4444 / rgb(239, 68, 68)
+Destination shadow: rgba(127, 29, 29, 0.28)
+User core brand-600: #2563EB / rgb(37, 99, 235)
+User pulse brand-500/30: rgba(59, 130, 246, 0.30)
+User shadow: rgba(15, 23, 42, 0.35)
+
+Active marker source count: 38 unique declared/resolved values (16 opaque and
+22 distinct translucent RGBA recipes), excluding transparent. 37 can affect
+current output; the cluster fallback rgba value is unreachable in current code.
+
+==================================================
+AVAILABILITY LOGIC
+==================================================
+
+Processing order:
+1. Math.round(value)
+2. Clamp to 0 through 100 inclusive
+3. High if >=66; medium if >=33; otherwise low
+
+65.5 -> 66 -> high
+32.5 -> 33 -> medium
+Above 100 -> 100
+Below 0 -> 0
+
+The bubble treats null and non-finite input as unknown. The lower-level utility
+alone normalizes NaN to 0, but the component's finite-value gate runs first.
+
+Known text example: 72%
+Unknown text: em dash (—)
+Unknown accessibility: Parking availability unavailable
+
+==================================================
+INDIVIDUAL PARKING BUBBLE GEOMETRY
+==================================================
+
+SMALL
+Canvas: 66 x 46 px
+Pill: 58 x 32 px
+Type: 16 px / 18 px
+
+MEDIUM
+Canvas: 72 x 50 px
+Pill: 64 x 34 px
+Type: 17 px / 19 px
+
+LARGE / PRODUCTION SPOT
+Canvas: 78 x 50 px
+Pill: 68 x 36 px
+Type: 18 px / 20 px
+
+ALL SIZES
+Pill radius: 999 px (full pill)
+Default border: 3 px
+Selected border: 3.5 px
+Aura dimensions: body width +8 px; body height +8 px
+Aura extension: 4 px each side; top offset -4 px
+Hit slop: 4 px each side
+Pressable: fills fixed canvas
+
+TYPOGRAPHY
+Font family: platform default system sans
+Weight: 900 / font-black
+Alignment: centered
+Letter spacing: -0.45 px
+Numeric behavior: tabular numerals
+Lines: one
+
+POINTER / TAIL (SPOT ONLY, SELECTED ONLY)
+Container: 0 x 11 px
+Outer triangle: left 8, right 8, top 11; white; left -8; top 0
+Inner triangle: left 5, right 5, top 7; current fill; left -5; top -3
+Animation: opacity 0 to 1; scale 0.75 to 1 over 160 ms
+The default state has no visible tail.
+
+==================================================
+CLUSTER BUBBLE GEOMETRY
+==================================================
+
+SMALL
+Canvas: 116 x 48 px
+Minimum pill: 74 x 40 px
+Type: 13 px / 15 px
+Padding: left 28 px; right 16 px
+
+MEDIUM
+Canvas: 124 x 50 px
+Minimum pill: 80 x 42 px
+Type: 14 px / 16 px
+Padding: left 29 px; right 17 px
+
+LARGE
+Canvas: 132 x 52 px
+Minimum pill: 86 x 44 px
+Type: 15 px / 17 px
+Padding: left 30 px; right 18 px
+
+ALL SIZES
+Body: white
+Radius: 999 px
+Dot: 7 x 7 px; left 12 px; vertically centered; opacity 0.95
+Default border: 1 px #DBEAFE
+Selected border: 2 px #2563EB
+Hit slop: 4 px each side
+No pointer and no aura
+
+COUNT TEXT
+0 areas
+1 area
+N areas
+Above 999: 999+ areas
+Input count is rounded, finite, and clamped to at least zero.
+
+==================================================
+SHADOWS AND DEPTH
+==================================================
+
+Spot default:
+  0 3px 9px rgba(15, 23, 42, 0.24)
+  X 0, Y 3, blur 9, spread 0, elevation 3
+
+Spot selected:
+  0 7px 18px 2px using state glowStrong
+  X 0, Y 7, blur 18, spread 2, elevation 5
+
+Spot moving:
+  0 1px 3px rgba(15, 23, 42, 0.18)
+  X 0, Y 1, blur 3, spread 0
+
+Cluster default:
+  0 8px 18px rgba(15, 23, 42, 0.22)
+  X 0, Y 8, blur 18, spread 0, elevation 6
+
+Cluster selected:
+  0 9px 20px rgba(37, 99, 235, 0.26)
+  X 0, Y 9, blur 20, spread 0, elevation 8
+
+Cluster moving:
+  0 3px 8px rgba(15, 23, 42, 0.16)
+  X 0, Y 3, blur 8, spread 0
+
+Cell: 0 7px 16px rgba(30, 64, 175, 0.18)
+Search destination: 0 4px 10px rgba(127, 29, 29, 0.28)
+User core: 0 1px 4px rgba(15, 23, 42, 0.35)
+
+==================================================
+SELECTION, PRESS, AND ANIMATION
+==================================================
+
+Spot default scale: 1.00
+Spot selected scale: 1.12
+Spot touch down: 0.95
+
+Cluster default scale: 1.00
+Cluster selected scale: 1.05
+Cluster touch down: 0.97
+
+Externally forced pressed state rests at 0.95 for either type.
+Touch release returns to selected/default resting scale.
+
+Selection transition: 160 ms timing, ReduceMotion.System
+Press spring: damping 18, stiffness 260, mass 0.65, ReduceMotion.System
+Aura: opacity 0->1, scale 0.82->1, 160 ms
+Pointer: opacity 0->1, scale 0.75->1, 160 ms
+Marker card enter: ZoomIn 200 ms, opacity 0 / scale 0.92 -> 1
+Semantic stage: FadeIn 180 ms, FadeOut 140 ms
+Search recommendation: ZoomIn 180 ms / FadeOut 140 ms
+Cell press: 0.96, spring damping 18, stiffness 320, default mass
+Destination enter: ZoomIn 170 ms, opacity 0 / scale 0.92 -> 1
+User pulse: 1600 ms, scale 1->2.25, opacity 0.34->0, infinite
+
+All bubble/card/stage/cell animations use system reduced-motion handling.
+Destination entry and user pulse do not specify reduced-motion behavior.
+
+==================================================
+SELECTED AURA
+==================================================
+
+Spot only. It sits behind the pill.
+Width formula: body width + 8 px
+Height formula: body height + 8 px
+Top: -4 px
+Radius: 999 px
+High/medium/low alpha: 42%
+Unknown alpha: 26%
+Initial: opacity 0, scale 0.82
+Selected: opacity 1, scale 1
+Duration: 160 ms
+Moving mode: hidden
+
+==================================================
+ZOOM AND SEMANTIC MARKERS
+==================================================
+
+INDIVIDUAL SIZE
+All individual markers return the spot tier and render the large 68 x 36 pill.
+
+CLUSTER SIZE
+Zoom <=10: large
+Zoom >10 and <=13: medium
+Zoom >13: small
+
+Normal clusters begin at zoom 14.7, so ordinary production clusters normally
+render small. Other tiers remain supported by the reusable component.
+
+SEMANTIC STAGES
+City: initial zoom below 12.2; return threshold <=11.8
+Cell: zoom 12.2 to below 14.7; return threshold <=14.3
+Segment cluster: zoom 14.7 to below 16.2; return threshold <=15.8
+Segment: zoom >=16.2
+
+City/cell -> cell summary markers
+Segment cluster -> clusters plus unclustered spot bubbles
+Segment -> individual segment bubbles
+
+CELL RESOLUTION
+City: max 24; horizontal/vertical gap 24/20 px
+Cell coarse below zoom 14; fine at/above 14
+Cell: max 48; horizontal/vertical gap 12/10 px
+
+CLUSTER DENSITY
+Zoom <=10: radius 64, marker cap 20
+Zoom >10 to <=13: radius 48, cap 50
+Zoom >13 to <=15: radius 32, cap 90
+Zoom >15: radius 16, cap 140
+Supercluster maximum zoom: 16
+Maximum clustering features: 180
+Collision footprint: canvas width +4 and height +4
+
+Selected parking: sole normal displayed parking marker
+Search destination: top three recommendation parking markers displayed
+
+==================================================
+MOVING / PERFORMANCE MODE
+==================================================
+
+Starts during camera movement and clears 150 ms after the final event.
+
+Visual changes:
+- reduced, tighter shadows
+- marker card entry animation omitted
+- selected aura and pointer hidden
+- selected scale, border, and elevation remain
+- high/medium/low fill colors remain unchanged
+- unknown spot remains near-white
+
+These are performance optimizations, not a new semantic status.
+
+==================================================
+POSITIONING AND LAYERS
+==================================================
+
+Projection:
+translateX = projected x - canvas width / 2
+translateY = projected y - canvas height / 2
+
+The canvas is centered on the coordinate and is larger than the visual pill so
+effects and pointer can fit. Selected local marker z-index is 2; default is 1.
+
+Map layer: z 0, elevation 0
+Marker layer: z 10, elevation 2
+Marker highlight layer: z 20, elevation 4
+Floating controls: z 40, elevation 6
+
+Search destination and user location share the highlight layer. User location
+is rendered later and may paint above destination at an exact overlap.
+
+==================================================
+CELL SUMMARY MARKER
+==================================================
+
+Role: semantic zoom aggregate marker, not an availability bubble
+Canvas: 112 x 44 px
+Inner height: 38 px
+Maximum width: 112 px
+Horizontal padding: 12 px each side
+Border: 1 px #93C5FD
+Background: #EFF6FF
+Dot: 7 x 7 px, #3B82F6, 7 px right margin
+Text: #172554; 12/15 px; weight 800; tabular system sans
+Radius: 9999 px / full pill
+Shadow: 0 7px 16px rgba(30, 64, 175, 0.18)
+Hit slop: 6 px
+Pressed scale: 0.96
+Spring: damping 18, stiffness 320, default mass
+Press camera zoom target: 14.9
+
+Content: de-DE formatted capacity plus space/spaces when capacity exists;
+otherwise segment count plus parking area/parking areas.
+
+==================================================
+SEARCH DESTINATION MARKER
+==================================================
+
+Canvas: 40 x 44 px
+Lucide MapPin: size 38; fill #EF4444; white stroke; stroke width 1.8
+Center dot: 8 x 8 px; white; left 15; top 11; full radius
+Shadow: 0 4px 10px rgba(127, 29, 29, 0.28)
+Projection offset: x -20; y -38
+Layer: z 20, elevation 4
+Entry: ZoomIn 170 ms from opacity 0 / scale 0.92
+Accessibility: image, Searched destination
+Interaction: none
+
+==================================================
+USER LOCATION MARKER
+==================================================
+
+Canvas: 28 x 28 px; position x/y -14
+Pulse: 20 x 20 px; radius 10; rgba(59, 130, 246, 0.30)
+Pulse animation: 1600 ms; scale 1->2.25; opacity 0.34->0; infinite
+Pulse starting effective alpha: approximately 10.2%
+Core: 18 x 18 px; radius 9; 3 px white border; #2563EB fill
+Core shadow: 0 1px 4px rgba(15, 23, 42, 0.35)
+Layer: z 20, elevation 4
+Interaction: none
+
+==================================================
+STATE MATRIX SUMMARY
+==================================================
+
+Spot high/default: green pill, white type/border, default slate shadow
+Spot medium/default: orange pill, white type/border, default slate shadow
+Spot low/default: red pill, white type/border, default slate shadow
+Spot unknown/default: near-white pill, slate em dash, pale-slate border
+Spot selected: 1.12, 3.5 border, aura, pointer, strong status shadow
+Spot moving: reduced shadow; aura/pointer hidden; selection body retained
+
+Cluster high/default: white pill, green dot, pale-blue border
+Cluster medium/default: white pill, orange dot, pale-blue border
+Cluster low/default: white pill, red dot, pale-blue border
+Cluster unknown/default: white pill, slate dot, pale-blue border
+Cluster selected: 1.05, 2 px blue border, selected blue shadow
+Cluster moving: reduced shadow; selected body treatment retained
+
+==================================================
+COMPETING PALETTES — NOT USED BY THE BUBBLE
+==================================================
+
+Warm availability/Tailwind:
+Low #78AFC8 / rgb(120, 175, 200)
+Medium #B7B068 / rgb(183, 176, 104)
+High #DFA536 / rgb(223, 165, 54)
+Unknown #C9C4B8 / rgb(201, 196, 184)
+
+PM semantics:
+Success #34C759 / rgb(52, 199, 89)
+Warning #FF9F0A / rgb(255, 159, 10)
+Danger #D92D20 / rgb(217, 45, 32)
+
+Generic status:
+Success #059669 / rgb(5, 150, 105)
+Warning #D97706 / rgb(217, 119, 6)
+Danger #DC2626 / rgb(220, 38, 38)
+Unavailable #94A3B8 / rgb(148, 163, 184)
+
+Utility palette:
+Emerald #10B981/#047857 = rgb(16,185,129) / rgb(4,120,87)
+Orange #F97316/#EA580C/#C2410C = rgb(249,115,22) / rgb(234,88,12) / rgb(194,65,12)
+Red #DC2626/#B91C1C/#991B1B = rgb(220,38,38) / rgb(185,28,28) / rgb(153,27,27)
+
+Parking-detail unknown also differs:
+Fill #64748B / rgb(100,116,139)
+Text #475569 / rgb(71,85,105)
+Ring #94A3B8 / rgb(148,163,184)
+Track #E2E8F0 / rgb(226,232,240)
+glow rgba(100, 116, 139, 0.20); strong glow rgba(100, 116, 139, 0.25);
+Tint #F1F5F9 / rgb(241,245,249)
+Border #CBD5E1 / rgb(203,213,225)
+Moving #94A3B8 / rgb(148,163,184)
+
+The visible bubble uses 66/33 thresholds. A separate feature adapter derives
+colorStatus with 60/30 thresholds, but that field does not drive bubble color.
+
+Active declarations plus adjacent competing palette count: 60 distinct
+opaque/RGBA values, excluding transparent. 59 can participate in current
+rendering; one is the unreachable cluster fallback noted above.
+
+==================================================
+FIGMA BUILD CHECKLIST
+==================================================
+
+INDIVIDUAL PRODUCTION SPOT
+1. Frame 78 x 50, visible overflow.
+2. Pill 68 x 36, radius 999.
+3. Apply status fill or unknown near-white fill.
+4. Border 3 px; selected 3.5 px.
+5. Center 18/20 px, 900-weight, -0.45 tracking, tabular text.
+6. Create selected-only two-layer pointer.
+7. Apply default and status-specific selected shadows.
+8. Create 76 x 44 selected aura, 4 px extension.
+9. Create availability x interaction x performance variants.
+
+CLUSTER
+1. Choose fixed canvas and size-specific minimum pill.
+2. White full-radius pill.
+3. Border 1 px #DBEAFE; selected 2 px #2563EB.
+4. Add 7 px status dot at x=12, vertically centered, 95% opacity.
+5. Apply exact left/right padding for size.
+6. Add dark weight-900 count label with size-specific type.
+7. Apply default/selected/moving shadows.
+8. Build default, selected, pressed, moving variants; no tail/aura.
+
+==================================================
+DESIGNER-EDITABLE VS LOGIC-DEPENDENT
+==================================================
+
+SAFE VISUAL VARIABLES, SUBJECT TO IMPLEMENTATION REVIEW:
+Colors, borders, dimensions, radius, padding, type, shadows, aura, pointer,
+animation duration, and spring feel.
+
+LOGIC-DEPENDENT / BEHAVIORAL:
+Availability thresholds, semantic zoom boundaries, cluster radii, marker caps,
+cell aggregation, count content, collision priority, projection, data, selected
+substitution, and search recommendations.
+
+==================================================
+DESIGN REVIEW OPPORTUNITIES
+==================================================
+
+- Multiple competing availability palettes and threshold systems
+- White text contrast on bright green/orange
+- Pointer appears only in selected state
+- Selected state combines scale, border, aura, shadow, and pointer
+- Normal production clusters nearly always use only small tier
+- Unknown-state inconsistency across bubble, cluster, and detail UI
+- Destination entry/user pulse lack explicit reduced-motion handling
+- Mixture of hardcoded colors and centralized NativeWind tokens
+
+==================================================
+TECHNICAL OBSERVATIONS — NO CODE CHANGED
+==================================================
+
+- Cluster accessibility can produce duplicated wording such as
+  "12 areas parking areas."
+- Derived square canvasSize values are not authoritative in projection.
+- Outgoing features are retained for 200 ms, while keyed wrappers provide the
+  visible stage transition.
+- A third marker overlay layer exists structurally but is empty in the inspected
+  production path.
+- The legacy src/app/parking/[id].tsx route uses provider-native markers and is
+  not part of this custom bubble system.
+
+For exact source-per-token traceability, full state tables, and Figma formulas,
+see docs/parking-bubble-design-spec.md.

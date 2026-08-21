@@ -89,7 +89,8 @@ test('navbar exposes an accessible loading-aware Location action', async () => {
     navbar,
     /accessibilityHint: 'Centers the map on your current location'/,
   );
-  assert.match(navbar, /icon: LocateFixed/);
+  assert.match(navbar, /icon: Navigation/);
+  assert.doesNotMatch(navbar, /LocateFixed/);
   assert.match(navbar, /disabled: isLocationLoading/);
   assert.match(navbar, /<ActivityIndicator color=\{color\} size="small"/);
 });

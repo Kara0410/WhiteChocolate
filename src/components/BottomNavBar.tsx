@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import {
   Heart,
-  LocateFixed,
+  Navigation,
   UserRound,
   type LucideIcon,
 } from 'lucide-react-native';
@@ -151,7 +151,7 @@ export default function BottomNavBar({
         disabled: isLocationLoading,
         key: 'location',
         label: 'LOCATION',
-        icon: LocateFixed,
+        icon: Navigation,
         loading: isLocationLoading,
         onPress: onLocationPress,
       },
