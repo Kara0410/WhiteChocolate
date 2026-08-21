@@ -2,9 +2,11 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { MapSearchBar } from '@/components/parking-map/map-search-bar';
 import { ParkingMap } from '@/components/parking-map/parking-map';
 import { useOnboarding } from '@/context/OnboardingContext';
 import { useMapLocation } from '@/hooks/use-map-location';
+import { getMapSearchControlTop } from '@/utils/map-search-layout';
 
 function DevelopmentOnboardingReset({ top }: { top: number }) {
   const router = useRouter();
@@ -78,7 +80,10 @@ export default function MapScreen() {
         searchFocusKey={focusSearch}
         userLocation={userLocation}
       />
-      <DevelopmentOnboardingReset top={Math.max(insets.top, 12) + 12} />
+      <MapSearchBar />
+      <DevelopmentOnboardingReset
+        top={getMapSearchControlTop(insets.top) + 52}
+      />
     </View>
   );
 }

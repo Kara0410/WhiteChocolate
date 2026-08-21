@@ -58,6 +58,7 @@ import {
   SEARCH_NEARBY_RESULT_LIMIT,
   type ParkingSpotWithDistance,
 } from '@/utils/parkingSearch';
+import { getMapSearchControlTop } from '@/utils/map-search-layout';
 import {
   canFocusParkingCamera,
   shouldDeferParkingCameraCommand,
@@ -1334,7 +1335,7 @@ export function ParkingMap({
   }, [favoriteFocusKey, favoriteItems, favoriteSpotId, selectParkingItem]);
 
   useEffect(() => {
-    if (activeOverlay === 'none') {
+    if (activeOverlay === 'none' || activeOverlay === 'search') {
       return;
     }
 
@@ -1536,7 +1537,7 @@ export function ParkingMap({
             left: 0,
             position: 'absolute',
             right: 0,
-            top: insets.top + 12,
+            top: getMapSearchControlTop(insets.top),
             zIndex: MAP_LAYERS.floatingControls,
           }}
         >

@@ -127,6 +127,17 @@ export function useGooglePlaceSearch() {
     setSessionToken(createSearchSessionToken());
   }, []);
 
+  const clearQuery = useCallback(() => {
+    autocompleteRequestIdRef.current += 1;
+    autocompleteAbortRef.current?.abort();
+    autocompleteAbortRef.current = null;
+    setQuery('');
+    setDebouncedQuery('');
+    setSuggestions([]);
+    setError(null);
+    setIsLoading(false);
+  }, []);
+
   const resetSearch = useCallback(() => {
     autocompleteRequestIdRef.current += 1;
     detailsRequestIdRef.current += 1;
@@ -205,6 +216,7 @@ export function useGooglePlaceSearch() {
 
   return {
     beginSearchSession,
+    clearQuery,
     debouncedQuery,
     error,
     hasSearched,

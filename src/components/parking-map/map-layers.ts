@@ -6,8 +6,9 @@ export const MAP_LAYERS = {
   bottomSheetHost: 100,
   // Keep the existing sheet-body styles unchanged.
   bottomSheet: 100,
-  navBackdrop: 190,
   navBar: 200,
+  mapSearchBackdrop: 210,
+  mapSearch: 220,
 } as const;
 
 export const MAP_ELEVATIONS = {
@@ -18,6 +19,7 @@ export const MAP_ELEVATIONS = {
   bottomSheetHost: 12,
   // Keep the existing sheet-body styles unchanged.
   bottomSheet: 12,
-  navBackdrop: 18,
   navBar: 20,
+  mapSearchBackdrop: 22,
+  mapSearch: 24,
 } as const;

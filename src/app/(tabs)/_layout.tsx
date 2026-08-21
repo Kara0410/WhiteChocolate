@@ -22,9 +22,6 @@ function TabNavigation() {
   const {
     activeOverlay,
     closeOverlay,
-    closeSearch,
-    isSearchActive,
-    openSearch,
     toggleOverlay,
   } = useMapOverlay();
   const isMapRoute = pathname.endsWith('/map');
@@ -57,14 +54,12 @@ function TabNavigation() {
     [isMapRoute, router, toggleOverlay],
   );
 
-  const activeKey: NavItemKey =
+  const activeKey: NavItemKey | undefined =
     isAccountRoute
       ? 'profile'
       : activeOverlay === 'favorites'
         ? 'favorite'
-        : activeOverlay === 'search'
-          ? 'search'
-          : 'search';
+        : undefined;
 
   return (
     <View className="flex-1 bg-warm-bg">
@@ -76,18 +71,10 @@ function TabNavigation() {
       </Stack>
       <BottomNavBar
         activeKey={activeKey}
-        isSearchActive={isSearchActive}
         onProfilePress={() => {
           closeOverlay();
           if (!isAccountRoute) {
             router.push('/account');
-          }
-        }}
-        onSearchCancel={closeSearch}
-        onSearchPress={() => {
-          openSearch();
-          if (!isMapRoute) {
-            router.replace('/map');
           }
         }}
         onFavoritePress={() => {
