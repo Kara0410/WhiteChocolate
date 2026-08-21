@@ -9,7 +9,7 @@ import {
   View,
   type LayoutChangeEvent,
 } from 'react-native';
-import { LocateFixed, MapPinned } from 'lucide-react-native';
+import { MapPinned } from 'lucide-react-native';
 import Animated, {
   FadeIn,
   FadeOut,
@@ -1361,14 +1361,21 @@ export function ParkingMap({
   useEffect(() => {
     if (
       currentLocationFocusKey === undefined ||
-      currentLocationFocusKey === lastLocationFocusKeyRef.current
+      currentLocationFocusKey === lastLocationFocusKeyRef.current ||
+      isLocationLoading ||
+      !onRequestUserLocation
     ) {
       return;
     }
 
     lastLocationFocusKeyRef.current = currentLocationFocusKey;
     void handleCurrentLocationPress();
-  }, [currentLocationFocusKey, handleCurrentLocationPress]);
+  }, [
+    currentLocationFocusKey,
+    handleCurrentLocationPress,
+    isLocationLoading,
+    onRequestUserLocation,
+  ]);
 
   useEffect(() => {
     if (
@@ -1603,22 +1610,6 @@ export function ParkingMap({
               ) : null}
             </View>
           ) : null}
-          <Pressable
-            accessibilityLabel="Center map on current location"
-            accessibilityRole="button"
-            accessibilityState={{
-              selected: mapMode === 'userLocation',
-            }}
-            className="h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white shadow-floating-deep active:bg-slate-100"
-            disabled={isLocationLoading}
-            onPress={handleCurrentLocationPress}
-          >
-            {isLocationLoading ? (
-              <ActivityIndicator color="#2563EB" size="small" />
-            ) : (
-              <LocateFixed color="#2563EB" size={22} strokeWidth={2.4} />
-            )}
-          </Pressable>
           <Pressable
             accessibilityHint="Returns to the full Munich parking map"
             accessibilityLabel="Show Munich parking overview"

@@ -1,6 +1,17 @@
 import { memo, useEffect, useMemo } from 'react';
-import { Pressable, Text, View } from 'react-native';
-import { Heart, UserRound, type LucideIcon } from 'lucide-react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
+import {
+  Heart,
+  LocateFixed,
+  UserRound,
+  type LucideIcon,
+} from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
@@ -16,18 +27,24 @@ import {
   MAP_LAYERS,
 } from '@/components/parking-map/map-layers';
 
-export type NavItemKey = 'favorite' | 'profile';
+export type NavItemKey = 'location' | 'favorite' | 'profile';
 
 type BottomNavBarProps = {
-  activeKey?: NavItemKey;
+  activeKey: NavItemKey;
+  isLocationLoading?: boolean;
+  onLocationPress?: () => void;
   onProfilePress?: () => void;
   onFavoritePress?: () => void;
 };
 
 type NavItem = {
+  accessibilityHint?: string;
+  accessibilityLabel: string;
+  disabled?: boolean;
   key: NavItemKey;
   label: string;
   icon: LucideIcon;
+  loading?: boolean;
   onPress?: () => void;
 };
 
@@ -68,10 +85,16 @@ const NavigationItem = memo(function NavigationItem({
 
   return (
     <Pressable
-      accessibilityLabel={item.label}
+      accessibilityLabel={item.accessibilityLabel}
+      accessibilityHint={item.accessibilityHint}
       accessibilityRole="tab"
-      accessibilityState={{ selected: active }}
+      accessibilityState={{
+        busy: item.loading === true,
+        disabled: item.disabled === true,
+        selected: active,
+      }}
       className="h-full min-w-11 flex-1 items-center justify-center"
+      disabled={item.disabled}
       hitSlop={6}
       onPress={item.onPress}
       onPressIn={() => {
@@ -86,7 +109,11 @@ const NavigationItem = memo(function NavigationItem({
         style={[activeStyle, animatedStyle]}
       >
         <View className="h-[29px] w-[29px] items-center justify-center rounded-[15px]">
-          <Icon color={color} size={19} strokeWidth={active ? 2.45 : 2.05} />
+          {item.loading ? (
+            <ActivityIndicator color={color} size="small" />
+          ) : (
+            <Icon color={color} size={19} strokeWidth={active ? 2.45 : 2.05} />
+          )}
         </View>
         <Text
           className="text-[8.5px] font-extrabold leading-[10px] tracking-[0.35px]"
@@ -102,26 +129,46 @@ const NavigationItem = memo(function NavigationItem({
 
 export default function BottomNavBar({
   activeKey,
+  isLocationLoading = false,
+  onLocationPress,
   onProfilePress,
   onFavoritePress,
 }: BottomNavBarProps) {
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
   const items = useMemo<NavItem[]>(
     () => [
       {
+        accessibilityHint: 'Centers the map on your current location',
+        accessibilityLabel: 'Current location',
+        disabled: isLocationLoading,
+        key: 'location',
+        label: 'LOCATION',
+        icon: LocateFixed,
+        loading: isLocationLoading,
+        onPress: onLocationPress,
+      },
+      {
+        accessibilityLabel: 'Favorites',
         key: 'favorite',
         label: 'FAVORITES',
         icon: Heart,
         onPress: onFavoritePress,
       },
       {
+        accessibilityLabel: 'You',
         key: 'profile',
         label: 'YOU',
         icon: UserRound,
         onPress: onProfilePress,
       },
     ],
-    [onFavoritePress, onProfilePress],
+    [
+      isLocationLoading,
+      onFavoritePress,
+      onLocationPress,
+      onProfilePress,
+    ],
   );
 
   return (
@@ -135,8 +182,11 @@ export default function BottomNavBar({
       }}
     >
       <View
-        className="h-[66px] w-[232px] overflow-hidden rounded-[32px] border border-white/10 shadow-nav"
-        style={{ borderCurve: 'continuous' }}
+        className="h-[66px] overflow-hidden rounded-[32px] border border-white/10 shadow-nav"
+        style={{
+          borderCurve: 'continuous',
+          width: Math.min(windowWidth - 32, 336),
+        }}
       >
         <BlurView
           className="absolute inset-0"

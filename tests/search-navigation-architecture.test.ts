@@ -10,12 +10,16 @@ async function source(path: string) {
   return readFile(resolve(root, path), 'utf8');
 }
 
-test('bottom navbar contains Favorites and You only', async () => {
+test('bottom navbar contains Location, Favorites, and You without Search', async () => {
   const navbar = await source('src/components/BottomNavBar.tsx');
 
+  assert.match(navbar, /label: 'LOCATION'/);
   assert.match(navbar, /label: 'FAVORITES'/);
   assert.match(navbar, /label: 'YOU'/);
-  assert.match(navbar, /NavItemKey = 'favorite' \| 'profile'/);
+  assert.match(
+    navbar,
+    /NavItemKey = 'location' \| 'favorite' \| 'profile'/,
+  );
   assert.doesNotMatch(navbar, /key: 'search'|useGooglePlaceSearch|TextInput/);
 });
 

@@ -1,9 +1,11 @@
+import { useEffect } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MapSearchBar } from '@/components/parking-map/map-search-bar';
 import { ParkingMap } from '@/components/parking-map/parking-map';
+import { useMapOverlay } from '@/context/MapOverlayContext';
 import { useOnboarding } from '@/context/OnboardingContext';
 import { useMapLocation } from '@/hooks/use-map-location';
 import { getMapSearchControlTop } from '@/utils/map-search-layout';
@@ -36,6 +38,7 @@ function DevelopmentOnboardingReset({ top }: { top: number }) {
 
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
+  const { setLocationLoading } = useMapOverlay();
   const { favoriteFocusKey, favoriteSpotId, focusSearch, locate } =
     useLocalSearchParams<{
     favoriteFocusKey?: string;
@@ -52,6 +55,18 @@ export default function MapScreen() {
     requestCurrentLocation,
     userLocation,
   } = useMapLocation({ resolveInitialCamera: true });
+
+  useEffect(() => {
+    setLocationLoading(isLocationLoading);
+  }, [isLocationLoading, setLocationLoading]);
+
+  useEffect(
+    () => () => {
+      setLocationLoading(false);
+    },
+    [setLocationLoading],
+  );
+
   if (initialCamera === null) {
     return (
       <View className="flex-1 items-center justify-center bg-slate-100">

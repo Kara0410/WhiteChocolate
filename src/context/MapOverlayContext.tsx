@@ -26,11 +26,13 @@ type MapOverlayContextValue = {
   closeOverlay: () => void;
   closeSearch: () => void;
   consumeSelection: (id: number) => void;
+  isLocationLoading: boolean;
   isSearchActive: boolean;
   openOverlay: (mode: Exclude<MapOverlayMode, 'none'>) => void;
   openSearch: () => void;
   selectPlace: (place: PlaceSearchResult) => void;
   selection: SearchSelection | null;
+  setLocationLoading: (isLoading: boolean) => void;
   toggleOverlay: (mode: Exclude<MapOverlayMode, 'none' | 'search'>) => void;
 };
 
@@ -38,6 +40,7 @@ const MapOverlayContext = createContext<MapOverlayContextValue | null>(null);
 
 export function MapOverlayProvider({ children }: PropsWithChildren) {
   const [activeOverlay, setActiveOverlay] = useState<MapOverlayMode>('none');
+  const [isLocationLoading, setLocationLoading] = useState(false);
   const [selection, setSelection] = useState<SearchSelection | null>(null);
   const selectionIdRef = useRef(0);
 
@@ -86,11 +89,13 @@ export function MapOverlayProvider({ children }: PropsWithChildren) {
       closeOverlay,
       closeSearch,
       consumeSelection,
+      isLocationLoading,
       isSearchActive: activeOverlay === 'search',
       openOverlay,
       openSearch,
       selectPlace,
       selection,
+      setLocationLoading,
       toggleOverlay,
     }),
     [
@@ -98,10 +103,12 @@ export function MapOverlayProvider({ children }: PropsWithChildren) {
       closeOverlay,
       closeSearch,
       consumeSelection,
+      isLocationLoading,
       openOverlay,
       openSearch,
       selectPlace,
       selection,
+      setLocationLoading,
       toggleOverlay,
     ],
   );

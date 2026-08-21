@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Stack, usePathname, useRouter } from 'expo-router';
 import { BackHandler, View } from 'react-native';
 import BottomNavBar, {
@@ -13,6 +13,10 @@ import {
 } from '@/context/MapOverlayContext';
 import { useAuthSheet } from '@/context/AuthSheetContext';
 import { useAccount } from '@/hooks/use-account';
+import {
+  createLocationFocusKey,
+  getActiveNavItemKey,
+} from '@/utils/tab-navigation';
 
 function TabNavigation() {
   const account = useAccount();
@@ -22,8 +26,10 @@ function TabNavigation() {
   const {
     activeOverlay,
     closeOverlay,
+    isLocationLoading,
     toggleOverlay,
   } = useMapOverlay();
+  const locationFocusSequenceRef = useRef(0);
   const isMapRoute = pathname.endsWith('/map');
   const isAccountRoute =
     pathname.endsWith('/account') || pathname.includes('/account/');
@@ -54,12 +60,25 @@ function TabNavigation() {
     [isMapRoute, router, toggleOverlay],
   );
 
-  const activeKey: NavItemKey | undefined =
-    isAccountRoute
-      ? 'profile'
-      : activeOverlay === 'favorites'
-        ? 'favorite'
-        : undefined;
+  const handleLocationPress = useCallback(() => {
+    if (isLocationLoading) {
+      return;
+    }
+
+    closeOverlay();
+    locationFocusSequenceRef.current += 1;
+    router.replace({
+      pathname: '/map',
+      params: {
+        locate: createLocationFocusKey(locationFocusSequenceRef.current),
+      },
+    });
+  }, [closeOverlay, isLocationLoading, router]);
+
+  const activeKey: NavItemKey = getActiveNavItemKey({
+    activeOverlay,
+    isAccountRoute,
+  });
 
   return (
     <View className="flex-1 bg-warm-bg">
@@ -71,6 +90,8 @@ function TabNavigation() {
       </Stack>
       <BottomNavBar
         activeKey={activeKey}
+        isLocationLoading={isLocationLoading}
+        onLocationPress={handleLocationPress}
         onProfilePress={() => {
           closeOverlay();
           if (!isAccountRoute) {
