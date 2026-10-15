@@ -21,6 +21,7 @@ module.exports = {
           secondary: colors.text.secondary,
           placeholder: colors.text.placeholder,
           muted: colors.text.muted,
+          metadata: colors.text.metadata,
           'on-accent': colors.text.onAccent,
         },
         icon: {
@@ -37,6 +38,7 @@ module.exports = {
           'glass-tint': colors.surface.glassTint,
           'glass-dense': colors.surface.glassDense,
           'glass-readable': colors.surface.glassReadable,
+          'glass-card': colors.surface.glassCard,
         },
         border: {
           subtle: colors.border.subtle,
@@ -140,6 +142,7 @@ module.exports = {
         md: `${radii.md}px`,
         control: `${radii.control}px`,
         card: `${radii.card}px`,
+        'list-card': `${radii.listCard}px`,
         sheet: `${radii.sheet}px`,
         navigation: `${radii.navigation}px`,
         search: `${radii.search}px`,

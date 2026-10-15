@@ -3,7 +3,7 @@ import BottomSheet, {
   BottomSheetFlatList,
   useBottomSheetSpringConfigs,
 } from '@gorhom/bottom-sheet';
-import { ChevronDown, ChevronUp, MapPin, Navigation, X } from 'lucide-react-native';
+import { ArrowRight, ChevronDown, ChevronUp, MapPin, X } from 'lucide-react-native';
 import {
   ActivityIndicator,
   Pressable,
@@ -11,21 +11,22 @@ import {
   Text,
   View,
 } from 'react-native';
-import Svg, { Circle } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   MAP_ELEVATIONS,
   MAP_LAYERS,
 } from '@/components/parking-map/map-layers';
+import { ParkingAreaListItem } from '@/components/parking-map/ParkingAreaListItem';
+import { GlassSheetBackground } from '@/components/parking-map/glass-sheet-background';
 import type { PlaceSearchResult } from '@/hooks/use-google-place-search';
 import type { ParkingClusterResponse } from '@/types/parking-map';
 import {
+  formatParkingPriceLabel,
   formatSearchDistance,
   type ParkingSpotWithDistance,
 } from '@/utils/parkingSearch';
 
-import { getAvailabilityTheme } from './parking-availability-status';
 import { COLORS, RADII, SHADOWS } from '@/constants/theme';
 
 type SearchNearestSpotsBottomSheetProps = {
@@ -42,117 +43,6 @@ type SearchNearestSpotsBottomSheetProps = {
 const INITIAL_VISIBLE_RESULTS = 5;
 /** Hard cap for the expanded list; the rest stays available on the map flow. */
 const EXPANDED_VISIBLE_RESULTS = 12;
-
-const RING_SIZE = 42;
-const RING_STROKE = 5;
-const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
-const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
-
-function clampPercentage(value: number) {
-  return Math.max(0, Math.min(100, Math.round(value)));
-}
-
-function formatPrice(item: ParkingClusterResponse) {
-  const price = item.avgPrice ?? item.minPrice;
-  if (item.pricingStatus === 'free') {
-    return 'Free';
-  }
-  return price === null ? 'Price unavailable' : `EUR ${price.toFixed(2)} / hr`;
-}
-
-function AvailabilityRing({ percentage }: { percentage: number | null }) {
-  const theme =
-    percentage === null
-      ? { ring: COLORS.text.muted, ringTrack: COLORS.border.subtle, text: COLORS.text.secondary }
-      : getAvailabilityTheme(percentage);
-  const ringOffset =
-    percentage === null
-      ? RING_CIRCUMFERENCE
-      : RING_CIRCUMFERENCE * (1 - percentage / 100);
-
-  return (
-    <View className="items-center justify-center">
-      <Svg
-        height={RING_SIZE}
-        style={{ transform: [{ rotate: '-90deg' }] }}
-        width={RING_SIZE}
-      >
-        <Circle
-          cx={RING_SIZE / 2}
-          cy={RING_SIZE / 2}
-          fill={COLORS.surface.glassReadable}
-          r={RING_RADIUS}
-          stroke={theme.ringTrack}
-          strokeWidth={RING_STROKE}
-        />
-        <Circle
-          cx={RING_SIZE / 2}
-          cy={RING_SIZE / 2}
-          fill="none"
-          r={RING_RADIUS}
-          stroke={theme.ring}
-          strokeDasharray={`${RING_CIRCUMFERENCE} ${RING_CIRCUMFERENCE}`}
-          strokeDashoffset={ringOffset}
-          strokeLinecap="round"
-          strokeWidth={RING_STROKE}
-        />
-      </Svg>
-      <Text
-        className="absolute text-[11px] font-extrabold"
-        style={{ color: theme.text, fontVariant: ['tabular-nums'] }}
-      >
-        {percentage === null ? '—' : `${percentage}%`}
-      </Text>
-    </View>
-  );
-}
-
-const NearestSpotRow = memo(function NearestSpotRow({
-  item,
-  onPress,
-}: {
-  item: ParkingSpotWithDistance;
-  onPress: (item: ParkingClusterResponse) => void;
-}) {
-  const percentage =
-    item.availabilityStatus !== undefined &&
-    item.availabilityStatus !== 'unknown' &&
-    item.availabilityPercent !== null
-      ? clampPercentage(item.availabilityPercent)
-      : null;
-  const title = item.bestSpot.label || 'Parking Area';
-
-  return (
-    <Pressable
-      accessibilityLabel={`Open ${title}`}
-      accessibilityRole="button"
-      className="mb-3 flex-row items-center rounded-3xl border border-border-glass bg-surface-default px-4 py-4 shadow-floating active:bg-surface-input"
-      onPress={() => onPress(item)}
-      style={{ borderCurve: 'continuous' }}
-    >
-      <AvailabilityRing percentage={percentage} />
-      <View className="ml-4 flex-1">
-        <Text
-          className="text-[16px] font-extrabold text-ink-primary"
-          numberOfLines={1}
-        >
-          {title}
-        </Text>
-        <View className="mt-1 flex-row items-center">
-          <Text className="text-[13px] font-bold text-ink-secondary">
-            {formatSearchDistance(item.distanceFromSearchMeters)}
-          </Text>
-          <Text className="ml-2 text-[13px] font-semibold text-ink-muted">
-            {formatPrice(item)}
-          </Text>
-        </View>
-      </View>
-      <View className="ml-3 h-9 w-9 items-center justify-center rounded-full bg-accent-soft">
-        <Navigation color={COLORS.accent.primary} size={17} strokeWidth={2.4} />
-      </View>
-    </Pressable>
-  );
-});
 
 function SearchNearestSpotsBottomSheetComponent({
   searchPlace,
@@ -214,9 +104,32 @@ function SearchNearestSpotsBottomSheetComponent({
   }, [onClose]);
 
   const renderSpot = useCallback(
-    ({ item }: { item: ParkingSpotWithDistance }) => (
-      <NearestSpotRow item={item} onPress={onSpotPress} />
-    ),
+    ({ item }: { item: ParkingSpotWithDistance }) => {
+      const percentage =
+        item.availabilityStatus !== undefined &&
+        item.availabilityStatus !== 'unknown' &&
+        item.availabilityPercent !== null
+          ? item.availabilityPercent
+          : null;
+      const title = item.bestSpot.label || 'Parking Area';
+
+      return (
+        <View className="mb-2.5">
+          <ParkingAreaListItem
+            action={{
+              accessibilityLabel: `Navigate to ${title}`,
+              icon: ArrowRight,
+              onPress: () => onSpotPress(item),
+            }}
+            metaPrimary={formatSearchDistance(item.distanceFromSearchMeters)}
+            metaSecondary={formatParkingPriceLabel(item)}
+            onPress={() => onSpotPress(item)}
+            percentage={percentage}
+            title={title}
+          />
+        </View>
+      );
+    },
     [onSpotPress],
   );
 
@@ -225,6 +138,7 @@ function SearchNearestSpotsBottomSheetComponent({
       ref={sheetRef}
       animateOnMount={false}
       animationConfigs={animationConfigs}
+      backgroundComponent={GlassSheetBackground}
       backgroundStyle={styles.background}
       enableDynamicSizing={false}
       enableOverDrag={false}
@@ -241,7 +155,7 @@ function SearchNearestSpotsBottomSheetComponent({
         <View className="flex-row items-center justify-between">
           <View className="flex-1 pr-3">
             <Text className="text-[24px] font-extrabold text-ink-primary">
-              Nearby parking areas
+              Nearby Parking areas
             </Text>
             <View className="mt-1 flex-row items-center">
               <MapPin color={COLORS.text.secondary} size={14} strokeWidth={2.4} />
@@ -378,7 +292,6 @@ export const SearchNearestSpotsBottomSheet = memo(
 
 const styles = StyleSheet.create({
   background: {
-    backgroundColor: COLORS.background.default,
     borderTopLeftRadius: RADII.sheet,
     borderTopRightRadius: RADII.sheet,
   },

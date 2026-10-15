@@ -30,17 +30,18 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import Svg, { Circle } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   MAP_ELEVATIONS,
   MAP_LAYERS,
 } from '@/components/parking-map/map-layers';
+import { ParkingAreaListItemContent } from '@/components/parking-map/ParkingAreaListItem';
+import { GlassSheetBackground } from '@/components/parking-map/glass-sheet-background';
+import { GlassSurface } from '@/components/ui/glass-surface';
 import { useFavoriteParking } from '@/context/FavoriteParkingContext';
 import type { ParkingClusterResponse } from '@/types/parking-map';
 
-import { getAvailabilityTheme } from './parking-availability-status';
 import { COLORS, RADII, SHADOWS } from '@/constants/theme';
 
 type FavoriteParkingBottomSheetProps = {
@@ -48,10 +49,6 @@ type FavoriteParkingBottomSheetProps = {
   onSpotPress: (item: ParkingClusterResponse) => void;
 };
 
-const RING_SIZE = 42;
-const RING_STROKE = 5;
-const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
-const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 const DELETE_ACTION_WIDTH = 82;
 const REVEAL_THRESHOLD = 44;
 const FULL_DELETE_DISTANCE = 138;
@@ -68,53 +65,6 @@ function formatDistance(distance?: number) {
 
   const walkingMinutes = Math.max(1, Math.round(distance / 80));
   return `${walkingMinutes} min walk`;
-}
-
-function FavoriteProgressRing({ percentage }: { percentage: number | null }) {
-  const theme = getAvailabilityTheme(percentage ?? 0);
-  const ringOffset =
-    percentage === null
-      ? RING_CIRCUMFERENCE
-      : RING_CIRCUMFERENCE * (1 - percentage / 100);
-
-  return (
-    <View className="items-center justify-center">
-      <Svg
-        height={RING_SIZE}
-        style={{ transform: [{ rotate: '-90deg' }] }}
-        width={RING_SIZE}
-      >
-        <Circle
-          cx={RING_SIZE / 2}
-          cy={RING_SIZE / 2}
-          fill={COLORS.surface.glassDense}
-          r={RING_RADIUS}
-          stroke={theme.ringTrack}
-          strokeWidth={RING_STROKE}
-        />
-        <Circle
-          cx={RING_SIZE / 2}
-          cy={RING_SIZE / 2}
-          fill="none"
-          r={RING_RADIUS}
-          stroke={percentage === null ? COLORS.text.muted : theme.ring}
-          strokeDasharray={`${RING_CIRCUMFERENCE} ${RING_CIRCUMFERENCE}`}
-          strokeDashoffset={ringOffset}
-          strokeLinecap="round"
-          strokeWidth={RING_STROKE}
-        />
-      </Svg>
-      <Text
-        className="absolute text-[11px] font-extrabold"
-        style={{
-          color: percentage === null ? COLORS.text.secondary : theme.text,
-          fontVariant: ['tabular-nums'],
-        }}
-      >
-        {percentage === null ? '—' : `${percentage}%`}
-      </Text>
-    </View>
-  );
 }
 
 const FavoriteSpotRow = memo(function FavoriteSpotRow({
@@ -310,10 +260,10 @@ const FavoriteSpotRow = memo(function FavoriteSpotRow({
       layout={LinearTransition.springify().damping(26).stiffness(260)}
       onLayout={handleLayout}
       style={containerAnimatedStyle}
-      className="overflow-hidden rounded-3xl"
+      className="overflow-hidden rounded-list-card"
     >
       <Animated.View
-        className="absolute bottom-0 right-0 top-0 w-[82px] items-center justify-center rounded-3xl bg-feedback-error"
+        className="absolute bottom-0 right-0 top-0 w-[82px] items-center justify-center rounded-list-card bg-feedback-error"
         style={actionAnimatedStyle}
       >
         <Pressable
@@ -328,52 +278,37 @@ const FavoriteSpotRow = memo(function FavoriteSpotRow({
 
       <GestureDetector gesture={panGesture}>
         <Animated.View style={rowAnimatedStyle}>
-          <Pressable
-            accessibilityLabel={`Open ${title}`}
-            accessibilityRole="button"
-            className="flex-row items-center rounded-3xl border border-border-glass bg-surface-default px-4 py-4 shadow-floating active:bg-surface-input"
-            onPress={handlePress}
-            onPressIn={() => {
-              pressedScale.value = withTiming(0.985, { duration: 90 });
-            }}
-            onPressOut={() => {
-              pressedScale.value = withSpring(1, {
-                damping: 18,
-                stiffness: 260,
-              });
-            }}
-            style={{ borderCurve: 'continuous' }}
-          >
-            <FavoriteProgressRing percentage={percentage} />
-            <View className="ml-4 flex-1">
-              <Text
-                className="text-[16px] font-extrabold text-ink-primary"
-                numberOfLines={1}
-              >
-                {title}
-              </Text>
-              <View className="mt-1 flex-row items-center">
-                <Text className="text-[13px] font-bold text-ink-secondary">
-                  {percentage === null
-                    ? 'Availability unavailable'
-                    : `${percentage}% estimated available`}
-                </Text>
-                {distanceLabel ? (
-                  <Text className="ml-2 text-[13px] font-semibold text-ink-muted">
-                    {distanceLabel}
-                  </Text>
-                ) : null}
-              </View>
-            </View>
-            <View className="ml-3 h-9 w-9 items-center justify-center rounded-full bg-rose-50">
-              <Heart
-                color={COLORS.accent.primary}
-                fill={COLORS.accent.primary}
-                size={17}
-                strokeWidth={2.4}
+          <GlassSurface style={{ minHeight: 62 }} variant="listCard">
+            <Pressable
+              accessibilityLabel={`Open ${title}`}
+              accessibilityRole="button"
+              className="flex-1 justify-center px-4 active:opacity-80"
+              onPress={handlePress}
+              onPressIn={() => {
+                pressedScale.value = withTiming(0.985, { duration: 90 });
+              }}
+              onPressOut={() => {
+                pressedScale.value = withSpring(1, {
+                  damping: 18,
+                  stiffness: 260,
+                });
+              }}
+            >
+              <ParkingAreaListItemContent
+                action={{
+                  accessibilityLabel: `Remove ${title} from favorites`,
+                  active: true,
+                  icon: Heart,
+                  // Same handler the row already uses on tap — the heart stays a visual
+                  // badge, unfavoriting stays swipe-only, identical to prior behavior.
+                  onPress: handlePress,
+                }}
+                metaPrimary={distanceLabel}
+                percentage={percentage}
+                title={title}
               />
-            </View>
-          </Pressable>
+            </Pressable>
+          </GlassSurface>
         </Animated.View>
       </GestureDetector>
     </Animated.View>
@@ -462,6 +397,7 @@ export function FavoriteParkingBottomSheet({
   return (
     <BottomSheet
       ref={sheetRef}
+      backgroundComponent={GlassSheetBackground}
       backgroundStyle={styles.background}
       animationConfigs={animationConfigs}
       enableDynamicSizing={false}
@@ -560,7 +496,6 @@ export function FavoriteParkingBottomSheet({
 
 const styles = StyleSheet.create({
   background: {
-    backgroundColor: COLORS.background.default,
     borderTopLeftRadius: RADII.sheet,
     borderTopRightRadius: RADII.sheet,
   },

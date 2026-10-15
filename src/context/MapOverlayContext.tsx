@@ -31,6 +31,14 @@ type MapOverlayContextValue = {
   closeOverlay: () => void;
   closeSearch: () => void;
   consumeSelection: (id: number) => void;
+  /** Mirrors ParkingMap's local `selectedSearchPlace` so the search header can show the
+   * live destination title without owning search state itself. */
+  focusedSearchPlace: PlaceSearchResult | null;
+  setFocusedSearchPlace: (place: PlaceSearchResult | null) => void;
+  /** One-shot counter: bump to ask ParkingMap to dismiss whatever focused surface (search
+   * results or a parking detail) is currently open. Consumed by an effect in ParkingMap. */
+  dismissFocusedSurfaceRequestId: number;
+  requestDismissFocusedSurface: () => void;
   focusedMapSurface: FocusedMapSurface;
   isLocationLoading: boolean;
   isSearchActive: boolean;
@@ -52,6 +60,14 @@ export function MapOverlayProvider({ children }: PropsWithChildren) {
   const [isLocationLoading, setLocationLoading] = useState(false);
   const [selection, setSelection] = useState<SearchSelection | null>(null);
   const selectionIdRef = useRef(0);
+  const [focusedSearchPlace, setFocusedSearchPlace] =
+    useState<PlaceSearchResult | null>(null);
+  const [dismissFocusedSurfaceRequestId, setDismissFocusedSurfaceRequestId] =
+    useState(0);
+
+  const requestDismissFocusedSurface = useCallback(() => {
+    setDismissFocusedSurfaceRequestId((current) => current + 1);
+  }, []);
 
   const closeOverlay = useCallback(() => {
     setActiveOverlay('none');
@@ -99,14 +115,18 @@ export function MapOverlayProvider({ children }: PropsWithChildren) {
       closeOverlay,
       closeSearch,
       consumeSelection,
+      dismissFocusedSurfaceRequestId,
       focusedMapSurface,
+      focusedSearchPlace,
       isLocationLoading,
       isSearchActive: activeOverlay === 'search',
       openOverlay,
       openSearch,
+      requestDismissFocusedSurface,
       selectPlace,
       selection,
       setFocusedMapSurface,
+      setFocusedSearchPlace,
       setLocationLoading,
       toggleOverlay,
     }),
@@ -115,10 +135,13 @@ export function MapOverlayProvider({ children }: PropsWithChildren) {
       closeOverlay,
       closeSearch,
       consumeSelection,
+      dismissFocusedSurfaceRequestId,
       focusedMapSurface,
+      focusedSearchPlace,
       isLocationLoading,
       openOverlay,
       openSearch,
+      requestDismissFocusedSurface,
       selectPlace,
       selection,
       setLocationLoading,

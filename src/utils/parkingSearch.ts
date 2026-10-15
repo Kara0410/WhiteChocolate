@@ -36,6 +36,15 @@ export function formatSearchDistance(distanceMeters: number) {
   return `${(distanceMeters / 1000).toFixed(1)} km away`;
 }
 
+export function formatParkingPriceLabel(item: ParkingClusterResponse) {
+  if (item.pricingStatus === 'free') {
+    return 'Free';
+  }
+
+  const price = item.avgPrice ?? item.minPrice;
+  return price === null ? 'Price unavailable' : `EUR ${price.toFixed(2)}/hr`;
+}
+
 export function getNearestParkingSpots({
   origin,
   spots,

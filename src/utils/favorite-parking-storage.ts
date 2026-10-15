@@ -102,6 +102,9 @@ export function normalizeStoredFavorite(
     totalCapacity: value.totalCapacity,
     availableSpots: value.availableSpots,
     colorStatus: value.colorStatus,
+    // Line geometry is never persisted to storage — restored favorites always get a fresh
+    // null here; a live refresh (refreshFavorites) repopulates it from real segment data.
+    lineGeometry: null,
     minPrice: toNullablePrice(value.minPrice),
     avgPrice: toNullablePrice(value.avgPrice),
     bestSpot,

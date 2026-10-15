@@ -18,7 +18,11 @@ const MAX_LONGITUDE_BUFFER_DEGREES = 24;
 
 export const PARKING_RENDER_RADIUS_SCREEN_RATIO = 0.52;
 export const PARKING_RENDER_FETCH_PADDING_RATIO = 1.2;
-export const PARKING_SEARCH_FOCUS_ZOOM = 15.8;
+// Tighter, closer-in framing for search-results mode than browse-mode zoom levels —
+// frames the destination and its nearby highlighted bubbles without showing excess
+// surrounding map area. (Also the pre-existing expected value in
+// tests/parking-marker-density.test.ts's camera-composition test.)
+export const PARKING_SEARCH_FOCUS_ZOOM = 17;
 
 export function hasValidParkingCoordinates(
   coordinates: ParkingCoordinates,

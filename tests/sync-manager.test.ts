@@ -30,6 +30,7 @@ test('getLocalSnapshot loads data and counts from storage', async () => {
         totalCapacity: 10,
         availableSpots: 5,
         colorStatus: 'orange',
+        lineGeometry: null,
         minPrice: null,
         avgPrice: null,
         bestSpot: {

@@ -33,6 +33,10 @@ import { SearchDestinationMarker } from '@/components/parking-map/search-destina
 import { SearchNearestSpotsBottomSheet } from '@/components/parking-map/SearchNearestSpotsBottomSheet';
 import { UserLocationMarker } from '@/components/parking-map/user-location-marker';
 import { useParkingMarkerPipeline } from '@/components/parking-map/use-parking-marker-pipeline';
+import {
+  buildStreetAvailabilityPolylines,
+  type StreetAvailabilityPolyline,
+} from '@/components/parking-map/street-availability-overlay';
 import { WHITE_CHOCOLATE_GOOGLE_MAP_STYLE } from '@/components/parking-map/map-style';
 import { useFavoriteParking } from '@/context/FavoriteParkingContext';
 import { useMapOverlay } from '@/context/MapOverlayContext';
@@ -122,6 +126,7 @@ const INITIAL_CAMERA_SETTLE_MS = 750;
 const MAP_DRAG_SETTLE_MS = 180;
 const MARKER_MOVEMENT_SETTLE_MS = 150;
 const EMPTY_SEARCH_SPOTS: ParkingSpotWithDistance[] = [];
+const EMPTY_STREET_OVERLAY_POLYLINES: StreetAvailabilityPolyline[] = [];
 /** Only the top recommendations get map markers in active search mode. */
 const SEARCH_HIGHLIGHTED_MARKER_LIMIT = 3;
 /**
@@ -343,9 +348,11 @@ export function ParkingMap({
     activeOverlay,
     closeOverlay,
     consumeSelection,
+    dismissFocusedSurfaceRequestId,
     openSearch,
     selection,
     setFocusedMapSurface,
+    setFocusedSearchPlace,
   } = useMapOverlay();
   const lastFocusedFavoriteRequestRef = useRef<string | null>(null);
   const lastSearchFocusKeyRef = useRef<string | null>(null);
@@ -524,6 +531,7 @@ export function ParkingMap({
     projectedMarkers,
     projectedSearchDestination,
     projectedUserLocation,
+    streetAvailabilitySegments,
   } = useParkingMarkerPipeline({
     activeOverlay,
     currentRegion,
@@ -540,6 +548,17 @@ export function ParkingMap({
     selectedSearchPlace,
     userLocation,
   });
+  // Visible only in destination-search-results mode — not while typing, not on
+  // Favorites/other overlays, not once a specific spot's detail sheet is open. Reuses
+  // `isSearchRecommendationMode`, which already goes false through the existing
+  // closeSearchResults/clearSelection/overlay-switch teardown paths.
+  const streetOverlayPolylines = useMemo(
+    () =>
+      isSearchRecommendationMode
+        ? buildStreetAvailabilityPolylines(streetAvailabilitySegments)
+        : EMPTY_STREET_OVERLAY_POLYLINES,
+    [isSearchRecommendationMode, streetAvailabilitySegments],
+  );
   const canFocusCamera = useCallback(
     () =>
       canFocusParkingCamera({
@@ -1049,11 +1068,12 @@ export function ParkingMap({
     if (selectedParkingItem !== null) {
       return;
     }
+    cancelPendingCameraFocus();
     setSelectedSearchPlace(null);
     setSearchParkingRequest(null);
     setSearchSpotsSnapshot(null);
     setFocusedMapSurface('none');
-  }, [selectedParkingItem, setFocusedMapSurface]);
+  }, [cancelPendingCameraFocus, selectedParkingItem, setFocusedMapSurface]);
 
   const handleSearchThisAreaPress = useCallback(() => {
     if (selectedSearchPlace === null) {
@@ -1118,6 +1138,42 @@ export function ParkingMap({
     clearSelection();
     cancelPendingCameraFocus();
   }, [cancelPendingCameraFocus, clearSelection, closeOverlay]);
+
+  // Mirrors the local destination into context so the search header (which doesn't own
+  // search state) can show its live title.
+  useEffect(() => {
+    setFocusedSearchPlace(selectedSearchPlace);
+  }, [selectedSearchPlace, setFocusedSearchPlace]);
+
+  const lastDismissFocusedSurfaceRequestIdRef = useRef(0);
+
+  // One-shot consumer for the search header's back-arrow and the Android hardware-back
+  // fix: dismiss whichever focused surface (a specific spot's detail, or search results)
+  // is currently open.
+  useEffect(() => {
+    if (
+      dismissFocusedSurfaceRequestId ===
+      lastDismissFocusedSurfaceRequestIdRef.current
+    ) {
+      return;
+    }
+    lastDismissFocusedSurfaceRequestIdRef.current =
+      dismissFocusedSurfaceRequestId;
+
+    if (selectedParkingItem !== null) {
+      clearSelection();
+      return;
+    }
+    if (selectedSearchPlace !== null) {
+      closeSearchResults();
+    }
+  }, [
+    clearSelection,
+    closeSearchResults,
+    dismissFocusedSurfaceRequestId,
+    selectedParkingItem,
+    selectedSearchPlace,
+  ]);
 
   const handleCurrentLocationPress = useCallback(async () => {
     if (!onRequestUserLocation || isLocationLoading) {
@@ -1457,6 +1513,7 @@ export function ParkingMap({
           cameraPosition={cameraPosition}
           onCameraMove={handleCameraMove}
           onMapClick={handleMapPress}
+          polylines={streetOverlayPolylines}
           properties={APPLE_MAP_PROPERTIES}
           style={MAP_VIEW_STYLE}
           uiSettings={APPLE_MAP_UI_SETTINGS}
@@ -1468,6 +1525,7 @@ export function ParkingMap({
           onCameraMove={handleCameraMove}
           onMapLoaded={handleGoogleMapLoaded}
           onMapClick={handleMapPress}
+          polylines={streetOverlayPolylines}
           properties={GOOGLE_MAP_PROPERTIES}
           style={MAP_VIEW_STYLE}
           uiSettings={GOOGLE_MAP_UI_SETTINGS}

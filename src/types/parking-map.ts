@@ -39,6 +39,9 @@ export type ParkingClusterResponse = {
   expansionZoom?: number;
   distanceToDestination?: number;
   walkingCategory?: WalkingCategory;
+  /** Real WGS84 path for this segment's street kerb, reprojected from the source WKT.
+   * Null for clusters (no single underlying segment's geometry) and unparseable shapes. */
+  lineGeometry: ParkingCoordinates[] | null;
 };
 
 export type ParkingCameraState = {

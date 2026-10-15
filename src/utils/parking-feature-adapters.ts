@@ -4,6 +4,8 @@ import type {
   ParkingSegmentSummary,
 } from '@/types/parking-domain';
 import type { ParkingClusterResponse } from '@/types/parking-map';
+import { getAvailabilityColorStatus } from '@/utils/parking-availability';
+import { wktLineStringToWgs84Path } from '@/utils/wkt-utm32n';
 
 export function cellSummaryToMapFeature(
   cell: ParkingCellSummary,
@@ -68,11 +70,7 @@ export function parkingMapFeatureToResponse(
     colorStatus:
       feature.stats.availabilityPercent === null
         ? 'neutral'
-        : feature.stats.availabilityPercent >= 60
-          ? 'green'
-          : feature.stats.availabilityPercent >= 30
-            ? 'orange'
-            : 'red',
+        : getAvailabilityColorStatus(feature.stats.availabilityPercent),
     minPrice: minimumRate,
     avgPrice: minimumRate,
     pricingStatus: feature.stats.pricing.hasFreeParking
@@ -89,5 +87,9 @@ export function parkingMapFeatureToResponse(
     },
     expansionZoom:
       feature.kind === 'segment-cluster' ? feature.expansionZoom : undefined,
+    // Segment-clusters never carry a single underlying segment's geometry (clustering
+    // discards individual segments, keeping only aggregate stats) — only isolated `segment`
+    // features have a real street line to draw.
+    lineGeometry: segment ? wktLineStringToWgs84Path(segment.sourceGeometry) : null,
   };
 }

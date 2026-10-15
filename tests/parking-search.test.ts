@@ -23,6 +23,7 @@ function spot(
     totalCapacity: 10,
     availableSpots: 5,
     colorStatus: 'orange',
+    lineGeometry: null,
     minPrice: 2,
     avgPrice: 2,
     pricingStatus: 'paid',

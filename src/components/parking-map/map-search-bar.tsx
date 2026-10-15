@@ -106,8 +106,11 @@ export function MapSearchBar() {
   const {
     activeOverlay,
     closeSearch,
+    focusedMapSurface,
+    focusedSearchPlace,
     isSearchActive,
     openSearch,
+    requestDismissFocusedSurface,
     selectPlace,
   } = useMapOverlay();
   const {
@@ -301,6 +304,25 @@ export function MapSearchBar() {
                   <FigmaSearchIcon color={COLORS.accent.primary} size={20} />
                 </View>
               )}
+            </View>
+          ) : focusedMapSurface === 'search-results' &&
+            focusedSearchPlace !== null ? (
+            <View className="h-full flex-row items-center px-2">
+              <Pressable
+                accessibilityLabel="Close search results"
+                accessibilityRole="button"
+                className="h-11 w-11 items-center justify-center rounded-full active:bg-surface-muted"
+                hitSlop={4}
+                onPress={requestDismissFocusedSurface}
+              >
+                <ArrowLeft color={COLORS.icon.default} size={21} strokeWidth={2.4} />
+              </Pressable>
+              <Text
+                className="ml-1 flex-1 text-[16px] font-semibold text-ink-primary"
+                numberOfLines={1}
+              >
+                {focusedSearchPlace.title}
+              </Text>
             </View>
           ) : (
             <Pressable

@@ -30,6 +30,7 @@ function TabNavigation() {
     closeOverlay,
     focusedMapSurface,
     isLocationLoading,
+    requestDismissFocusedSurface,
     toggleOverlay,
   } = useMapOverlay();
   const locationFocusSequenceRef = useRef(0);
@@ -40,17 +41,25 @@ function TabNavigation() {
     const subscription = BackHandler.addEventListener(
       'hardwareBackPress',
       () => {
-        if (activeOverlay === 'none') {
-          return false;
+        if (activeOverlay !== 'none') {
+          closeOverlay();
+          return true;
         }
 
-        closeOverlay();
-        return true;
+        // `selectPlace` already sets activeOverlay to 'none' when entering
+        // search-results mode, so a focused surface (search results, or a parking
+        // detail opened directly from a marker) needs its own back-press branch here.
+        if (focusedMapSurface !== 'none') {
+          requestDismissFocusedSurface();
+          return true;
+        }
+
+        return false;
       },
     );
 
     return () => subscription.remove();
-  }, [activeOverlay, closeOverlay]);
+  }, [activeOverlay, closeOverlay, focusedMapSurface, requestDismissFocusedSurface]);
 
   const showOverlay = useCallback(
     (mode: Exclude<MapOverlayMode, 'none' | 'search'>) => {

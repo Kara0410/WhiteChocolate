@@ -42,6 +42,7 @@ function marker(
     totalCapacity: count,
     availableSpots: Math.round(count * 0.72),
     colorStatus: 'green',
+    lineGeometry: null,
     minPrice: 2,
     avgPrice: 2,
     bestSpot: {

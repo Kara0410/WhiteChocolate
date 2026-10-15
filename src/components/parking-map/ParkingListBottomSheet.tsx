@@ -1,15 +1,9 @@
-import {
-  memo,
-  useCallback,
-  useMemo,
-  useRef,
-  type ComponentRef,
-} from 'react';
+import { useCallback, useMemo, useRef, type ComponentRef } from 'react';
 import BottomSheet, {
   BottomSheetFlatList,
   useBottomSheetSpringConfigs,
 } from '@gorhom/bottom-sheet';
-import { Car, ChevronRight, MapPin, X } from 'lucide-react-native';
+import { ArrowRight, Car, X } from 'lucide-react-native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -17,7 +11,10 @@ import {
   MAP_ELEVATIONS,
   MAP_LAYERS,
 } from '@/components/parking-map/map-layers';
+import { ParkingAreaListItem } from '@/components/parking-map/ParkingAreaListItem';
+import { GlassSheetBackground } from '@/components/parking-map/glass-sheet-background';
 import type { ParkingClusterResponse } from '@/types/parking-map';
+import { formatParkingPriceLabel } from '@/utils/parkingSearch';
 import { COLORS, RADII, SHADOWS } from '@/constants/theme';
 
 type ParkingListBottomSheetProps = {
@@ -27,74 +24,6 @@ type ParkingListBottomSheetProps = {
   onSpotPress: (item: ParkingClusterResponse) => void;
   spots: ParkingClusterResponse[];
 };
-
-const ParkingListRow = memo(function ParkingListRow({
-  item,
-  onPress,
-}: {
-  item: ParkingClusterResponse;
-  onPress: (item: ParkingClusterResponse) => void;
-}) {
-  const hasKnownAvailability =
-    item.availabilityStatus !== undefined &&
-    item.availabilityStatus !== 'unknown' &&
-    item.availabilityPercent !== null;
-  const percentage =
-    hasKnownAvailability && item.availabilityPercent !== null
-      ? Math.max(0, Math.min(100, Math.round(item.availabilityPercent)))
-      : null;
-  const price = item.avgPrice ?? item.minPrice;
-  const availabilityColor =
-    percentage === null
-      ? COLORS.text.secondary
-      : percentage >= 55
-        ? COLORS.feedback.success
-        : percentage >= 25
-          ? COLORS.feedback.warning
-          : COLORS.feedback.error;
-  const priceLabel =
-    item.pricingStatus === 'free'
-      ? 'Free'
-      : price !== null
-        ? `EUR ${price.toFixed(2)}/hr`
-        : 'Price unavailable';
-
-  return (
-    <Pressable
-      accessibilityLabel={`Open ${item.bestSpot.label || 'parking area'}`}
-      accessibilityRole="button"
-      className="mb-3 flex-row items-center rounded-3xl border border-border-glass bg-surface-default px-4 py-4 shadow-floating active:bg-surface-input"
-      onPress={() => onPress(item)}
-      style={{ borderCurve: 'continuous' }}
-    >
-      <View className="h-12 w-12 items-center justify-center rounded-2xl bg-accent-soft">
-        <MapPin color={COLORS.accent.primary} size={21} strokeWidth={2.3} />
-      </View>
-      <View className="ml-4 flex-1">
-        <Text
-          className="text-[16px] font-extrabold text-ink-primary"
-          numberOfLines={1}
-        >
-          {item.bestSpot.label || 'Parking area'}
-        </Text>
-        <View className="mt-1 flex-row items-center">
-          <Text
-            className="text-[13px] font-extrabold"
-            style={{ color: availabilityColor }}
-          >
-            {percentage === null
-              ? 'Availability unavailable'
-              : `${percentage}% estimated`}
-          </Text>
-          <Text className="ml-2 text-[13px] font-semibold text-ink-muted">
-            {priceLabel}
-          </Text>
-        </View>
-      </View>
-      <ChevronRight color={COLORS.text.muted} size={19} strokeWidth={2.3} />
-    </Pressable>
-  );
-});
 
 export function ParkingListBottomSheet({
   errorMessage = null,
@@ -136,9 +65,29 @@ export function ParkingListBottomSheet({
   }, [onClose, onSpotPress]);
 
   const renderItem = useCallback(
-    ({ item }: { item: ParkingClusterResponse }) => (
-      <ParkingListRow item={item} onPress={handleSpotPress} />
-    ),
+    ({ item }: { item: ParkingClusterResponse }) => {
+      const hasKnownAvailability =
+        item.availabilityStatus !== undefined &&
+        item.availabilityStatus !== 'unknown' &&
+        item.availabilityPercent !== null;
+      const title = item.bestSpot.label || 'Parking area';
+
+      return (
+        <View className="mb-2.5">
+          <ParkingAreaListItem
+            action={{
+              accessibilityLabel: `Navigate to ${title}`,
+              icon: ArrowRight,
+              onPress: () => handleSpotPress(item),
+            }}
+            metaSecondary={formatParkingPriceLabel(item)}
+            onPress={() => handleSpotPress(item)}
+            percentage={hasKnownAvailability ? item.availabilityPercent : null}
+            title={title}
+          />
+        </View>
+      );
+    },
     [handleSpotPress],
   );
 
@@ -146,6 +95,7 @@ export function ParkingListBottomSheet({
     <BottomSheet
       ref={sheetRef}
       animationConfigs={animationConfigs}
+      backgroundComponent={GlassSheetBackground}
       backgroundStyle={styles.background}
       enableDynamicSizing={false}
       enableOverDrag={false}
@@ -231,7 +181,7 @@ export function ParkingListBottomSheet({
 
 const styles = StyleSheet.create({
   background: {
-    backgroundColor: COLORS.background.default,
+    backgroundColor: 'transparent',
     borderTopLeftRadius: RADII.sheet,
     borderTopRightRadius: RADII.sheet,
   },

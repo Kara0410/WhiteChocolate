@@ -18,7 +18,7 @@ const designTokens = {
     accent: {
       primary: '#824DFF',
       surfaceTint: '#601CFF',
-      soft: '#EEE7FF',
+      soft: '#E9E0FF',
       pressed: '#6F3EE8',
     },
     text: {
@@ -27,6 +27,9 @@ const designTokens = {
       placeholder: '#797979',
       muted: '#8A8A8A',
       onAccent: '#FFFFFF',
+      // Searching.svg "secondary metadata" tone — distinct from secondary/placeholder/muted,
+      // used for card meta rows (distance, price, area name secondary line).
+      metadata: '#979797',
     },
     icon: {
       default: '#323232',
@@ -40,8 +43,12 @@ const designTokens = {
       input: '#F8F7FA',
       glass: 'rgba(255,255,255,0.10)',
       glassTint: 'rgba(96,28,255,0.10)',
+      // Application extension for a readable floating sheet above the live map.
+      glassSheet: 'rgba(255,255,255,0.92)',
       glassDense: 'rgba(255,255,255,0.90)',
       glassReadable: 'rgba(255,255,255,0.92)',
+      // Parking rows stay crisp and legible without a per-row backdrop blur.
+      glassCard: 'rgba(255,255,255,0.96)',
     },
     border: {
       subtle: 'rgba(50,50,50,0.12)',
@@ -53,22 +60,25 @@ const designTokens = {
       mapFallback: '#EEF0ED',
     },
     status: {
-      available: '#22C55E',
+      // available/full updated to Searching.svg's exact high/low-availability hexes (were
+      // #22C55E / #FF2D2D) — single source of truth, every bubble/card/overlay consumer of
+      // COLORS.status.* picks this up automatically. limited already matched, unchanged.
+      available: '#71E517',
       limited: '#FF9500',
-      full: '#FF2D2D',
+      full: '#E51717',
       unknown: '#797979',
       availableSoft: '#E8F8ED',
-      availableTrack: 'rgba(34,197,94,0.20)',
-      availableGlow: 'rgba(34,197,94,0.42)',
-      availableGlowStrong: 'rgba(34,197,94,0.58)',
+      availableTrack: '#DBFFBE',
+      availableGlow: 'rgba(113,229,23,0.42)',
+      availableGlowStrong: 'rgba(113,229,23,0.58)',
       limitedSoft: '#FFF3E0',
-      limitedTrack: 'rgba(255,149,0,0.20)',
+      limitedTrack: '#FFE3BE',
       limitedGlow: 'rgba(255,149,0,0.42)',
       limitedGlowStrong: 'rgba(255,149,0,0.58)',
       fullSoft: '#FDEBEC',
-      fullTrack: 'rgba(255,45,45,0.20)',
-      fullGlow: 'rgba(255,45,45,0.42)',
-      fullGlowStrong: 'rgba(255,45,45,0.58)',
+      fullTrack: '#FFD5D5',
+      fullGlow: 'rgba(229,23,23,0.42)',
+      fullGlowStrong: 'rgba(229,23,23,0.58)',
       unknownSoft: '#EFEFF1',
       unknownTrack: 'rgba(121,121,121,0.24)',
       unknownGlow: 'rgba(121,121,121,0.26)',
@@ -119,7 +129,10 @@ const designTokens = {
     md: 14,
     control: 16,
     card: 20,
-    sheet: 24,
+    // Searching.svg reusable parking-card corner radius — distinct from `card` (full-bleed
+    // panels/empty states keep radius 20).
+    listCard: 15,
+    sheet: 25,
     navigation: 20,
     search: 23.5,
     floating: 23.5,

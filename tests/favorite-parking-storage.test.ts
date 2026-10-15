@@ -25,6 +25,7 @@ function favorite(id: string): ParkingClusterResponse {
     totalCapacity: 20,
     availableSpots: 12,
     colorStatus: 'green',
+    lineGeometry: null,
     minPrice: 2.5,
     avgPrice: 3,
     bestSpot: {

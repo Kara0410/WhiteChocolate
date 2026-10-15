@@ -22,6 +22,10 @@ import type {
   ParkingCoordinates,
   ParkingMapSize,
 } from '@/types/parking-map';
+import {
+  buildStreetAvailabilitySegments,
+  type StreetAvailabilitySegment,
+} from '@/components/parking-map/street-availability-overlay';
 import { parkingMapFeatureToResponse } from '@/utils/parking-feature-adapters';
 import { hasValidParkingCoordinates } from '@/utils/parking-map-geo';
 
@@ -184,6 +188,30 @@ export function useParkingMarkerPipeline({
       displayedMarkerItems,
       mapSize.height,
       mapSize.width,
+    ],
+  );
+
+  // Overlay IDs and geometry come from the same projected markers rendered by
+  // ParkingMarkerOverlay. This keeps off-screen and non-search segments out.
+  const streetAvailabilitySegments = useMemo<StreetAvailabilitySegment[]>(
+    () =>
+      buildStreetAvailabilitySegments(projectedMarkers, {
+        activeSearchResults:
+          selectedSearchPlace !== null &&
+          selectedParkingItem === null &&
+          activeOverlay === 'none' &&
+          mapMode !== 'munichOverview',
+        mapHeight: mapSize.height,
+        mapWidth: mapSize.width,
+      }),
+    [
+      activeOverlay,
+      mapMode,
+      mapSize.height,
+      mapSize.width,
+      projectedMarkers,
+      selectedParkingItem,
+      selectedSearchPlace,
     ],
   );
 
@@ -362,5 +390,6 @@ export function useParkingMarkerPipeline({
     projectedSearchDestination,
     projectedUserLocation,
     cellSummaries,
+    streetAvailabilitySegments,
   };
 }

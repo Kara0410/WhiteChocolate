@@ -34,6 +34,7 @@ function spot(
     totalCapacity: overrides.totalCapacity ?? 18,
     availableSpots,
     colorStatus: overrides.colorStatus ?? 'neutral',
+    lineGeometry: overrides.lineGeometry ?? null,
     minPrice: null,
     avgPrice: null,
     pricingStatus: 'unknown',
