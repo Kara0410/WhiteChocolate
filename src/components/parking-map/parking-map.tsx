@@ -33,6 +33,7 @@ import { SearchDestinationMarker } from '@/components/parking-map/search-destina
 import { SearchNearestSpotsBottomSheet } from '@/components/parking-map/SearchNearestSpotsBottomSheet';
 import { UserLocationMarker } from '@/components/parking-map/user-location-marker';
 import { useParkingMarkerPipeline } from '@/components/parking-map/use-parking-marker-pipeline';
+import { WHITE_CHOCOLATE_GOOGLE_MAP_STYLE } from '@/components/parking-map/map-style';
 import { useFavoriteParking } from '@/context/FavoriteParkingContext';
 import { useMapOverlay } from '@/context/MapOverlayContext';
 import { useParkingMapData } from '@/hooks/use-parking-map-data';
@@ -69,30 +70,16 @@ import {
   resolveCurrentParkingSelection,
   type ParkingSelectionSource,
 } from '@/utils/parking-selection';
+import { COLORS, HOME_LAYOUT } from '@/constants/theme';
 
-const LABEL_FREE_MAP_STYLE = JSON.stringify([
-  {
-    featureType: 'all',
-    elementType: 'labels',
-    stylers: [{ visibility: 'off' }],
-  },
-  {
-    featureType: 'poi',
-    elementType: 'all',
-    stylers: [{ visibility: 'off' }],
-  },
-  {
-    featureType: 'transit',
-    elementType: 'all',
-    stylers: [{ visibility: 'off' }],
-  },
-]);
 const MAP_VIEW_STYLE = {
   elevation: MAP_ELEVATIONS.map,
   flex: 1,
   zIndex: MAP_LAYERS.map,
 } as const;
 const APPLE_MAP_PROPERTIES = {
+  elevation: 'FLAT' as AppleMaps.MapProperties['elevation'],
+  emphasis: 'MUTED' as AppleMaps.MapProperties['emphasis'],
   isMyLocationEnabled: false,
   pointsOfInterest: { including: [] },
 };
@@ -108,7 +95,7 @@ const GOOGLE_MAP_PROPERTIES = {
   isMyLocationEnabled: false,
   isTrafficEnabled: false,
   selectionEnabled: false,
-  mapStyleOptions: { json: LABEL_FREE_MAP_STYLE },
+  mapStyleOptions: { json: WHITE_CHOCOLATE_GOOGLE_MAP_STYLE },
 };
 const GOOGLE_MAP_UI_SETTINGS = {
   compassEnabled: false,
@@ -1463,7 +1450,7 @@ export function ParkingMap({
   );
 
   return (
-    <View className="flex-1 overflow-hidden" onLayout={handleLayout}>
+    <View className="flex-1 overflow-hidden bg-background-map-fallback" onLayout={handleLayout}>
       {Platform.OS === 'ios' ? (
         <AppleMaps.View
           ref={handleAppleMapRef}
@@ -1533,15 +1520,15 @@ export function ParkingMap({
           pointerEvents="none"
           style={{
             elevation: MAP_ELEVATIONS.markerHighlights,
-            height: 28,
+            height: 25,
             left: 0,
             position: 'absolute',
             top: 0,
             transform: [
-              { translateX: projectedUserLocation.x - 14 },
-              { translateY: projectedUserLocation.y - 14 },
+              { translateX: projectedUserLocation.x - 12.5 },
+              { translateY: projectedUserLocation.y - 12.5 },
             ],
-            width: 28,
+            width: 25,
             zIndex: MAP_LAYERS.markerHighlights,
           }}
         >
@@ -1574,15 +1561,15 @@ export function ParkingMap({
               accessibilityHint="Finds parking recommendations in the visible map area"
               accessibilityLabel="Search this area"
               accessibilityRole="button"
-              className="flex-row items-center rounded-full border border-slate-200 bg-white px-4 py-2.5 shadow-floating-strong active:bg-slate-100"
+              className="flex-row items-center rounded-full border border-border-subtle bg-surface-default px-4 py-2.5 shadow-floating active:bg-surface-muted"
               disabled={isSearchAreaRefreshing}
               onPress={handleSearchThisAreaPress}
             >
               {isSearchAreaRefreshing ? (
-                <ActivityIndicator color="#2563EB" size="small" />
+                <ActivityIndicator color={COLORS.accent.primary} size="small" />
               ) : null}
               <Text
-                className={`text-[14px] font-bold text-blue-700${
+                className={`text-[14px] font-bold text-accent-primary${
                   isSearchAreaRefreshing ? ' ml-2' : ''
                 }`}
               >
@@ -1599,29 +1586,33 @@ export function ParkingMap({
       selectedParkingItem === null &&
       selectedSearchPlace === null ? (
         <View
-          className="absolute right-4 items-end gap-2"
+          className="absolute items-start gap-2"
           pointerEvents="box-none"
           style={{
-            bottom: Math.max(insets.bottom, 10) + 104,
+            bottom:
+              Math.max(HOME_LAYOUT.navigationBottom, insets.bottom) +
+              HOME_LAYOUT.navigationHeight +
+              HOME_LAYOUT.gpsNavigationGap,
             elevation: MAP_ELEVATIONS.floatingControls,
+            left: HOME_LAYOUT.horizontalInset,
             zIndex: MAP_LAYERS.floatingControls,
           }}
         >
           {locationMessage ? (
-            <View className="max-w-72 items-end rounded-2xl bg-slate-950/90 px-3 py-2 shadow-floating-message">
-              <Text className="text-right text-xs font-semibold leading-4 text-white">
+            <View className="max-w-72 items-start rounded-control bg-ink-primary/90 px-3 py-2 shadow-floating">
+              <Text className="text-left text-xs font-semibold leading-4 text-ink-on-accent">
                 {locationMessage}
               </Text>
               {locationSettingsRequired && onOpenLocationSettings ? (
                 <Pressable
                   accessibilityLabel="Open location settings"
                   accessibilityRole="button"
-                  className="mt-2 min-h-9 justify-center rounded-full bg-white/15 px-3 active:bg-white/25"
+                  className="mt-2 min-h-9 justify-center rounded-full bg-surface-default/15 px-3 active:bg-surface-default/25"
                   onPress={() => {
                     void onOpenLocationSettings();
                   }}
                 >
-                  <Text className="text-xs font-extrabold text-white">
+                  <Text className="text-xs font-extrabold text-ink-on-accent">
                     Open Settings
                   </Text>
                 </Pressable>
@@ -1635,10 +1626,10 @@ export function ParkingMap({
             accessibilityState={{
               selected: mapMode === 'munichOverview',
             }}
-            className="h-12 w-12 items-center justify-center rounded-full border border-blue-200 bg-blue-50 shadow-floating-strong active:bg-blue-100"
+            className="h-12 w-12 items-center justify-center rounded-full border border-accent-primary/20 bg-accent-soft shadow-floating active:opacity-70"
             onPress={handleMunichOverviewPress}
           >
-            <MapPinned color="#1D4ED8" size={21} strokeWidth={2.3} />
+            <MapPinned color={COLORS.accent.primary} size={21} strokeWidth={2.3} />
           </Pressable>
         </View>
       ) : null}

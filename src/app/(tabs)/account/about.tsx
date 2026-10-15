@@ -18,14 +18,14 @@ export default function AccountAboutScreen() {
       description="Product information and a reliable configured app version are available here."
       title="About"
     >
-      <Text className="text-[15px] font-extrabold text-slate-900">
+      <Text className="text-[15px] font-extrabold text-ink-primary">
         {appName}
       </Text>
-      <Text className="mt-2 text-[13px] font-semibold text-slate-500">
+      <Text className="mt-2 text-[13px] font-semibold text-ink-secondary">
         {version ? `Version ${version}` : 'Version unavailable'}
       </Text>
       {configuredBuild ? (
-        <Text className="mt-1 text-[13px] font-semibold text-slate-500">
+        <Text className="mt-1 text-[13px] font-semibold text-ink-secondary">
           Build {configuredBuild}
         </Text>
       ) : null}

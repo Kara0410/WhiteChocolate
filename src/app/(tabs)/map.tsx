@@ -9,6 +9,7 @@ import { useMapOverlay } from '@/context/MapOverlayContext';
 import { useOnboarding } from '@/context/OnboardingContext';
 import { useMapLocation } from '@/hooks/use-map-location';
 import { getMapSearchControlTop } from '@/utils/map-search-layout';
+import { COLORS } from '@/constants/theme';
 
 function DevelopmentOnboardingReset({ top }: { top: number }) {
   const router = useRouter();
@@ -22,14 +23,14 @@ function DevelopmentOnboardingReset({ top }: { top: number }) {
     <Pressable
       accessibilityLabel="Reset onboarding"
       accessibilityRole="button"
-      className="absolute right-4 z-50 min-h-10 items-center justify-center rounded-full bg-slate-950/85 px-4 active:bg-slate-800"
+      className="absolute right-4 z-50 min-h-10 items-center justify-center rounded-full bg-ink-primary/85 px-4 active:opacity-70"
       onPress={() => {
         resetOnboardingForDev();
         router.replace('/onboarding');
       }}
       style={{ top }}
     >
-      <Text className="text-[12px] font-black text-white">
+      <Text className="text-[12px] font-bold text-ink-on-accent">
         Reset onboarding
       </Text>
     </Pressable>
@@ -69,10 +70,10 @@ export default function MapScreen() {
 
   if (initialCamera === null) {
     return (
-      <View className="flex-1 items-center justify-center bg-slate-100">
-        <View className="items-center gap-3 rounded-3xl bg-white px-6 py-5">
-          <ActivityIndicator color="#2563EB" size="small" />
-          <Text className="text-sm font-semibold text-slate-600">
+      <View className="flex-1 items-center justify-center bg-background-default">
+        <View className="items-center gap-3 rounded-card bg-surface-default px-6 py-5 shadow-card">
+          <ActivityIndicator color={COLORS.accent.primary} size="small" />
+          <Text className="text-sm font-semibold text-ink-secondary">
             Finding your location…
           </Text>
         </View>

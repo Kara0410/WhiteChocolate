@@ -13,7 +13,7 @@ test('keeps map search below the top safe area', () => {
     viewportBottom: 900,
   });
 
-  assert.equal(layout.searchTop, 44);
+  assert.equal(layout.searchTop, 64);
   assert.ok(layout.searchTop >= 32);
   assert.ok(layout.searchTop + MAP_SEARCH_BAR_HEIGHT < 900);
 });

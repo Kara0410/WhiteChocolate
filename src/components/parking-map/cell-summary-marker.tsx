@@ -51,11 +51,11 @@ export const CellSummaryMarker = memo(function CellSummaryMarker({
             reduceMotion: ReduceMotion.System,
           });
         }}
-        className="h-[38px] max-w-[112px] flex-row items-center justify-center rounded-full border border-brand-300 bg-brand-50 px-3 shadow-marker-cell"
+        className="h-[38px] max-w-[112px] flex-row items-center justify-center rounded-full border border-accent-primary/30 bg-accent-soft px-3 shadow-card"
       >
-        <View className="mr-[7px] h-[7px] w-[7px] rounded-full bg-brand-500" />
+        <View className="mr-[7px] h-[7px] w-[7px] rounded-full bg-accent-primary" />
         <Text
-          className="text-[12px] font-extrabold leading-[15px] text-brand-950"
+          className="text-[12px] font-extrabold leading-[15px] text-ink-primary"
           numberOfLines={1}
           style={{ fontVariant: ['tabular-nums'] }}
         >

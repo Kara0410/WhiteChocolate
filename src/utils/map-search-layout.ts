@@ -1,5 +1,5 @@
-export const MAP_SEARCH_BAR_HEIGHT = 54;
-export const MAP_SEARCH_TOP_GAP = 12;
+export const MAP_SEARCH_BAR_HEIGHT = 47;
+export const MAP_SEARCH_TOP_GAP = 32;
 export const MAP_SEARCH_RESULTS_GAP = 6;
 export const MAP_SEARCH_CONTROL_GAP = 12;
 

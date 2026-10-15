@@ -4,6 +4,7 @@ import { Heart, Navigation, Share2, X } from 'lucide-react-native';
 import Svg, { Circle } from 'react-native-svg';
 
 import type { AvailabilityTheme } from './parking-availability-status';
+import { COLORS } from '@/constants/theme';
 
 export type ParkingDetailHeaderProps = {
   title: string;
@@ -45,7 +46,7 @@ export const ParkingDetailHeader = memo(function ParkingDetailHeader({
     <View className="px-5 pb-5 pt-2">
       <View className="flex-row items-start justify-between">
         <Text
-          className="flex-1 pr-3 text-[20px] font-bold text-slate-950"
+          className="flex-1 pr-3 text-[20px] font-bold text-ink-primary"
           numberOfLines={2}
         >
           {title}
@@ -55,11 +56,11 @@ export const ParkingDetailHeader = memo(function ParkingDetailHeader({
             <Pressable
               accessibilityLabel="Share parking location"
               accessibilityRole="button"
-              className="h-9 w-9 items-center justify-center rounded-full bg-blue-50 active:bg-blue-100"
+              className="h-9 w-9 items-center justify-center rounded-full bg-accent-soft active:bg-accent-soft"
               hitSlop={6}
               onPress={onShare}
             >
-              <Share2 color="#2563EB" size={17} strokeWidth={2.3} />
+              <Share2 color={COLORS.accent.primary} size={17} strokeWidth={2.3} />
             </Pressable>
           ) : null}
           {onFavorite ? (
@@ -70,13 +71,13 @@ export const ParkingDetailHeader = memo(function ParkingDetailHeader({
                   : 'Add parking location to favorites'
               }
               accessibilityRole="button"
-              className="h-9 w-9 items-center justify-center rounded-full bg-blue-50 active:bg-blue-100"
+              className="h-9 w-9 items-center justify-center rounded-full bg-accent-soft active:bg-accent-soft"
               hitSlop={6}
               onPress={onFavorite}
             >
               <Heart
-                color="#2563EB"
-                fill={isFavorite ? '#2563EB' : 'transparent'}
+                color={COLORS.accent.primary}
+                fill={isFavorite ? COLORS.accent.primary : 'transparent'}
                 size={17}
                 strokeWidth={2.3}
               />
@@ -85,11 +86,11 @@ export const ParkingDetailHeader = memo(function ParkingDetailHeader({
           <Pressable
             accessibilityLabel="Close parking details"
             accessibilityRole="button"
-            className="h-9 w-9 items-center justify-center rounded-full bg-slate-200/80"
+            className="h-9 w-9 items-center justify-center rounded-full bg-surface-muted/80"
             hitSlop={8}
             onPress={onClose}
           >
-            <X color="#475569" size={18} strokeWidth={2.5} />
+            <X color={COLORS.icon.default} size={18} strokeWidth={2.5} />
           </Pressable>
         </View>
       </View>
@@ -106,7 +107,7 @@ export const ParkingDetailHeader = memo(function ParkingDetailHeader({
                 <Circle
                   cx={RING_SIZE / 2}
                   cy={RING_SIZE / 2}
-                  fill="rgba(255,255,255,0.9)"
+                  fill={COLORS.surface.glassDense}
                   r={RING_RADIUS}
                   stroke={theme.ringTrack}
                   strokeWidth={RING_STROKE}
@@ -142,7 +143,7 @@ export const ParkingDetailHeader = memo(function ParkingDetailHeader({
             </Text>
           </View>
 
-          <Text className="ml-4 flex-1 text-right text-[13px] font-semibold text-blue-600">
+          <Text className="ml-4 flex-1 text-right text-[13px] font-semibold text-accent-primary">
             {distanceLabel}
           </Text>
         </View>
@@ -151,12 +152,12 @@ export const ParkingDetailHeader = memo(function ParkingDetailHeader({
       <Pressable
         accessibilityLabel="Navigate to parking spot"
         accessibilityRole="button"
-        className="mt-5 h-14 flex-row items-center justify-center rounded-2xl bg-blue-600 active:bg-blue-700"
+        className="mt-5 h-14 flex-row items-center justify-center rounded-2xl bg-accent-primary active:bg-accent-pressed"
         onPress={onNavigate}
         style={{ borderCurve: 'continuous' }}
       >
-        <Navigation color="#FFFFFF" fill="#FFFFFF" size={18} />
-        <Text className="ml-2 text-[16px] font-bold text-white">
+        <Navigation color={COLORS.surface.default} fill={COLORS.surface.default} size={18} />
+        <Text className="ml-2 text-[16px] font-bold text-ink-on-accent">
           Navigate to spot
         </Text>
       </Pressable>

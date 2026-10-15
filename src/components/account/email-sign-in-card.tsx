@@ -5,6 +5,7 @@ import type {
   AccountActionResult,
   RegisterActionResult,
 } from '@/types/account';
+import { COLORS } from '@/constants/theme';
 
 type EmailSignInCardProps = {
   errorMessage: string | null;
@@ -22,7 +23,7 @@ type EmailSignInCardProps = {
 type AuthMode = 'login' | 'register';
 
 const INPUT_CLASS =
-  'mt-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-[15px] font-semibold text-slate-900';
+  'mt-2 rounded-2xl border border-border-subtle bg-surface-input px-4 py-3 text-[15px] font-semibold text-ink-primary';
 
 export const EmailSignInCard = memo(function EmailSignInCard({
   errorMessage,
@@ -119,10 +120,10 @@ export const EmailSignInCard = memo(function EmailSignInCard({
 
   return (
     <View>
-      <Text className="text-[15px] font-extrabold text-slate-900">
+      <Text className="text-[15px] font-extrabold text-ink-primary">
         {isRegistering ? 'Create an account' : 'Sign in with email'}
       </Text>
-      <Text className="mt-2 text-[13px] font-semibold leading-5 text-slate-500">
+      <Text className="mt-2 text-[13px] font-semibold leading-5 text-ink-secondary">
         {isRegistering
           ? 'Use an email and password to save your parking setup later.'
           : 'Sign in with your email and password. No code or magic link required.'}
@@ -139,7 +140,7 @@ export const EmailSignInCard = memo(function EmailSignInCard({
         keyboardType="email-address"
         onChangeText={setEmail}
         placeholder="you@example.com"
-        placeholderTextColor="#94A3B8"
+        placeholderTextColor={COLORS.text.muted}
         textContentType="emailAddress"
         value={email}
       />
@@ -152,7 +153,7 @@ export const EmailSignInCard = memo(function EmailSignInCard({
         editable={!busy}
         onChangeText={setPassword}
         placeholder="Password"
-        placeholderTextColor="#94A3B8"
+        placeholderTextColor={COLORS.text.muted}
         secureTextEntry
         textContentType={isRegistering ? 'newPassword' : 'password'}
         value={password}
@@ -168,7 +169,7 @@ export const EmailSignInCard = memo(function EmailSignInCard({
           editable={!busy}
           onChangeText={setConfirmPassword}
           placeholder="Confirm password"
-          placeholderTextColor="#94A3B8"
+          placeholderTextColor={COLORS.text.muted}
           secureTextEntry
           textContentType="newPassword"
           value={confirmPassword}
@@ -179,11 +180,11 @@ export const EmailSignInCard = memo(function EmailSignInCard({
         <Pressable
           accessibilityLabel="Reset forgotten password"
           accessibilityRole="button"
-          className="mt-2 min-h-11 self-end justify-center rounded-full px-2 active:bg-blue-50"
+          className="mt-2 min-h-11 self-end justify-center rounded-full px-2 active:bg-accent-soft"
           disabled={busy}
           onPress={() => onForgotPassword(email)}
         >
-          <Text className="text-[13px] font-extrabold text-blue-600">
+          <Text className="text-[13px] font-extrabold text-accent-primary">
             Forgot password?
           </Text>
         </Pressable>
@@ -194,8 +195,8 @@ export const EmailSignInCard = memo(function EmailSignInCard({
         accessibilityRole="button"
         className={`mt-4 min-h-12 items-center justify-center rounded-full ${
           canSubmit
-            ? 'bg-blue-600 active:bg-blue-700'
-            : 'bg-slate-300'
+            ? 'bg-accent-primary active:bg-accent-pressed'
+            : 'bg-surface-muted'
         }`}
         disabled={!canSubmit}
         onPress={() => {
@@ -203,7 +204,7 @@ export const EmailSignInCard = memo(function EmailSignInCard({
         }}
         style={{ borderCurve: 'continuous' }}
       >
-        <Text className="text-[15px] font-extrabold text-white">
+        <Text className="text-[15px] font-extrabold text-ink-on-accent">
           {busy
             ? isRegistering
               ? 'Creating account...'
@@ -220,7 +221,7 @@ export const EmailSignInCard = memo(function EmailSignInCard({
         disabled={busy}
         onPress={toggleMode}
       >
-        <Text className="text-[13px] font-extrabold text-blue-600">
+        <Text className="text-[13px] font-extrabold text-accent-primary">
           {isRegistering
             ? 'Already have an account? Sign in'
             : 'New here? Create an account'}
@@ -230,7 +231,7 @@ export const EmailSignInCard = memo(function EmailSignInCard({
       {isRegistering && confirmPassword.length > 0 && !passwordsMatch ? (
         <Text
           accessibilityRole="alert"
-          className="mt-2 text-[13px] font-semibold leading-5 text-red-700"
+          className="mt-2 text-[13px] font-semibold leading-5 text-feedback-error"
         >
           Passwords do not match.
         </Text>
@@ -239,7 +240,7 @@ export const EmailSignInCard = memo(function EmailSignInCard({
       {visibleError ? (
         <Text
           accessibilityRole="alert"
-          className="mt-3 text-[13px] font-semibold leading-5 text-red-700"
+          className="mt-3 text-[13px] font-semibold leading-5 text-feedback-error"
         >
           {visibleError}
         </Text>
@@ -248,13 +249,13 @@ export const EmailSignInCard = memo(function EmailSignInCard({
       {notice ? (
         <Text
           accessibilityRole="alert"
-          className="mt-3 rounded-2xl bg-blue-50 px-4 py-3 text-[13px] font-semibold leading-5 text-blue-800"
+          className="mt-3 rounded-2xl bg-accent-soft px-4 py-3 text-[13px] font-semibold leading-5 text-accent-primary"
         >
           {notice}
         </Text>
       ) : null}
 
-      <Text className="mt-4 text-[12px] font-semibold leading-5 text-slate-400">
+      <Text className="mt-4 text-[12px] font-semibold leading-5 text-ink-muted">
         Signing in is optional. Parking, map, and search always work without
         an account.
       </Text>

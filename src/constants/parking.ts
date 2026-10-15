@@ -1,8 +1,10 @@
+import { COLORS } from '@/constants/theme';
+
 export const BADGE_COLORS: Record<string, string> = {
-  Bewohnerparken: '#ffd33d',
-  Kurzzeitparken: '#60a5fa',
-  Mischparken: '#34d399',
-  'E-Parken': '#22d3ee',
-  Behindertenparken: '#a78bfa',
-  'Absolutes Halteverbot': '#f87171',
+  Bewohnerparken: COLORS.zone.resident,
+  Kurzzeitparken: COLORS.zone.shortTerm,
+  Mischparken: COLORS.zone.mixed,
+  'E-Parken': COLORS.zone.electric,
+  Behindertenparken: COLORS.zone.accessible,
+  'Absolutes Halteverbot': COLORS.zone.restricted,
 };

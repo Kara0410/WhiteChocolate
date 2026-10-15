@@ -89,7 +89,7 @@ function TabNavigation() {
   });
 
   return (
-    <View className="flex-1 bg-warm-bg">
+    <View className="flex-1 bg-background-default">
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="map" />
         <Stack.Screen name="list" />
@@ -100,6 +100,12 @@ function TabNavigation() {
         activeKey={activeKey}
         isLocationLoading={isLocationLoading}
         onLocationPress={handleLocationPress}
+        onMapPress={() => {
+          closeOverlay();
+          if (!isMapRoute) {
+            router.replace('/map');
+          }
+        }}
         onProfilePress={() => {
           closeOverlay();
           if (!isAccountRoute) {

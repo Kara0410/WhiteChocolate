@@ -1,5 +1,6 @@
 import type { ExpoConfig } from 'expo/config';
 import type { ConfigContext } from 'expo/config';
+import designTokens = require('./src/constants/design-tokens');
 
 const APP_NAME = 'Munich Parking';
 const LOCATION_PERMISSION_DESCRIPTION =
@@ -17,7 +18,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   newArchEnabled: true,
   ios: {
     bundleIdentifier: 'com.whitechoclate.app',
-    icon: './assets/expo.icon',
+    icon: './assets/images/icon.png',
     infoPlist: {
       LSApplicationQueriesSchemes: ['comgooglemaps', 'waze'],
       NSLocationWhenInUseUsageDescription: LOCATION_PERMISSION_DESCRIPTION,
@@ -35,9 +36,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       },
     },
     adaptiveIcon: {
-      backgroundColor: '#E6F4FE',
+      backgroundColor: designTokens.colors.accent.soft,
       foregroundImage: './assets/images/android-icon-foreground.png',
-      backgroundImage: './assets/images/android-icon-background.png',
       monochromeImage: './assets/images/android-icon-monochrome.png',
     },
     predictiveBackGestureEnabled: false,
@@ -51,7 +51,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       'expo-splash-screen',
       {
-        backgroundColor: '#208AEF',
+        backgroundColor: designTokens.colors.accent.primary,
         android: {
           image: './assets/images/splash-icon.png',
           imageWidth: 76,

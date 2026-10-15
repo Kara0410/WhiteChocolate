@@ -12,7 +12,7 @@ import BottomSheet, {
   BottomSheetScrollView,
   useBottomSheetSpringConfigs,
 } from '@gorhom/bottom-sheet';
-import { Alert, Platform, Share, StyleSheet, Text, View } from 'react-native';
+import { Alert, Share, StyleSheet, Text, View } from 'react-native';
 
 import {
   MAP_ELEVATIONS,
@@ -34,6 +34,7 @@ import {
   getAvailabilityTheme,
   type AvailabilityTheme,
 } from './parking-availability-status';
+import { COLORS, RADII } from '@/constants/theme';
 
 export type ParkingBottomSheetProps = {
   item: ParkingClusterResponse | null;
@@ -46,15 +47,15 @@ export type ParkingBottomSheetHandle = {
 };
 
 const UNKNOWN_THEME: AvailabilityTheme = {
-  fill: '#64748B',
-  text: '#475569',
-  ring: '#94A3B8',
-  ringTrack: '#E2E8F0',
-  glow: 'rgba(100, 116, 139, 0.2)',
-  glowStrong: 'rgba(100, 116, 139, 0.25)',
-  backgroundTint: '#F1F5F9',
-  border: '#CBD5E1',
-  movingFill: '#94A3B8',
+  fill: COLORS.text.secondary,
+  text: COLORS.icon.default,
+  ring: COLORS.text.muted,
+  ringTrack: COLORS.border.subtle,
+  glow: COLORS.status.unknownGlow,
+  glowStrong: COLORS.status.unknownGlowStrong,
+  backgroundTint: COLORS.background.default,
+  border: COLORS.border.strong,
+  movingFill: COLORS.text.muted,
 };
 
 function formatDistance(distance?: number) {
@@ -182,13 +183,13 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
         style={styles.detailScrollView}
       >
         <ParkingDetailSection title="Estimated availability">
-          <Text className="text-[22px] font-extrabold text-slate-950">
+          <Text className="text-[22px] font-extrabold text-ink-primary">
             {percentage === null ? 'Estimate unavailable' : `${percentage}% available`}
           </Text>
-          <Text className="mt-2 text-[13px] font-semibold leading-5 text-slate-600">
+          <Text className="mt-2 text-[13px] font-semibold leading-5 text-ink-secondary">
             Estimate based on time, parking rules and area demand
           </Text>
-          <View className="mt-4 border-t border-slate-100 pt-3">
+          <View className="mt-4 border-t border-border-subtle pt-3">
             <ParkingInfoRow
               label="Confidence"
               value={
@@ -280,15 +281,15 @@ export const ParkingBottomSheet = forwardRef<
 const styles = StyleSheet.create({
   detailContent: { flex: 1 },
   detailScrollView: { flex: 1 },
-  handleIndicator: { backgroundColor: '#CBD5E1', width: 42 },
+  handleIndicator: { backgroundColor: COLORS.border.strong, width: 42 },
   scrollContent: { paddingBottom: 48, paddingHorizontal: 20 },
   sheet: {
     elevation: MAP_ELEVATIONS.bottomSheet,
     zIndex: MAP_LAYERS.bottomSheet,
   },
   sheetBackground: {
-    backgroundColor: Platform.OS === 'ios' ? '#F8FAFC' : '#FFFFFF',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+    backgroundColor: COLORS.surface.input,
+    borderTopLeftRadius: RADII.sheet,
+    borderTopRightRadius: RADII.sheet,
   },
 });

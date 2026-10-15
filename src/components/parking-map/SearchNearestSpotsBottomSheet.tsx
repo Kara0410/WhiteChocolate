@@ -26,6 +26,7 @@ import {
 } from '@/utils/parkingSearch';
 
 import { getAvailabilityTheme } from './parking-availability-status';
+import { COLORS, RADII, SHADOWS } from '@/constants/theme';
 
 type SearchNearestSpotsBottomSheetProps = {
   searchPlace: PlaceSearchResult | null;
@@ -62,7 +63,7 @@ function formatPrice(item: ParkingClusterResponse) {
 function AvailabilityRing({ percentage }: { percentage: number | null }) {
   const theme =
     percentage === null
-      ? { ring: '#94A3B8', ringTrack: '#E2E8F0', text: '#64748B' }
+      ? { ring: COLORS.text.muted, ringTrack: COLORS.border.subtle, text: COLORS.text.secondary }
       : getAvailabilityTheme(percentage);
   const ringOffset =
     percentage === null
@@ -79,7 +80,7 @@ function AvailabilityRing({ percentage }: { percentage: number | null }) {
         <Circle
           cx={RING_SIZE / 2}
           cy={RING_SIZE / 2}
-          fill="rgba(255,255,255,0.92)"
+          fill={COLORS.surface.glassReadable}
           r={RING_RADIUS}
           stroke={theme.ringTrack}
           strokeWidth={RING_STROKE}
@@ -125,29 +126,29 @@ const NearestSpotRow = memo(function NearestSpotRow({
     <Pressable
       accessibilityLabel={`Open ${title}`}
       accessibilityRole="button"
-      className="mb-3 flex-row items-center rounded-3xl border border-white/80 bg-white px-4 py-4 shadow-floating active:bg-slate-50"
+      className="mb-3 flex-row items-center rounded-3xl border border-border-glass bg-surface-default px-4 py-4 shadow-floating active:bg-surface-input"
       onPress={() => onPress(item)}
       style={{ borderCurve: 'continuous' }}
     >
       <AvailabilityRing percentage={percentage} />
       <View className="ml-4 flex-1">
         <Text
-          className="text-[16px] font-extrabold text-slate-950"
+          className="text-[16px] font-extrabold text-ink-primary"
           numberOfLines={1}
         >
           {title}
         </Text>
         <View className="mt-1 flex-row items-center">
-          <Text className="text-[13px] font-bold text-slate-600">
+          <Text className="text-[13px] font-bold text-ink-secondary">
             {formatSearchDistance(item.distanceFromSearchMeters)}
           </Text>
-          <Text className="ml-2 text-[13px] font-semibold text-slate-400">
+          <Text className="ml-2 text-[13px] font-semibold text-ink-muted">
             {formatPrice(item)}
           </Text>
         </View>
       </View>
-      <View className="ml-3 h-9 w-9 items-center justify-center rounded-full bg-blue-50">
-        <Navigation color="#2563EB" size={17} strokeWidth={2.4} />
+      <View className="ml-3 h-9 w-9 items-center justify-center rounded-full bg-accent-soft">
+        <Navigation color={COLORS.accent.primary} size={17} strokeWidth={2.4} />
       </View>
     </Pressable>
   );
@@ -239,32 +240,32 @@ function SearchNearestSpotsBottomSheetComponent({
       <View className="px-5 pb-3 pt-1">
         <View className="flex-row items-center justify-between">
           <View className="flex-1 pr-3">
-            <Text className="text-[24px] font-extrabold text-slate-950">
+            <Text className="text-[24px] font-extrabold text-ink-primary">
               Nearby parking areas
             </Text>
             <View className="mt-1 flex-row items-center">
-              <MapPin color="#64748B" size={14} strokeWidth={2.4} />
+              <MapPin color={COLORS.text.secondary} size={14} strokeWidth={2.4} />
               <Text
-                className="ml-1 flex-1 text-[13px] font-semibold text-slate-500"
+                className="ml-1 flex-1 text-[13px] font-semibold text-ink-secondary"
                 numberOfLines={1}
               >
                 {searchPlace?.address ?? searchPlace?.title ?? 'Selected place'}
               </Text>
             </View>
             {spots.length > 0 ? (
-              <Text className="mt-1 text-[12px] font-medium text-slate-400">
+              <Text className="mt-1 text-[12px] font-medium text-ink-muted">
                 Showing the closest recommended parking areas
               </Text>
             ) : null}
             {spots.length > 0 && errorMessage !== null ? (
-              <Text className="mt-2 text-[12px] font-semibold leading-4 text-amber-700">
+              <Text className="mt-2 text-[12px] font-semibold leading-4 text-status-limited">
                 {errorMessage}
               </Text>
             ) : null}
             {spots.length > 0 && isLoading ? (
               <View className="mt-2 flex-row items-center">
-                <ActivityIndicator color="#2563EB" size="small" />
-                <Text className="ml-2 text-[12px] font-semibold text-blue-700">
+                <ActivityIndicator color={COLORS.accent.primary} size="small" />
+                <Text className="ml-2 text-[12px] font-semibold text-accent-primary">
                   Updating parking availability
                 </Text>
               </View>
@@ -273,12 +274,12 @@ function SearchNearestSpotsBottomSheetComponent({
           <Pressable
             accessibilityLabel="Close nearby parking areas"
             accessibilityRole="button"
-            className="h-10 w-10 items-center justify-center rounded-full bg-white active:bg-slate-100"
+            className="h-10 w-10 items-center justify-center rounded-full bg-surface-default active:bg-background-default"
             hitSlop={8}
             onPress={closeSheet}
              style={{ borderCurve: 'continuous' }}
           >
-            <X color="#475569" size={18} strokeWidth={2.5} />
+            <X color={COLORS.icon.default} size={18} strokeWidth={2.5} />
           </Pressable>
         </View>
       </View>
@@ -301,25 +302,25 @@ function SearchNearestSpotsBottomSheetComponent({
                   : 'Show more nearby parking areas'
               }
               accessibilityRole="button"
-              className="mt-1 flex-row items-center justify-center rounded-3xl border border-slate-200 bg-white px-4 py-3.5 active:bg-slate-50"
+              className="mt-1 flex-row items-center justify-center rounded-3xl border border-border-subtle bg-surface-default px-4 py-3.5 active:bg-surface-input"
               onPress={toggleExpandedResults}
               style={{ borderCurve: 'continuous' }}
             >
-              <Text className="text-[14px] font-bold text-blue-700">
+              <Text className="text-[14px] font-bold text-accent-primary">
                 {isExpandedNearbyList
                   ? 'Show less'
                   : `Show more parking areas (${hiddenResultCount})`}
               </Text>
               {isExpandedNearbyList ? (
                 <ChevronUp
-                  color="#1D4ED8"
+                  color={COLORS.accent.primary}
                   size={16}
                   strokeWidth={2.6}
                   className="ml-1.5"
                 />
               ) : (
                 <ChevronDown
-                  color="#1D4ED8"
+                  color={COLORS.accent.primary}
                   size={16}
                   strokeWidth={2.6}
                   className="ml-1.5"
@@ -329,18 +330,18 @@ function SearchNearestSpotsBottomSheetComponent({
           ) : null
         }
         ListEmptyComponent={
-          <View className="items-center justify-center rounded-[28px] border border-dashed border-slate-300 bg-white/80 px-6 py-10">
+          <View className="items-center justify-center rounded-card border border-dashed border-border-strong bg-surface-default/80 px-6 py-10">
             {isLoading && errorMessage === null ? (
-              <ActivityIndicator color="#2563EB" size="small" />
+              <ActivityIndicator color={COLORS.accent.primary} size="small" />
             ) : null}
-            <Text className="mt-2 text-[18px] font-extrabold text-slate-950">
+            <Text className="mt-2 text-[18px] font-extrabold text-ink-primary">
               {errorMessage !== null
                 ? 'Unable to load parking areas'
                 : isLoading
                   ? 'Finding nearby parking areas'
                   : 'No nearby parking areas found'}
             </Text>
-            <Text className="mt-2 text-center text-[14px] font-medium leading-5 text-slate-500">
+            <Text className="mt-2 text-center text-[14px] font-medium leading-5 text-ink-secondary">
               {errorMessage !== null
                 ? 'Parking information couldn\'t be loaded. Try again.'
                 : isLoading
@@ -351,10 +352,10 @@ function SearchNearestSpotsBottomSheetComponent({
               <Pressable
                 accessibilityLabel="Retry parking information"
                 accessibilityRole="button"
-                className="mt-4 min-h-11 justify-center rounded-full bg-blue-600 px-4 active:bg-blue-700"
+                className="mt-4 min-h-11 justify-center rounded-full bg-accent-primary px-4 active:bg-accent-pressed"
                 onPress={onRetry}
               >
-                <Text className="text-center text-[13px] font-extrabold text-white">
+                <Text className="text-center text-[13px] font-extrabold text-ink-on-accent">
                   Retry
                 </Text>
               </Pressable>
@@ -377,16 +378,16 @@ export const SearchNearestSpotsBottomSheet = memo(
 
 const styles = StyleSheet.create({
   background: {
-    backgroundColor: '#F3F5F8',
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
+    backgroundColor: COLORS.background.default,
+    borderTopLeftRadius: RADII.sheet,
+    borderTopRightRadius: RADII.sheet,
   },
   handle: {
     paddingBottom: 10,
     paddingTop: 12,
   },
   handleIndicator: {
-    backgroundColor: 'rgba(0,0,0,0.16)',
+    backgroundColor: COLORS.border.strong,
     borderRadius: 999,
     height: 5,
     width: 42,
@@ -396,9 +397,9 @@ const styles = StyleSheet.create({
     paddingTop: 2,
   },
   sheet: {
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    boxShadow: '0 -4px 14px rgba(0,0,0,0.1)',
+    borderTopLeftRadius: RADII.sheet,
+    borderTopRightRadius: RADII.sheet,
+    boxShadow: SHADOWS.sheet,
     elevation: MAP_ELEVATIONS.bottomSheet,
     zIndex: MAP_LAYERS.bottomSheet,
   },

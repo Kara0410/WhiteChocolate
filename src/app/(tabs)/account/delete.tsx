@@ -7,16 +7,17 @@ import { useFavoriteParking } from '@/context/FavoriteParkingContext';
 import { useOnboarding } from '@/context/OnboardingContext';
 import { usePreferences } from '@/context/PreferencesContext';
 import { useAccount } from '@/hooks/use-account';
+import { COLORS } from '@/constants/theme';
 
 type DeletionStep = 'overview' | 'confirm' | 'done';
 
 function Consequence({ children }: { children: string }) {
   return (
     <View className="mt-2 flex-row">
-      <Text className="text-[13px] font-semibold leading-5 text-red-500">
+      <Text className="text-[13px] font-semibold leading-5 text-feedback-error">
         {'•'}
       </Text>
-      <Text className="ml-2 flex-1 text-[13px] font-semibold leading-5 text-slate-600">
+      <Text className="ml-2 flex-1 text-[13px] font-semibold leading-5 text-ink-secondary">
         {children}
       </Text>
     </View>
@@ -93,36 +94,36 @@ export default function AccountDeleteScreen() {
     >
       {step === 'done' ? (
         <View accessibilityRole="alert">
-          <Text className="text-[17px] font-extrabold text-slate-900">
+          <Text className="text-[17px] font-extrabold text-ink-primary">
             Account deleted
           </Text>
-          <Text className="mt-2 text-[13px] font-semibold leading-5 text-slate-500">
+          <Text className="mt-2 text-[13px] font-semibold leading-5 text-ink-secondary">
             You are signed out and can continue using the app without an
             account.
           </Text>
           {cleanupWarning ? (
-            <Text className="mt-3 text-[13px] font-semibold leading-5 text-amber-800">
+            <Text className="mt-3 text-[13px] font-semibold leading-5 text-status-limited">
               {cleanupWarning}
             </Text>
           ) : null}
           <Pressable
             accessibilityLabel="Continue without an account"
             accessibilityRole="button"
-            className="mt-5 min-h-12 items-center justify-center rounded-full bg-blue-600 active:bg-blue-700"
+            className="mt-5 min-h-12 items-center justify-center rounded-full bg-accent-primary active:bg-accent-pressed"
             onPress={continueAfterDeletion}
             style={{ borderCurve: 'continuous' }}
           >
-            <Text className="text-[15px] font-extrabold text-white">
+            <Text className="text-[15px] font-extrabold text-ink-on-accent">
               Continue
             </Text>
           </Pressable>
         </View>
       ) : !account.isSignedIn && !isDeleting ? (
         <View accessibilityRole="alert">
-          <Text className="text-[17px] font-extrabold text-slate-900">
+          <Text className="text-[17px] font-extrabold text-ink-primary">
             Sign in required
           </Text>
-          <Text className="mt-2 text-[13px] font-semibold leading-5 text-slate-500">
+          <Text className="mt-2 text-[13px] font-semibold leading-5 text-ink-secondary">
             Sign in to manage and delete your account.
           </Text>
         </View>
@@ -131,14 +132,14 @@ export default function AccountDeleteScreen() {
           {error ? (
             <Text
               accessibilityRole="alert"
-              className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] font-semibold leading-5 text-red-800"
+              className="mb-4 rounded-2xl border border-feedback-error bg-feedback-error-soft px-4 py-3 text-[13px] font-semibold leading-5 text-feedback-error"
             >
               {error}
             </Text>
           ) : null}
 
-          <View className="rounded-2xl border border-red-100 bg-red-50 p-4">
-            <Text className="text-[15px] font-extrabold text-red-900">
+          <View className="rounded-2xl border border-feedback-error bg-feedback-error-soft p-4">
+            <Text className="text-[15px] font-extrabold text-feedback-error">
               What will be removed
             </Text>
             <Consequence>Your profile and account</Consequence>
@@ -150,7 +151,7 @@ export default function AccountDeleteScreen() {
 
           {step === 'confirm' ? (
             <>
-              <Text className="mt-5 text-[14px] font-extrabold leading-5 text-red-800">
+              <Text className="mt-5 text-[14px] font-extrabold leading-5 text-feedback-error">
                 Are you sure? This action cannot be undone.
               </Text>
               <Pressable
@@ -158,8 +159,8 @@ export default function AccountDeleteScreen() {
                 accessibilityRole="button"
                 className={
                   isDeleting
-                    ? 'mt-4 min-h-12 flex-row items-center justify-center rounded-full bg-red-300'
-                    : 'mt-4 min-h-12 flex-row items-center justify-center rounded-full bg-red-700 active:bg-red-800'
+                    ? 'mt-4 min-h-12 flex-row items-center justify-center rounded-full bg-feedback-error-soft'
+                    : 'mt-4 min-h-12 flex-row items-center justify-center rounded-full bg-feedback-error active:bg-feedback-error'
                 }
                 disabled={isDeleting}
                 onPress={() => {
@@ -168,21 +169,21 @@ export default function AccountDeleteScreen() {
                 style={{ borderCurve: 'continuous' }}
               >
                 {isDeleting ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
+                  <ActivityIndicator color={COLORS.surface.default} size="small" />
                 ) : null}
-                <Text className="text-[15px] font-extrabold text-white">
+                <Text className="text-[15px] font-extrabold text-ink-on-accent">
                   {isDeleting ? 'Deleting account' : 'Delete permanently'}
                 </Text>
               </Pressable>
               <Pressable
                 accessibilityLabel="Cancel account deletion"
                 accessibilityRole="button"
-                className="mt-3 min-h-12 items-center justify-center rounded-full bg-slate-100 active:bg-slate-200"
+                className="mt-3 min-h-12 items-center justify-center rounded-full bg-background-default active:bg-surface-muted"
                 disabled={isDeleting}
                 onPress={() => setStep('overview')}
                 style={{ borderCurve: 'continuous' }}
               >
-                <Text className="text-[15px] font-extrabold text-slate-700">
+                <Text className="text-[15px] font-extrabold text-ink-secondary">
                   Cancel
                 </Text>
               </Pressable>
@@ -192,11 +193,11 @@ export default function AccountDeleteScreen() {
               accessibilityHint="Shows a confirmation before deletion"
               accessibilityLabel="Delete account"
               accessibilityRole="button"
-              className="mt-5 min-h-12 items-center justify-center rounded-full border border-red-300 bg-red-50 active:bg-red-100"
+              className="mt-5 min-h-12 items-center justify-center rounded-full border border-feedback-error bg-feedback-error-soft active:bg-feedback-error-soft"
               onPress={() => setStep('confirm')}
               style={{ borderCurve: 'continuous' }}
             >
-              <Text className="text-[15px] font-extrabold text-red-700">
+              <Text className="text-[15px] font-extrabold text-feedback-error">
                 Delete account
               </Text>
             </Pressable>

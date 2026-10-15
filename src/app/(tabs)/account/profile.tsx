@@ -41,10 +41,10 @@ export default function AccountProfileScreen() {
         description="You're signed in. Favorites and preferences are kept on this device while cloud sync is prepared."
         title="Profile"
       >
-        <Text className="text-[15px] font-extrabold text-slate-900">
+        <Text className="text-[15px] font-extrabold text-ink-primary">
           {account.displayName}
         </Text>
-        <Text className="mt-1 text-[13px] font-semibold text-slate-500">
+        <Text className="mt-1 text-[13px] font-semibold text-ink-secondary">
           {account.email}
         </Text>
         <Pressable
@@ -52,34 +52,34 @@ export default function AccountProfileScreen() {
           accessibilityRole="button"
           className={`mt-5 min-h-12 items-center justify-center rounded-full ${
             account.status === 'signingOut'
-              ? 'bg-slate-300'
-              : 'bg-slate-950 active:bg-slate-800'
+              ? 'bg-surface-muted'
+              : 'bg-accent-primary active:bg-accent-pressed'
           }`}
           disabled={account.status === 'signingOut'}
           onPress={handleSignOut}
           style={{ borderCurve: 'continuous' }}
         >
-          <Text className="text-[15px] font-extrabold text-white">
+          <Text className="text-[15px] font-extrabold text-ink-on-accent">
             {account.status === 'signingOut' ? 'Signing out…' : 'Sign out'}
           </Text>
         </Pressable>
-        <Text className="mt-3 text-[12px] font-semibold leading-5 text-slate-400">
+        <Text className="mt-3 text-[12px] font-semibold leading-5 text-ink-muted">
           Signing out keeps your favorites and preferences on this device.
           Nothing is deleted.
         </Text>
         {account.error ? (
           <Text
             accessibilityRole="alert"
-            className="mt-3 text-[13px] font-semibold leading-5 text-red-700"
+            className="mt-3 text-[13px] font-semibold leading-5 text-feedback-error"
           >
             {account.error.message}
           </Text>
         ) : null}
-        <View className="mt-7 border-t border-slate-200 pt-6">
-          <Text className="text-[15px] font-extrabold text-red-700">
+        <View className="mt-7 border-t border-border-subtle pt-6">
+          <Text className="text-[15px] font-extrabold text-feedback-error">
             Delete account
           </Text>
-          <Text className="mt-2 text-[13px] font-semibold leading-5 text-slate-500">
+          <Text className="mt-2 text-[13px] font-semibold leading-5 text-ink-secondary">
             Permanently delete your account and associated server data. This
             action cannot be undone.
           </Text>
@@ -87,16 +87,16 @@ export default function AccountProfileScreen() {
             accessibilityHint="Opens the account deletion confirmation"
             accessibilityLabel="Delete account"
             accessibilityRole="button"
-            className={`mt-4 min-h-12 items-center justify-center rounded-full border border-red-300 ${
+            className={`mt-4 min-h-12 items-center justify-center rounded-full border border-feedback-error ${
               account.status === 'signingOut'
-                ? 'bg-red-100 opacity-60'
-                : 'bg-red-50 active:bg-red-100'
+                ? 'bg-feedback-error-soft opacity-60'
+                : 'bg-feedback-error-soft active:bg-feedback-error-soft'
             }`}
             disabled={account.status === 'signingOut'}
             onPress={handleDeleteAccount}
             style={{ borderCurve: 'continuous' }}
           >
-            <Text className="text-[15px] font-extrabold text-red-700">
+            <Text className="text-[15px] font-extrabold text-feedback-error">
               Delete account
             </Text>
           </Pressable>

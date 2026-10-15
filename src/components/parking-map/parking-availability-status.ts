@@ -2,6 +2,7 @@ import {
   getParkingAvailabilityLevel,
   type ParkingAvailabilityLevel,
 } from '@/utils/parking-availability';
+import { COLORS } from '@/constants/theme';
 
 export type AvailabilityStatus = ParkingAvailabilityLevel;
 
@@ -22,37 +23,37 @@ export const AVAILABILITY_THEME: Record<
   AvailabilityTheme
 > = {
   high: {
-    fill: '#22C55E',
-    text: '#FFFFFF',
-    ring: '#22C55E',
-    ringTrack: 'rgba(34, 197, 94, 0.2)',
-    glow: 'rgba(34, 197, 94, 0.42)',
-    glowStrong: 'rgba(34, 197, 94, 0.58)',
-    backgroundTint: '#22C55E',
-    border: '#FFFFFF',
-    movingFill: '#22C55E',
+    fill: COLORS.status.available,
+    text: COLORS.text.onAccent,
+    ring: COLORS.status.available,
+    ringTrack: COLORS.status.availableTrack,
+    glow: COLORS.status.availableGlow,
+    glowStrong: COLORS.status.availableGlowStrong,
+    backgroundTint: COLORS.status.available,
+    border: COLORS.surface.default,
+    movingFill: COLORS.status.available,
   },
   medium: {
-    fill: '#FF9500',
-    text: '#FFFFFF',
-    ring: '#FF9500',
-    ringTrack: 'rgba(255, 149, 0, 0.2)',
-    glow: 'rgba(255, 149, 0, 0.42)',
-    glowStrong: 'rgba(255, 149, 0, 0.58)',
-    backgroundTint: '#FF9500',
-    border: '#FFFFFF',
-    movingFill: '#FF9500',
+    fill: COLORS.status.limited,
+    text: COLORS.text.onAccent,
+    ring: COLORS.status.limited,
+    ringTrack: COLORS.status.limitedTrack,
+    glow: COLORS.status.limitedGlow,
+    glowStrong: COLORS.status.limitedGlowStrong,
+    backgroundTint: COLORS.status.limited,
+    border: COLORS.surface.default,
+    movingFill: COLORS.status.limited,
   },
   low: {
-    fill: '#FF2D2D',
-    text: '#FFFFFF',
-    ring: '#FF2D2D',
-    ringTrack: 'rgba(255, 45, 45, 0.2)',
-    glow: 'rgba(255, 45, 45, 0.42)',
-    glowStrong: 'rgba(255, 45, 45, 0.58)',
-    backgroundTint: '#FF2D2D',
-    border: '#FFFFFF',
-    movingFill: '#FF2D2D',
+    fill: COLORS.status.full,
+    text: COLORS.text.onAccent,
+    ring: COLORS.status.full,
+    ringTrack: COLORS.status.fullTrack,
+    glow: COLORS.status.fullGlow,
+    glowStrong: COLORS.status.fullGlowStrong,
+    backgroundTint: COLORS.status.full,
+    border: COLORS.surface.default,
+    movingFill: COLORS.status.full,
   },
 };
 

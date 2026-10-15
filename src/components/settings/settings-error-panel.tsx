@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import { AlertCircle } from 'lucide-react-native';
 import { Pressable, Text, View } from 'react-native';
+import { COLORS } from '@/constants/theme';
 
 type SettingsErrorPanelProps = {
   message: string;
@@ -14,10 +15,10 @@ export const SettingsErrorPanel = memo(function SettingsErrorPanel({
   return (
     <View
       accessibilityRole="alert"
-      className="mb-5 flex-row items-center rounded-2xl border border-red-200 bg-red-50 px-4 py-3"
+      className="mb-5 flex-row items-center rounded-2xl border border-feedback-error bg-feedback-error-soft px-4 py-3"
     >
-      <AlertCircle color="#DC2626" size={19} strokeWidth={2.3} />
-      <Text className="ml-3 flex-1 text-[13px] font-semibold leading-5 text-red-800">
+      <AlertCircle color={COLORS.feedback.error} size={19} strokeWidth={2.3} />
+      <Text className="ml-3 flex-1 text-[13px] font-semibold leading-5 text-feedback-error">
         {message}
       </Text>
       {onRetry ? (
@@ -25,10 +26,10 @@ export const SettingsErrorPanel = memo(function SettingsErrorPanel({
           accessibilityHint="Attempts to load this information again"
           accessibilityLabel="Retry"
           accessibilityRole="button"
-          className="ml-3 min-h-11 justify-center rounded-full bg-white px-3 active:bg-red-100"
+          className="ml-3 min-h-11 justify-center rounded-full bg-surface-default px-3 active:bg-feedback-error-soft"
           onPress={onRetry}
         >
-          <Text className="text-[13px] font-extrabold text-red-700">
+          <Text className="text-[13px] font-extrabold text-feedback-error">
             Retry
           </Text>
         </Pressable>

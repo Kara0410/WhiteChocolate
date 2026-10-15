@@ -33,5 +33,5 @@ export default function FavoritesDeepLink() {
     showCreateAccountSheet,
   ]);
 
-  return <View className="flex-1 bg-slate-100" />;
+  return <View className="flex-1 bg-background-default" />;
 }

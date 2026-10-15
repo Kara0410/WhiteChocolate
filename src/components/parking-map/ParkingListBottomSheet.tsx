@@ -18,6 +18,7 @@ import {
   MAP_LAYERS,
 } from '@/components/parking-map/map-layers';
 import type { ParkingClusterResponse } from '@/types/parking-map';
+import { COLORS, RADII, SHADOWS } from '@/constants/theme';
 
 type ParkingListBottomSheetProps = {
   errorMessage?: string | null;
@@ -45,12 +46,12 @@ const ParkingListRow = memo(function ParkingListRow({
   const price = item.avgPrice ?? item.minPrice;
   const availabilityColor =
     percentage === null
-      ? '#64748B'
+      ? COLORS.text.secondary
       : percentage >= 55
-        ? '#059669'
+        ? COLORS.feedback.success
         : percentage >= 25
-          ? '#D97706'
-          : '#DC2626';
+          ? COLORS.feedback.warning
+          : COLORS.feedback.error;
   const priceLabel =
     item.pricingStatus === 'free'
       ? 'Free'
@@ -62,16 +63,16 @@ const ParkingListRow = memo(function ParkingListRow({
     <Pressable
       accessibilityLabel={`Open ${item.bestSpot.label || 'parking area'}`}
       accessibilityRole="button"
-      className="mb-3 flex-row items-center rounded-3xl border border-white/80 bg-white px-4 py-4 shadow-floating active:bg-slate-50"
+      className="mb-3 flex-row items-center rounded-3xl border border-border-glass bg-surface-default px-4 py-4 shadow-floating active:bg-surface-input"
       onPress={() => onPress(item)}
       style={{ borderCurve: 'continuous' }}
     >
-      <View className="h-12 w-12 items-center justify-center rounded-2xl bg-blue-50">
-        <MapPin color="#2563EB" size={21} strokeWidth={2.3} />
+      <View className="h-12 w-12 items-center justify-center rounded-2xl bg-accent-soft">
+        <MapPin color={COLORS.accent.primary} size={21} strokeWidth={2.3} />
       </View>
       <View className="ml-4 flex-1">
         <Text
-          className="text-[16px] font-extrabold text-slate-950"
+          className="text-[16px] font-extrabold text-ink-primary"
           numberOfLines={1}
         >
           {item.bestSpot.label || 'Parking area'}
@@ -85,12 +86,12 @@ const ParkingListRow = memo(function ParkingListRow({
               ? 'Availability unavailable'
               : `${percentage}% estimated`}
           </Text>
-          <Text className="ml-2 text-[13px] font-semibold text-slate-400">
+          <Text className="ml-2 text-[13px] font-semibold text-ink-muted">
             {priceLabel}
           </Text>
         </View>
       </View>
-      <ChevronRight color="#94A3B8" size={19} strokeWidth={2.3} />
+      <ChevronRight color={COLORS.text.muted} size={19} strokeWidth={2.3} />
     </Pressable>
   );
 });
@@ -168,48 +169,48 @@ export function ParkingListBottomSheet({
         ListHeaderComponent={
           <View className="mb-5 flex-row items-center justify-between">
             <View className="flex-1 pr-3">
-              <Text className="text-[26px] font-extrabold text-slate-950">
+              <Text className="text-[26px] font-extrabold text-ink-primary">
                 Parking nearby
               </Text>
-              <Text className="mt-1 text-[14px] font-semibold text-slate-500">
+              <Text className="mt-1 text-[14px] font-semibold text-ink-secondary">
                 {spots.length} parking areas
               </Text>
             </View>
             <Pressable
               accessibilityLabel="Close parking list"
               accessibilityRole="button"
-              className="h-11 w-11 items-center justify-center rounded-full bg-white active:bg-slate-100"
+              className="h-11 w-11 items-center justify-center rounded-full bg-surface-default active:bg-background-default"
               hitSlop={8}
               onPress={closeSheet}
               style={{ borderCurve: 'continuous' }}
             >
-              <X color="#475569" size={19} strokeWidth={2.5} />
+              <X color={COLORS.icon.default} size={19} strokeWidth={2.5} />
             </Pressable>
           </View>
         }
         ListEmptyComponent={
-          <View className="items-center rounded-[28px] border border-dashed border-slate-300 bg-white/80 px-6 py-12">
-            <View className="mb-4 h-16 w-16 items-center justify-center rounded-full bg-blue-50">
-              <Car color="#2563EB" size={28} strokeWidth={2.2} />
+          <View className="items-center rounded-card border border-dashed border-border-strong bg-surface-default/80 px-6 py-12">
+            <View className="mb-4 h-16 w-16 items-center justify-center rounded-full bg-accent-soft">
+              <Car color={COLORS.accent.primary} size={28} strokeWidth={2.2} />
             </View>
-            <Text className="text-[18px] font-extrabold text-slate-950">
+            <Text className="text-[18px] font-extrabold text-ink-primary">
               {errorMessage === null
                 ? 'No parking areas found'
                 : 'Unable to load parking areas'}
             </Text>
             {errorMessage !== null ? (
               <>
-                <Text className="mt-2 text-center text-[14px] font-medium leading-5 text-slate-500">
+                <Text className="mt-2 text-center text-[14px] font-medium leading-5 text-ink-secondary">
                   Parking information couldn&apos;t be loaded. Try again.
                 </Text>
                 {onRetry ? (
                   <Pressable
                     accessibilityLabel="Retry parking information"
                     accessibilityRole="button"
-                    className="mt-4 min-h-11 justify-center rounded-full bg-blue-600 px-4 active:bg-blue-700"
+                    className="mt-4 min-h-11 justify-center rounded-full bg-accent-primary px-4 active:bg-accent-pressed"
                     onPress={onRetry}
                   >
-                    <Text className="text-center text-[13px] font-extrabold text-white">
+                    <Text className="text-center text-[13px] font-extrabold text-ink-on-accent">
                       Retry
                     </Text>
                   </Pressable>
@@ -230,9 +231,9 @@ export function ParkingListBottomSheet({
 
 const styles = StyleSheet.create({
   background: {
-    backgroundColor: '#F3F5F8',
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
+    backgroundColor: COLORS.background.default,
+    borderTopLeftRadius: RADII.sheet,
+    borderTopRightRadius: RADII.sheet,
   },
   content: {
     paddingHorizontal: 20,
@@ -243,15 +244,15 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   handleIndicator: {
-    backgroundColor: 'rgba(0,0,0,0.16)',
+    backgroundColor: COLORS.border.strong,
     borderRadius: 999,
     height: 5,
     width: 42,
   },
   sheet: {
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    boxShadow: '0 -4px 14px rgba(0,0,0,0.1)',
+    borderTopLeftRadius: RADII.sheet,
+    borderTopRightRadius: RADII.sheet,
+    boxShadow: SHADOWS.sheet,
     elevation: MAP_ELEVATIONS.bottomSheet,
     zIndex: MAP_LAYERS.bottomSheet,
   },

@@ -15,9 +15,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAccount } from '@/hooks/use-account';
 import { validateAccountEmail } from '@/utils/account-validation';
+import { COLORS } from '@/constants/theme';
 
 const INPUT_CLASS =
-  'mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-[15px] font-semibold text-slate-900';
+  'mt-4 rounded-2xl border border-border-subtle bg-surface-input px-4 py-3 text-[15px] font-semibold text-ink-primary';
 
 function PrimaryButton({
   disabled,
@@ -35,15 +36,15 @@ function PrimaryButton({
       accessibilityRole="button"
       accessibilityState={{ disabled }}
       className={`mt-8 min-h-14 flex-row items-center justify-center rounded-full px-5 ${
-        disabled ? 'bg-blue-300' : 'bg-blue-600 active:bg-blue-700'
+        disabled ? 'bg-accent-soft' : 'bg-accent-primary active:bg-accent-pressed'
       }`}
       disabled={disabled}
       onPress={onPress}
       style={{ borderCurve: 'continuous' }}
     >
-      {isLoading ? <ActivityIndicator color="#FFFFFF" size="small" /> : null}
+      {isLoading ? <ActivityIndicator color={COLORS.surface.default} size="small" /> : null}
       <Text
-        className={`text-[15px] font-black text-white${
+        className={`text-[15px] font-black text-ink-on-accent${
           isLoading ? ' ml-2' : ''
         }`}
       >
@@ -66,13 +67,13 @@ function SecondaryButton({
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ disabled }}
-      className="mt-4 min-h-11 items-center justify-center rounded-full px-4 active:bg-slate-100"
+      className="mt-4 min-h-11 items-center justify-center rounded-full px-4 active:bg-background-default"
       disabled={disabled}
       onPress={onPress}
     >
       <Text
         className={`text-[14px] font-extrabold ${
-          disabled ? 'text-slate-300' : 'text-slate-600'
+          disabled ? 'text-ink-muted' : 'text-ink-secondary'
         }`}
       >
         {label}
@@ -168,7 +169,7 @@ export default function ForgotPasswordScreen() {
   }, [account, canSubmit, email, source]);
 
   return (
-    <View className="flex-1 bg-slate-100">
+    <View className="flex-1 bg-background-default">
       <ScrollView
         contentContainerStyle={{
           flexGrow: 1,
@@ -181,30 +182,30 @@ export default function ForgotPasswordScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View className="w-full max-w-[520px] self-center rounded-[32px] border border-white/80 bg-white px-6 py-7 shadow-overlay">
+        <View className="w-full max-w-[520px] self-center rounded-sheet border border-border-glass bg-surface-default px-6 py-7 shadow-overlay">
           <Pressable
             accessibilityLabel="Return to login"
             accessibilityRole="button"
-            className="h-11 w-11 items-center justify-center rounded-full bg-slate-100 active:bg-slate-200"
+            className="h-11 w-11 items-center justify-center rounded-full bg-background-default active:bg-surface-muted"
             disabled={isSubmitting}
             onPress={returnToLogin}
           >
-            <ArrowLeft color="#475569" size={22} strokeWidth={2.6} />
+            <ArrowLeft color={COLORS.icon.default} size={22} strokeWidth={2.6} />
           </Pressable>
 
-          <View className="mt-7 h-16 w-16 items-center justify-center rounded-[24px] bg-blue-50">
-            <LockKeyhole color="#2563EB" size={30} strokeWidth={2.4} />
+          <View className="mt-7 h-16 w-16 items-center justify-center rounded-[24px] bg-accent-soft">
+            <LockKeyhole color={COLORS.accent.primary} size={30} strokeWidth={2.4} />
           </View>
-          <Text className="mt-6 text-[31px] font-black leading-9 text-slate-950">
+          <Text className="mt-6 text-[31px] font-black leading-9 text-ink-primary">
             Reset your password
           </Text>
-          <Text className="mt-3 text-[15px] font-semibold leading-6 text-slate-500">
+          <Text className="mt-3 text-[15px] font-semibold leading-6 text-ink-secondary">
             Enter the email address connected to your account.
           </Text>
 
-          <View className="mt-7 flex-row items-center rounded-2xl bg-slate-50 px-4 py-3">
-            <Mail color="#64748B" size={20} strokeWidth={2.2} />
-            <Text className="ml-3 text-[13px] font-semibold text-slate-500">
+          <View className="mt-7 flex-row items-center rounded-2xl bg-surface-input px-4 py-3">
+            <Mail color={COLORS.text.secondary} size={20} strokeWidth={2.2} />
+            <Text className="ml-3 text-[13px] font-semibold text-ink-secondary">
               We will send instructions if an account exists.
             </Text>
           </View>
@@ -229,7 +230,7 @@ export default function ForgotPasswordScreen() {
               }
             }}
             placeholder="you@example.com"
-            placeholderTextColor="#94A3B8"
+            placeholderTextColor={COLORS.text.muted}
             textContentType="emailAddress"
             value={email}
           />
@@ -237,7 +238,7 @@ export default function ForgotPasswordScreen() {
           {requestError ? (
             <Text
               accessibilityRole="alert"
-              className="mt-3 text-[13px] font-semibold leading-5 text-red-700"
+              className="mt-3 text-[13px] font-semibold leading-5 text-feedback-error"
             >
               {requestError}
             </Text>
@@ -246,7 +247,7 @@ export default function ForgotPasswordScreen() {
           {hasSent ? (
             <Text
               accessibilityRole="alert"
-              className="mt-5 rounded-2xl bg-blue-50 px-4 py-3 text-[13px] font-semibold leading-5 text-blue-800"
+              className="mt-5 rounded-2xl bg-accent-soft px-4 py-3 text-[13px] font-semibold leading-5 text-accent-primary"
             >
               If an account exists for this email, we sent password reset
               instructions.

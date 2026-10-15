@@ -15,17 +15,17 @@ export const SettingsSection = memo(function SettingsSection({
   return (
     <View className="mb-6">
       <View className="mb-2 px-1">
-        <Text className="text-[12px] font-extrabold uppercase tracking-[0.8px] text-slate-500">
+        <Text className="text-[12px] font-extrabold uppercase tracking-[0.8px] text-ink-secondary">
           {title}
         </Text>
         {subtitle ? (
-          <Text className="mt-1 text-[12px] font-semibold leading-4 text-slate-400">
+          <Text className="mt-1 text-[12px] font-semibold leading-4 text-ink-muted">
             {subtitle}
           </Text>
         ) : null}
       </View>
       <View
-        className="overflow-hidden rounded-card border border-white/80 bg-white shadow-card"
+        className="overflow-hidden rounded-card border border-border-glass bg-surface-default shadow-card"
         style={{ borderCurve: 'continuous' }}
       >
         {children}

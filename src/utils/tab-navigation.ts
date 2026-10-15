@@ -30,7 +30,7 @@ export function getActiveNavItemKey({
     return 'favorite';
   }
 
-  return 'location';
+  return 'map';
 }
 
 export function shouldShowBottomNav({

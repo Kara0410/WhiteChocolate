@@ -16,9 +16,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAccount } from '@/hooks/use-account';
 import { passwordsDoNotMatchError } from '@/utils/account-errors';
+import { COLORS } from '@/constants/theme';
 
 const INPUT_CLASS =
-  'mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-[15px] font-semibold text-slate-900';
+  'mt-4 rounded-2xl border border-border-subtle bg-surface-input px-4 py-3 text-[15px] font-semibold text-ink-primary';
 
 function getRecoverySource(
   routeSource: string | undefined,
@@ -58,15 +59,15 @@ function PrimaryButton({
       accessibilityRole="button"
       accessibilityState={{ disabled }}
       className={`mt-8 min-h-14 flex-row items-center justify-center rounded-full px-5 ${
-        disabled ? 'bg-blue-300' : 'bg-blue-600 active:bg-blue-700'
+        disabled ? 'bg-accent-soft' : 'bg-accent-primary active:bg-accent-pressed'
       }`}
       disabled={disabled}
       onPress={onPress}
       style={{ borderCurve: 'continuous' }}
     >
-      {isLoading ? <ActivityIndicator color="#FFFFFF" size="small" /> : null}
+      {isLoading ? <ActivityIndicator color={COLORS.surface.default} size="small" /> : null}
       <Text
-        className={`text-[15px] font-black text-white${
+        className={`text-[15px] font-black text-ink-on-accent${
           isLoading ? ' ml-2' : ''
         }`}
       >
@@ -86,10 +87,10 @@ function SecondaryButton({
   return (
     <Pressable
       accessibilityRole="button"
-      className="mt-4 min-h-11 items-center justify-center rounded-full px-4 active:bg-slate-100"
+      className="mt-4 min-h-11 items-center justify-center rounded-full px-4 active:bg-background-default"
       onPress={onPress}
     >
-      <Text className="text-[14px] font-extrabold text-slate-600">
+      <Text className="text-[14px] font-extrabold text-ink-secondary">
         {label}
       </Text>
     </Pressable>
@@ -244,7 +245,7 @@ export default function ResetPasswordScreen() {
     confirmPassword.length > 0 && !passwordsMatch;
 
   return (
-    <View className="flex-1 bg-slate-100">
+    <View className="flex-1 bg-background-default">
       <ScrollView
         contentContainerStyle={{
           flexGrow: 1,
@@ -257,37 +258,37 @@ export default function ResetPasswordScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View className="w-full max-w-[520px] self-center rounded-[32px] border border-white/80 bg-white px-6 py-7 shadow-overlay">
+        <View className="w-full max-w-[520px] self-center rounded-sheet border border-border-glass bg-surface-default px-6 py-7 shadow-overlay">
           <Pressable
             accessibilityLabel="Return to login"
             accessibilityRole="button"
-            className="h-11 w-11 items-center justify-center rounded-full bg-slate-100 active:bg-slate-200"
+            className="h-11 w-11 items-center justify-center rounded-full bg-background-default active:bg-surface-muted"
             disabled={isVerifying || isSubmitting || isFinishingRecovery}
             onPress={() => {
               void returnToLogin();
             }}
           >
-            <ArrowLeft color="#475569" size={22} strokeWidth={2.6} />
+            <ArrowLeft color={COLORS.icon.default} size={22} strokeWidth={2.6} />
           </Pressable>
 
           {isVerifying ? (
             <View className="items-center py-16">
-              <ActivityIndicator color="#2563EB" size="large" />
-              <Text className="mt-5 text-center text-[15px] font-extrabold text-slate-900">
+              <ActivityIndicator color={COLORS.accent.primary} size="large" />
+              <Text className="mt-5 text-center text-[15px] font-extrabold text-ink-primary">
                 Verifying your reset link…
               </Text>
             </View>
           ) : callbackError ? (
             <>
-              <View className="mt-7 h-16 w-16 items-center justify-center rounded-[24px] bg-amber-50">
-                <KeyRound color="#D97706" size={30} strokeWidth={2.4} />
+              <View className="mt-7 h-16 w-16 items-center justify-center rounded-[24px] bg-status-limited-soft">
+                <KeyRound color={COLORS.feedback.warning} size={30} strokeWidth={2.4} />
               </View>
-              <Text className="mt-6 text-[31px] font-black leading-9 text-slate-950">
+              <Text className="mt-6 text-[31px] font-black leading-9 text-ink-primary">
                 Reset link unavailable
               </Text>
               <Text
                 accessibilityRole="alert"
-                className="mt-3 text-[15px] font-semibold leading-6 text-slate-600"
+                className="mt-3 text-[15px] font-semibold leading-6 text-ink-secondary"
               >
                 {callbackError}
               </Text>
@@ -311,13 +312,13 @@ export default function ResetPasswordScreen() {
             </>
           ) : isUpdated ? (
             <>
-              <View className="mt-7 h-16 w-16 items-center justify-center rounded-[24px] bg-emerald-50">
-                <LockKeyhole color="#059669" size={30} strokeWidth={2.4} />
+              <View className="mt-7 h-16 w-16 items-center justify-center rounded-[24px] bg-status-available-soft">
+                <LockKeyhole color={COLORS.feedback.success} size={30} strokeWidth={2.4} />
               </View>
-              <Text className="mt-6 text-[31px] font-black leading-9 text-slate-950">
+              <Text className="mt-6 text-[31px] font-black leading-9 text-ink-primary">
                 Password updated
               </Text>
-              <Text className="mt-3 text-[15px] font-semibold leading-6 text-slate-600">
+              <Text className="mt-3 text-[15px] font-semibold leading-6 text-ink-secondary">
                 You can now log in with your new password.
               </Text>
               <PrimaryButton
@@ -331,13 +332,13 @@ export default function ResetPasswordScreen() {
             </>
           ) : (
             <>
-              <View className="mt-7 h-16 w-16 items-center justify-center rounded-[24px] bg-blue-50">
-                <LockKeyhole color="#2563EB" size={30} strokeWidth={2.4} />
+              <View className="mt-7 h-16 w-16 items-center justify-center rounded-[24px] bg-accent-soft">
+                <LockKeyhole color={COLORS.accent.primary} size={30} strokeWidth={2.4} />
               </View>
-              <Text className="mt-6 text-[31px] font-black leading-9 text-slate-950">
+              <Text className="mt-6 text-[31px] font-black leading-9 text-ink-primary">
                 Choose a new password
               </Text>
-              <Text className="mt-3 text-[15px] font-semibold leading-6 text-slate-500">
+              <Text className="mt-3 text-[15px] font-semibold leading-6 text-ink-secondary">
                 Use a new password to protect your account.
               </Text>
 
@@ -350,7 +351,7 @@ export default function ResetPasswordScreen() {
                 editable={!isSubmitting}
                 onChangeText={setPassword}
                 placeholder="New password"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={COLORS.text.muted}
                 secureTextEntry
                 textContentType="newPassword"
                 value={password}
@@ -364,25 +365,25 @@ export default function ResetPasswordScreen() {
                 editable={!isSubmitting}
                 onChangeText={setConfirmPassword}
                 placeholder="Confirm new password"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={COLORS.text.muted}
                 secureTextEntry
                 textContentType="newPassword"
                 value={confirmPassword}
               />
               {showPasswordLengthError ? (
-                <Text className="mt-3 text-[13px] font-semibold leading-5 text-red-700">
+                <Text className="mt-3 text-[13px] font-semibold leading-5 text-feedback-error">
                   Use a password with at least 8 characters.
                 </Text>
               ) : null}
               {showMismatchError ? (
-                <Text className="mt-3 text-[13px] font-semibold leading-5 text-red-700">
+                <Text className="mt-3 text-[13px] font-semibold leading-5 text-feedback-error">
                   {passwordsDoNotMatchError().message}
                 </Text>
               ) : null}
               {updateError ? (
                 <Text
                   accessibilityRole="alert"
-                  className="mt-3 text-[13px] font-semibold leading-5 text-red-700"
+                  className="mt-3 text-[13px] font-semibold leading-5 text-feedback-error"
                 >
                   {updateError}
                 </Text>

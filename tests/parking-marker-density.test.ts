@@ -320,6 +320,7 @@ test('search focus camera keeps the destination above the half-height sheet', ()
   const fetchBounds = createParkingRenderCircleBounds(camera, mapSize);
 
   assert.ok(fetchBounds);
+  assert.equal(camera.zoom, 17);
   assert.ok(Math.abs(projected.x - mapSize.width / 2) < 0.001);
   assert.ok(Math.abs(projected.y - mapSize.height / 4) < 0.001);
   assert.equal(isCoordinateInsideBounds(destination, fetchBounds), true);

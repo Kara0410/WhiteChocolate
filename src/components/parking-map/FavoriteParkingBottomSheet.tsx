@@ -41,6 +41,7 @@ import { useFavoriteParking } from '@/context/FavoriteParkingContext';
 import type { ParkingClusterResponse } from '@/types/parking-map';
 
 import { getAvailabilityTheme } from './parking-availability-status';
+import { COLORS, RADII, SHADOWS } from '@/constants/theme';
 
 type FavoriteParkingBottomSheetProps = {
   onClose: () => void;
@@ -86,7 +87,7 @@ function FavoriteProgressRing({ percentage }: { percentage: number | null }) {
         <Circle
           cx={RING_SIZE / 2}
           cy={RING_SIZE / 2}
-          fill="rgba(255,255,255,0.9)"
+          fill={COLORS.surface.glassDense}
           r={RING_RADIUS}
           stroke={theme.ringTrack}
           strokeWidth={RING_STROKE}
@@ -96,7 +97,7 @@ function FavoriteProgressRing({ percentage }: { percentage: number | null }) {
           cy={RING_SIZE / 2}
           fill="none"
           r={RING_RADIUS}
-          stroke={percentage === null ? '#94A3B8' : theme.ring}
+          stroke={percentage === null ? COLORS.text.muted : theme.ring}
           strokeDasharray={`${RING_CIRCUMFERENCE} ${RING_CIRCUMFERENCE}`}
           strokeDashoffset={ringOffset}
           strokeLinecap="round"
@@ -106,7 +107,7 @@ function FavoriteProgressRing({ percentage }: { percentage: number | null }) {
       <Text
         className="absolute text-[11px] font-extrabold"
         style={{
-          color: percentage === null ? '#64748B' : theme.text,
+          color: percentage === null ? COLORS.text.secondary : theme.text,
           fontVariant: ['tabular-nums'],
         }}
       >
@@ -312,16 +313,16 @@ const FavoriteSpotRow = memo(function FavoriteSpotRow({
       className="overflow-hidden rounded-3xl"
     >
       <Animated.View
-        className="absolute bottom-0 right-0 top-0 w-[82px] items-center justify-center rounded-3xl bg-red-600"
+        className="absolute bottom-0 right-0 top-0 w-[82px] items-center justify-center rounded-3xl bg-feedback-error"
         style={actionAnimatedStyle}
       >
         <Pressable
           accessibilityLabel={`Remove ${title} from favorites`}
           accessibilityRole="button"
-          className="h-full w-full items-center justify-center active:bg-red-700"
+          className="h-full w-full items-center justify-center active:bg-feedback-error"
           onPress={animateDelete}
         >
-          <Trash2 color="#FFFFFF" size={22} strokeWidth={2.4} />
+          <Trash2 color={COLORS.surface.default} size={22} strokeWidth={2.4} />
         </Pressable>
       </Animated.View>
 
@@ -330,7 +331,7 @@ const FavoriteSpotRow = memo(function FavoriteSpotRow({
           <Pressable
             accessibilityLabel={`Open ${title}`}
             accessibilityRole="button"
-            className="flex-row items-center rounded-3xl border border-white/80 bg-white px-4 py-4 shadow-floating active:bg-slate-50"
+            className="flex-row items-center rounded-3xl border border-border-glass bg-surface-default px-4 py-4 shadow-floating active:bg-surface-input"
             onPress={handlePress}
             onPressIn={() => {
               pressedScale.value = withTiming(0.985, { duration: 90 });
@@ -346,19 +347,19 @@ const FavoriteSpotRow = memo(function FavoriteSpotRow({
             <FavoriteProgressRing percentage={percentage} />
             <View className="ml-4 flex-1">
               <Text
-                className="text-[16px] font-extrabold text-slate-950"
+                className="text-[16px] font-extrabold text-ink-primary"
                 numberOfLines={1}
               >
                 {title}
               </Text>
               <View className="mt-1 flex-row items-center">
-                <Text className="text-[13px] font-bold text-slate-600">
+                <Text className="text-[13px] font-bold text-ink-secondary">
                   {percentage === null
                     ? 'Availability unavailable'
                     : `${percentage}% estimated available`}
                 </Text>
                 {distanceLabel ? (
-                  <Text className="ml-2 text-[13px] font-semibold text-slate-400">
+                  <Text className="ml-2 text-[13px] font-semibold text-ink-muted">
                     {distanceLabel}
                   </Text>
                 ) : null}
@@ -366,8 +367,8 @@ const FavoriteSpotRow = memo(function FavoriteSpotRow({
             </View>
             <View className="ml-3 h-9 w-9 items-center justify-center rounded-full bg-rose-50">
               <Heart
-                color="#E11D48"
-                fill="#E11D48"
+                color={COLORS.accent.primary}
+                fill={COLORS.accent.primary}
                 size={17}
                 strokeWidth={2.4}
               />
@@ -486,15 +487,15 @@ export function FavoriteParkingBottomSheet({
           <Animated.View
             entering={FadeInDown.duration(260).springify().damping(24)}
             exiting={FadeOutUp.duration(150)}
-            className="items-center justify-center rounded-[28px] border border-dashed border-slate-300 bg-white/80 px-6 py-12"
+            className="items-center justify-center rounded-card border border-dashed border-border-strong bg-surface-default/80 px-6 py-12"
           >
             <View className="mb-4 h-16 w-16 items-center justify-center rounded-full bg-rose-50">
-              <Heart color="#E11D48" size={28} strokeWidth={2.2} />
+              <Heart color={COLORS.accent.primary} size={28} strokeWidth={2.2} />
             </View>
-            <Text className="text-[18px] font-extrabold text-slate-950">
+            <Text className="text-[18px] font-extrabold text-ink-primary">
               No favorite parking areas yet
             </Text>
-            <Text className="mt-2 text-center text-[14px] font-medium leading-5 text-slate-500">
+            <Text className="mt-2 text-center text-[14px] font-medium leading-5 text-ink-secondary">
               Tap the heart on a parking area to add it here.
             </Text>
           </Animated.View>
@@ -503,10 +504,10 @@ export function FavoriteParkingBottomSheet({
           <View>
             <View className="mb-5 flex-row items-center justify-between">
               <View className="flex-1 pr-3">
-                <Text className="text-[26px] font-extrabold text-slate-950">
+                <Text className="text-[26px] font-extrabold text-ink-primary">
                   Favorite parking areas
                 </Text>
-                <Text className="mt-1 text-[14px] font-semibold text-slate-500">
+                <Text className="mt-1 text-[14px] font-semibold text-ink-secondary">
                   {favoriteItems.length === 1
                     ? '1 favorite parking area'
                     : `${favoriteItems.length} favorite parking areas`}
@@ -515,31 +516,31 @@ export function FavoriteParkingBottomSheet({
               <Pressable
                 accessibilityLabel="Close favorite parking areas"
                 accessibilityRole="button"
-                className="h-11 w-11 items-center justify-center rounded-full bg-white active:bg-slate-100"
+                className="h-11 w-11 items-center justify-center rounded-full bg-surface-default active:bg-background-default"
                 hitSlop={8}
                 onPress={closeSheet}
                 style={{ borderCurve: 'continuous' }}
               >
-                <X color="#475569" size={19} strokeWidth={2.5} />
+                <X color={COLORS.icon.default} size={19} strokeWidth={2.5} />
               </Pressable>
             </View>
             {error ? (
-              <View className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3">
+              <View className="mb-4 rounded-2xl border border-feedback-error bg-feedback-error-soft px-4 py-3">
                 <Text
                   accessibilityRole="alert"
-                  className="text-[13px] font-semibold leading-5 text-red-800"
+                  className="text-[13px] font-semibold leading-5 text-feedback-error"
                 >
                   {error.message}
                 </Text>
                 <Pressable
                   accessibilityLabel="Retry favorite refresh"
                   accessibilityRole="button"
-                  className="mt-2 min-h-10 self-start justify-center rounded-full bg-white px-3 active:bg-red-100"
+                  className="mt-2 min-h-10 self-start justify-center rounded-full bg-surface-default px-3 active:bg-feedback-error-soft"
                   onPress={() => {
                     void refreshFavorites();
                   }}
                 >
-                  <Text className="text-[13px] font-extrabold text-red-700">
+                  <Text className="text-[13px] font-extrabold text-feedback-error">
                     Retry
                   </Text>
                 </Pressable>
@@ -559,9 +560,9 @@ export function FavoriteParkingBottomSheet({
 
 const styles = StyleSheet.create({
   background: {
-    backgroundColor: '#F3F5F8',
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
+    backgroundColor: COLORS.background.default,
+    borderTopLeftRadius: RADII.sheet,
+    borderTopRightRadius: RADII.sheet,
   },
   content: {
     paddingHorizontal: 20,
@@ -572,15 +573,15 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   handleIndicator: {
-    backgroundColor: 'rgba(0,0,0,0.16)',
+    backgroundColor: COLORS.border.strong,
     borderRadius: 999,
     height: 5,
     width: 42,
   },
   sheet: {
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    boxShadow: '0 -4px 14px rgba(0,0,0,0.1)',
+    borderTopLeftRadius: RADII.sheet,
+    borderTopRightRadius: RADII.sheet,
+    boxShadow: SHADOWS.sheet,
     elevation: MAP_ELEVATIONS.bottomSheet,
     zIndex: MAP_LAYERS.bottomSheet,
   },

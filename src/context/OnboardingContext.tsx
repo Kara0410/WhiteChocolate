@@ -20,6 +20,7 @@ import {
   shouldShowOnboardingForState,
   type OnboardingState,
 } from '@/utils/onboarding-state';
+import { COLORS } from '@/constants/theme';
 
 type OnboardingActionResult =
   | { ok: true }
@@ -43,18 +44,18 @@ const OnboardingContext = createContext<OnboardingContextValue | null>(
 
 export function OnboardingLoadingScreen() {
   return (
-    <View className="flex-1 items-center justify-center bg-slate-100 px-6">
+    <View className="flex-1 items-center justify-center bg-background-default px-6">
       <View
-        className="w-full max-w-[320px] items-center rounded-[28px] border border-white/80 bg-white p-6 shadow-card"
+        className="w-full max-w-[320px] items-center rounded-card border border-border-glass bg-surface-default p-6 shadow-card"
         style={{
           borderCurve: 'continuous',
         }}
       >
-        <ActivityIndicator color="#2563EB" size="large" />
-        <Text className="mt-4 text-[15px] font-extrabold text-slate-900">
+        <ActivityIndicator color={COLORS.accent.primary} size="large" />
+        <Text className="mt-4 text-[15px] font-extrabold text-ink-primary">
           Preparing {APP_DISPLAY_NAME}
         </Text>
-        <Text className="mt-2 text-center text-[13px] font-semibold leading-5 text-slate-500">
+        <Text className="mt-2 text-center text-[13px] font-semibold leading-5 text-ink-secondary">
           Loading your setup.
         </Text>
       </View>

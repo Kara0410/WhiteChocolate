@@ -18,7 +18,7 @@ const MAX_LONGITUDE_BUFFER_DEGREES = 24;
 
 export const PARKING_RENDER_RADIUS_SCREEN_RATIO = 0.52;
 export const PARKING_RENDER_FETCH_PADDING_RATIO = 1.2;
-export const PARKING_SEARCH_FOCUS_ZOOM = 16;
+export const PARKING_SEARCH_FOCUS_ZOOM = 15.8;
 
 export function hasValidParkingCoordinates(
   coordinates: ParkingCoordinates,

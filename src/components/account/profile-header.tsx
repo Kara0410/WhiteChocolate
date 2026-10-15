@@ -40,10 +40,10 @@ export const ProfileHeader = memo(function ProfileHeader({
           ? `${displayName}, using without an account`
           : `${displayName}, ${email ?? 'signed in'}`
       }
-      className="mb-6 flex-row items-center rounded-[28px] bg-slate-950 px-5 py-5"
+      className="mb-6 flex-row items-center rounded-card border border-border-glass bg-surface-default px-5 py-5 shadow-card"
       style={{ borderCurve: 'continuous' }}
     >
-      <View className="h-14 w-14 items-center justify-center rounded-2xl bg-blue-500">
+      <View className="h-14 w-14 items-center justify-center rounded-2xl bg-accent-primary">
         {avatar ? (
           <Image
             accessibilityLabel={`${displayName} profile image`}
@@ -51,25 +51,25 @@ export const ProfileHeader = memo(function ProfileHeader({
             source={{ uri: avatar }}
           />
         ) : (
-          <Text className="text-[24px] font-black text-white">
+          <Text className="text-[24px] font-black text-ink-on-accent">
             {initial}
           </Text>
         )}
       </View>
       <View className="ml-4 min-w-0 flex-1">
         <Text
-          className="text-[18px] font-extrabold text-white"
+          className="text-[18px] font-bold text-ink-primary"
           numberOfLines={1}
         >
           {displayName}
         </Text>
         <Text
-          className="mt-1 text-[13px] font-semibold text-slate-400"
+          className="mt-1 text-[13px] font-semibold text-ink-secondary"
           numberOfLines={1}
         >
           {isAnonymous ? 'Using without an account' : email}
         </Text>
-        <Text className="mt-1 text-[12px] font-bold text-blue-300">
+        <Text className="mt-1 text-[12px] font-bold text-accent-primary">
           {subscriptionLabel(subscriptionStatus)}
         </Text>
       </View>

@@ -21,7 +21,7 @@ export const ParkingAvailabilitySection = memo(
         >
           {percentage}% available
         </Text>
-        <View className="mt-3 h-3 overflow-hidden rounded-full bg-slate-200">
+        <View className="mt-3 h-3 overflow-hidden rounded-full bg-surface-muted">
           <View
             className="h-full rounded-full"
             style={{

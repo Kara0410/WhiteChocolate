@@ -3,6 +3,7 @@ import { ChevronLeft } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { COLORS } from '@/constants/theme';
 
 type AccountPlaceholderScreenProps = {
   title: string;
@@ -29,7 +30,7 @@ export const AccountPlaceholderScreen = memo(
     }, [router]);
 
     return (
-      <View className="flex-1 bg-slate-100">
+      <View className="flex-1 bg-background-default">
         <ScrollView
           contentContainerStyle={{
             paddingBottom: Math.max(insets.bottom, 10) + 112,
@@ -42,34 +43,34 @@ export const AccountPlaceholderScreen = memo(
             accessibilityHint="Returns to the account page"
             accessibilityLabel="Back to account"
             accessibilityRole="button"
-            className="mb-5 min-h-11 flex-row items-center self-start rounded-full bg-white px-3 shadow-floating active:bg-slate-200"
+            className="mb-5 min-h-11 flex-row items-center self-start rounded-full bg-surface-default px-3 shadow-floating active:bg-surface-muted"
             hitSlop={8}
             onPress={goBack}
             style={{ borderCurve: 'continuous' }}
           >
-            <ChevronLeft color="#334155" size={20} strokeWidth={2.6} />
-            <Text className="mr-1 text-[14px] font-extrabold text-slate-700">
+            <ChevronLeft color={COLORS.icon.default} size={20} strokeWidth={2.6} />
+            <Text className="mr-1 text-[14px] font-extrabold text-ink-secondary">
               Back
             </Text>
           </Pressable>
 
-          <Text className="text-[30px] font-black tracking-[-0.8px] text-slate-950">
+          <Text className="text-[30px] font-black tracking-[-0.8px] text-ink-primary">
             {title}
           </Text>
-          <Text className="mt-2 text-[14px] font-semibold leading-6 text-slate-500">
+          <Text className="mt-2 text-[14px] font-semibold leading-6 text-ink-secondary">
             {description}
           </Text>
 
           <View
-            className="mt-6 rounded-card border border-white/80 bg-white p-5 shadow-card"
+            className="mt-6 rounded-card border border-border-glass bg-surface-default p-5 shadow-card"
             style={{ borderCurve: 'continuous' }}
           >
             {children ?? (
               <>
-                <Text className="text-[15px] font-extrabold text-slate-900">
+                <Text className="text-[15px] font-extrabold text-ink-primary">
                   Foundation ready
                 </Text>
-                <Text className="mt-2 text-[13px] font-semibold leading-5 text-slate-500">
+                <Text className="mt-2 text-[13px] font-semibold leading-5 text-ink-secondary">
                   This route is connected. Its full workflow belongs to a later
                   implementation phase.
                 </Text>

@@ -10,13 +10,22 @@ import {
 } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { AppleMaps, GoogleMaps, type CameraPosition } from 'expo-maps';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import {
+  Car,
+  ExternalLink,
+  FileText,
+  Map as MapIcon,
+  MapPin,
+  Navigation,
+} from 'lucide-react-native';
 
 import InfoRow from '@/components/InfoRow';
+import { WHITE_CHOCOLATE_GOOGLE_MAP_STYLE } from '@/components/parking-map/map-style';
 import { fetchParkingSegmentDetails } from '@/services/parkingMapData';
 import type { ParkingSegment } from '@/types/parking-segment';
 import { logAppError, normalizeAppError } from '@/utils/app-errors';
 import { getBadgeColor } from '@/utils/parking';
+import { COLORS } from '@/constants/theme';
 
 type DetailState =
   | { status: 'loading' }
@@ -36,14 +45,14 @@ function DetailStatus({
       <Stack.Screen
         options={{
           title: 'Parking details',
-          headerStyle: { backgroundColor: '#25292e' },
-          headerTintColor: '#fff',
+          headerStyle: { backgroundColor: COLORS.surface.default },
+          headerTintColor: COLORS.icon.default,
           headerShadowVisible: false,
         }}
       />
-      <View className="flex-1 items-center justify-center gap-3 bg-surface px-6">
-        {loading ? <ActivityIndicator color="#ffd33d" /> : null}
-        <Text className="text-center text-base text-white">{message}</Text>
+      <View className="flex-1 items-center justify-center gap-3 bg-background-default px-6">
+        {loading ? <ActivityIndicator color={COLORS.accent.primary} /> : null}
+        <Text className="text-center text-base text-ink-primary">{message}</Text>
       </View>
     </>
   );
@@ -107,7 +116,6 @@ export default function ParkingDetailScreen() {
   const groupName =
     item.regulation.groupName ?? item.geoportalClass ?? 'Parking';
   const badgeColor = getBadgeColor(groupName);
-  const darkBadge = badgeColor === '#6b7280' || badgeColor === '#f87171';
   const hasCoords =
     Number.isFinite(item.coordinates.latitude) &&
     item.coordinates.latitude >= -90 &&
@@ -164,19 +172,24 @@ export default function ParkingDetailScreen() {
       <Stack.Screen
         options={{
           title,
-          headerStyle: { backgroundColor: '#25292e' },
-          headerTintColor: '#fff',
+          headerStyle: { backgroundColor: COLORS.surface.default },
+          headerTintColor: COLORS.icon.default,
           headerShadowVisible: false,
         }}
       />
 
-      <ScrollView className="flex-1 bg-surface" contentContainerClassName="pb-10">
-        <View className="h-[260px] bg-sunken">
+      <ScrollView className="flex-1 bg-background-default" contentContainerClassName="pb-10">
+        <View className="h-[260px] bg-surface-muted">
           {Platform.OS === 'ios' && cameraPosition ? (
             <AppleMaps.View
               style={{ flex: 1 }}
               cameraPosition={cameraPosition}
               markers={appleMarkers}
+              properties={{
+                elevation: 'FLAT' as AppleMaps.MapProperties['elevation'],
+                emphasis: 'MUTED' as AppleMaps.MapProperties['emphasis'],
+                pointsOfInterest: { including: [] },
+              }}
               uiSettings={{
                 compassEnabled: false,
                 myLocationButtonEnabled: false,
@@ -187,6 +200,9 @@ export default function ParkingDetailScreen() {
               style={{ flex: 1 }}
               cameraPosition={cameraPosition}
               markers={googleMarkers}
+              properties={{
+                mapStyleOptions: { json: WHITE_CHOCOLATE_GOOGLE_MAP_STYLE },
+              }}
               uiSettings={{
                 compassEnabled: false,
                 mapToolbarEnabled: false,
@@ -201,22 +217,25 @@ export default function ParkingDetailScreen() {
               className="flex-1 items-center justify-center gap-2.5"
               onPress={hasCoords ? openOSM : undefined}
             >
-              <Ionicons
-                name="map-outline"
+              <MapIcon
                 size={40}
-                color={hasCoords ? '#ffd33d' : '#374151'}
+                color={
+                  hasCoords
+                    ? COLORS.accent.primary
+                    : COLORS.icon.muted
+                }
               />
               <Text
                 className={
                   hasCoords
-                    ? 'text-gold text-[15px] font-semibold'
-                    : 'text-gray-600 text-[15px]'
+                    ? 'text-accent-primary text-[15px] font-semibold'
+                    : 'text-ink-secondary text-[15px]'
                 }
               >
                 {hasCoords ? 'Open in OpenStreetMap' : 'No location data'}
               </Text>
               {hasCoords ? (
-                <Text className="text-xs text-gray-500">
+                <Text className="text-xs text-ink-secondary">
                   {item.coordinates.latitude.toFixed(5)},{' '}
                   {item.coordinates.longitude.toFixed(5)}
                 </Text>
@@ -225,26 +244,26 @@ export default function ParkingDetailScreen() {
           )}
         </View>
 
-        <View className="m-4 rounded-2xl bg-elevated p-5">
+        <View className="m-4 rounded-card border border-border-subtle bg-surface-raised p-5 shadow-card">
           <View className="mb-4 gap-2.5">
-            <Text className="text-[22px] font-bold text-white">{title}</Text>
+            <Text className="text-[22px] font-bold text-ink-primary">{title}</Text>
             <View
               className="self-start rounded-full px-3 py-1"
               style={{ backgroundColor: badgeColor }}
             >
               <Text
                 className="text-xs font-semibold"
-                style={{ color: darkBadge ? '#fff' : '#1a1f24' }}
+                style={{ color: COLORS.text.onAccent }}
               >
                 {groupName}
               </Text>
             </View>
           </View>
 
-          <View className="mb-4 h-px bg-gray-700" />
+          <View className="mb-4 h-px bg-border-subtle" />
 
           <InfoRow
-            icon="document-text-outline"
+            icon={FileText}
             label="Regulation"
             value={
               item.regulation.description ?? 'No regulation description'
@@ -252,21 +271,21 @@ export default function ParkingDetailScreen() {
           />
           {item.sourceAreaName ? (
             <InfoRow
-              icon="location-outline"
+              icon={MapPin}
               label="District"
               value={item.sourceAreaName}
             />
           ) : null}
           {item.capacity !== null ? (
             <InfoRow
-              icon="car-outline"
+              icon={Car}
               label="Spaces"
               value={`${item.capacity} spaces`}
             />
           ) : null}
           {hasCoords ? (
             <InfoRow
-              icon="navigate-outline"
+              icon={Navigation}
               label="Coordinates"
               value={`${item.coordinates.latitude.toFixed(5)} deg N, ${item.coordinates.longitude.toFixed(5)} deg E`}
             />
@@ -275,11 +294,11 @@ export default function ParkingDetailScreen() {
 
         {hasCoords && Platform.OS === 'web' ? (
           <Pressable
-            className="mx-4 flex-row items-center justify-center gap-2 rounded-xl bg-gold py-3.5"
+            className="mx-4 flex-row items-center justify-center gap-2 rounded-xl bg-accent-primary py-3.5"
             onPress={openOSM}
           >
-            <Ionicons name="open-outline" size={16} color="#25292e" />
-            <Text className="text-[15px] font-bold text-surface">
+            <ExternalLink size={16} color={COLORS.text.onAccent} />
+            <Text className="text-[15px] font-bold text-ink-on-accent">
               Open in OpenStreetMap
             </Text>
           </Pressable>

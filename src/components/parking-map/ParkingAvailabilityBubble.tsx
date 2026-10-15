@@ -21,6 +21,7 @@ import {
   type AvailabilityTheme,
 } from './parking-availability-status';
 import { formatParkingAreaCount } from './marker-visuals';
+import { COLORS, SHADOWS } from '@/constants/theme';
 
 export type BubbleType = 'cluster' | 'spot';
 export type BubbleSize = 'small' | 'medium' | 'large';
@@ -81,15 +82,15 @@ const SELECTION_TIMING_CONFIG = {
   reduceMotion: ReduceMotion.System,
 } as const;
 const UNKNOWN_AVAILABILITY_THEME: AvailabilityTheme = {
-  fill: '#64748B',
-  text: '#FFFFFF',
-  ring: '#94A3B8',
-  ringTrack: 'rgba(148, 163, 184, 0.24)',
-  glow: 'rgba(100, 116, 139, 0.26)',
-  glowStrong: 'rgba(100, 116, 139, 0.34)',
-  backgroundTint: '#64748B',
-  border: '#FFFFFF',
-  movingFill: '#64748B',
+  fill: COLORS.text.secondary,
+  text: COLORS.surface.default,
+  ring: COLORS.text.muted,
+  ringTrack: COLORS.status.unknownTrack,
+  glow: COLORS.status.unknownGlow,
+  glowStrong: COLORS.status.unknownGlowStrong,
+  backgroundTint: COLORS.text.secondary,
+  border: COLORS.surface.default,
+  movingFill: COLORS.text.secondary,
 };
 
 export { getAvailabilityStatus };
@@ -113,19 +114,19 @@ function markerShadow(
 ): ViewStyle['boxShadow'] {
   if (moving) {
     return isCluster
-      ? '0 3px 8px rgba(15, 23, 42, 0.16)'
-      : '0 1px 3px rgba(15, 23, 42, 0.18)';
+      ? SHADOWS.markerMovingCluster
+      : SHADOWS.markerMovingSpot;
   }
   if (isCluster && selected) {
-    return '0 9px 20px rgba(37, 99, 235, 0.26)';
+    return SHADOWS.markerClusterSelected;
   }
   if (isCluster) {
-    return '0 8px 18px rgba(15, 23, 42, 0.22)';
+    return SHADOWS.markerCluster;
   }
   if (selected) {
     return `0 7px 18px 2px ${glowStrong}`;
   }
-  return '0 3px 9px rgba(15, 23, 42, 0.24)';
+  return SHADOWS.markerSpot;
 }
 
 function ParkingAvailabilityBubble({
@@ -207,24 +208,24 @@ function ParkingAvailabilityBubble({
   }, [animateScale, restingScale]);
 
   const fillColor = isCluster
-    ? '#FFFFFF'
+    ? COLORS.surface.default
     : !availabilityKnown
-      ? '#F8FAFC'
+      ? COLORS.surface.input
     : moving
       ? theme.movingFill
       : theme.fill;
   const textColor = isCluster
-    ? '#0F172A'
+    ? COLORS.text.primary
     : availabilityKnown
       ? theme.text
-      : '#64748B';
+      : COLORS.text.secondary;
   const borderColor = isCluster
     ? selected
-      ? '#2563EB'
-      : '#DBEAFE'
+      ? COLORS.accent.primary
+      : COLORS.accent.soft
     : theme.border;
   const resolvedBorderColor =
-    !isCluster && !availabilityKnown ? '#CBD5E1' : borderColor;
+    !isCluster && !availabilityKnown ? COLORS.border.strong : borderColor;
 
   return (
     <Animated.View
@@ -281,9 +282,7 @@ function ParkingAvailabilityBubble({
                 selected,
                 moving,
                 isCluster,
-                isCluster
-                  ? 'rgba(15, 23, 42, 0.28)'
-                  : theme.glowStrong,
+                isCluster ? COLORS.overlay.scrim : theme.glowStrong,
               ),
               elevation: isCluster ? (selected ? 8 : 6) : selected ? 5 : 3,
               height: dimensions.height,
@@ -334,7 +333,7 @@ function ParkingAvailabilityBubble({
               style={[
                 styles.tail,
                 styles.tailBorder,
-                { borderTopColor: '#FFFFFF' },
+                { borderTopColor: COLORS.surface.default },
               ]}
             />
             <View

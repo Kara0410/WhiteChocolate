@@ -15,6 +15,7 @@ import {
   getGoogleCallbackNavigation,
   getGoogleCallbackProcessingDecision,
 } from '@/utils/google-auth-callback';
+import { COLORS } from '@/constants/theme';
 
 const CALLBACK_ERROR_MESSAGE =
   'Google sign-in could not finish. Please try again.';
@@ -118,23 +119,23 @@ export default function GoogleAuthCallbackScreen() {
   }, [callbackError]);
 
   return (
-    <View className="flex-1 items-center justify-center bg-slate-100 px-6">
-      <View className="w-full max-w-[340px] items-center rounded-[28px] border border-white/80 bg-white p-7">
+    <View className="flex-1 items-center justify-center bg-background-default px-6">
+      <View className="w-full max-w-[340px] items-center rounded-card border border-border-glass bg-surface-default p-7">
         {callbackError ? (
           <>
             <Text
               accessibilityRole="alert"
-              className="text-center text-[15px] font-extrabold leading-6 text-red-700"
+              className="text-center text-[15px] font-extrabold leading-6 text-feedback-error"
             >
               {callbackError}
             </Text>
             <Pressable
               accessibilityLabel="Return to onboarding"
               accessibilityRole="button"
-              className="mt-6 min-h-12 items-center justify-center rounded-full bg-blue-600 px-6 active:bg-blue-700"
+              className="mt-6 min-h-12 items-center justify-center rounded-full bg-accent-primary px-6 active:bg-accent-pressed"
               onPress={navigateAfterAuthentication}
             >
-              <Text className="text-[15px] font-extrabold text-white">
+              <Text className="text-[15px] font-extrabold text-ink-on-accent">
                 Return to onboarding
               </Text>
             </Pressable>
@@ -143,10 +144,10 @@ export default function GoogleAuthCallbackScreen() {
           <>
             <ActivityIndicator
               accessibilityLabel="Completing Google sign-in"
-              color="#2563EB"
+              color={COLORS.accent.primary}
               size="large"
             />
-            <Text className="mt-5 text-center text-[15px] font-extrabold text-slate-900">
+            <Text className="mt-5 text-center text-[15px] font-extrabold text-ink-primary">
               Completing Google sign-in…
             </Text>
           </>

@@ -15,27 +15,27 @@ async function source(path: string) {
   return readFile(resolve(root, path), 'utf8');
 }
 
-test('Location is the stable default nav item outside Favorites and Account', () => {
+test('Map is the stable default nav item outside Favorites and Account', () => {
   assert.equal(
     getActiveNavItemKey({
       activeOverlay: 'none',
       isAccountRoute: false,
     }),
-    'location',
+    'map',
   );
   assert.equal(
     getActiveNavItemKey({
       activeOverlay: 'search',
       isAccountRoute: false,
     }),
-    'location',
+    'map',
   );
   assert.equal(
     getActiveNavItemKey({
       activeOverlay: 'parking',
       isAccountRoute: false,
     }),
-    'location',
+    'map',
   );
 });
 
@@ -59,7 +59,7 @@ test('Favorites and Account select their corresponding nav items', () => {
       activeOverlay: 'none',
       isAccountRoute: false,
     }),
-    'location',
+    'map',
   );
 });
 
@@ -81,18 +81,17 @@ test('Location action closes overlays and replaces any route with focused map', 
   assert.doesNotMatch(layout, /activeKey === 'location'[\s\S]*return/);
 });
 
-test('navbar exposes an accessible loading-aware Location action', async () => {
+test('navbar exposes a separate accessible loading-aware GPS action', async () => {
   const navbar = await source('src/components/BottomNavBar.tsx');
 
-  assert.match(navbar, /accessibilityLabel: 'Current location'/);
   assert.match(
     navbar,
-    /accessibilityHint: 'Centers the map on your current location'/,
+    /accessibilityHint="Centers the map on your current location"/,
   );
-  assert.match(navbar, /icon: Navigation/);
-  assert.doesNotMatch(navbar, /LocateFixed/);
-  assert.match(navbar, /disabled: isLocationLoading/);
-  assert.match(navbar, /<ActivityIndicator color=\{color\} size="small"/);
+  assert.match(navbar, /accessibilityLabel="Current location"/);
+  assert.match(navbar, /<FigmaGpsIcon color=\{COLORS\.accent\.primary\}/);
+  assert.match(navbar, /disabled=\{isLocationLoading\}/);
+  assert.match(navbar, /<ActivityIndicator color=\{COLORS\.accent\.primary\}/);
 });
 
 test('ParkingMap consumes each focus key through the existing location flow', async () => {
@@ -135,7 +134,7 @@ test('permission denial, settings recovery, and current location reuse remain au
   assert.match(hook, /RECENT_LOCATION_REUSE_MS/);
 });
 
-test('old floating location button is removed while top search stays independent', async () => {
+test('the single GPS action lives with floating navigation while search stays independent', async () => {
   const [parkingMap, mapRoute, navbar] = await Promise.all([
     source('src/components/parking-map/parking-map.tsx'),
     source('src/app/(tabs)/map.tsx'),
@@ -148,5 +147,6 @@ test('old floating location button is removed while top search stays independent
     /accessibilityLabel="Center map on current location"/,
   );
   assert.match(mapRoute, /<MapSearchBar \/>/);
+  assert.match(navbar, /variant="floatingAction"/);
   assert.doesNotMatch(navbar, /useGooglePlaceSearch|TextInput|key: 'search'/);
 });

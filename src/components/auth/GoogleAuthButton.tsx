@@ -2,6 +2,7 @@ import { ActivityIndicator, Image, Pressable, Text, View } from 'react-native';
 
 import { getGoogleAuthCopy } from '@/utils/onboarding-flow';
 import type { GoogleAuthMode } from '@/utils/onboarding-flow';
+import { COLORS } from '@/constants/theme';
 
 const GOOGLE_G_LOGO = require('../../../assets/images/google-g-logo.png');
 
@@ -27,8 +28,8 @@ export function GoogleAuthButton({
       accessibilityRole="button"
       className={`mt-6 min-h-14 flex-row items-center justify-center rounded-2xl border px-5 ${
         disabled
-          ? 'border-slate-200 bg-slate-100 opacity-60'
-          : 'border-[#747775] bg-white active:bg-slate-50'
+          ? 'border-border-subtle bg-background-default opacity-60'
+          : 'border-border-strong bg-surface-default active:bg-surface-input'
       }`}
       disabled={disabled}
       onPress={onPress}
@@ -36,7 +37,7 @@ export function GoogleAuthButton({
     >
       <View className="absolute left-4 h-[18px] w-[18px] items-center justify-center">
         {isLoading ? (
-          <ActivityIndicator color="#334155" size="small" />
+          <ActivityIndicator color={COLORS.icon.default} size="small" />
         ) : (
           <Image
             accessibilityIgnoresInvertColors
@@ -48,7 +49,7 @@ export function GoogleAuthButton({
       </View>
       <Text
         className={`px-7 text-center text-[15px] font-extrabold ${
-          disabled ? 'text-[#747775]' : 'text-[#1F1F1F]'
+          disabled ? 'text-ink-placeholder' : 'text-ink-primary'
         }`}
       >
         {isLoading ? copy.loadingLabel : copy.actionLabel}

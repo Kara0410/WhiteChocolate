@@ -26,6 +26,7 @@ import { EmailSeparator } from '@/components/auth/EmailSeparator';
 import { GoogleAuthButton } from '@/components/auth/GoogleAuthButton';
 import { useAccount } from '@/hooks/use-account';
 import { getGoogleAuthCopy } from '@/utils/onboarding-flow';
+import { COLORS, RADII } from '@/constants/theme';
 
 type CreateAccountSheetProps = {
   isVisible: boolean;
@@ -49,17 +50,17 @@ function BenefitRow({
   return (
     <View
       className={`flex-row gap-4 py-4 ${
-        showDivider ? 'border-b border-slate-200' : ''
+        showDivider ? 'border-b border-border-subtle' : ''
       }`}
     >
-      <View className="h-14 w-14 items-center justify-center rounded-2xl bg-blue-50">
-        <Icon color="#2563EB" size={28} strokeWidth={2.4} />
+      <View className="h-14 w-14 items-center justify-center rounded-2xl bg-accent-soft">
+        <Icon color={COLORS.accent.primary} size={28} strokeWidth={2.4} />
       </View>
       <View className="flex-1 justify-center">
-        <Text className="text-[17px] font-extrabold text-slate-950">
+        <Text className="text-[17px] font-extrabold text-ink-primary">
           {title}
         </Text>
-        <Text className="mt-1 text-[14px] font-semibold leading-5 text-slate-500">
+        <Text className="mt-1 text-[14px] font-semibold leading-5 text-ink-secondary">
           {subtitle}
         </Text>
       </View>
@@ -130,24 +131,24 @@ export function CreateAccountSheet({
         showsVerticalScrollIndicator={false}
       >
         <View className="flex-row items-start justify-between">
-          <View className="h-20 w-20 items-center justify-center rounded-[28px] bg-blue-50">
-            <User color="#2563EB" size={39} strokeWidth={2.4} />
+          <View className="h-20 w-20 items-center justify-center rounded-card bg-accent-soft">
+            <User color={COLORS.accent.primary} size={39} strokeWidth={2.4} />
           </View>
           <Pressable
             accessibilityLabel="Close create account prompt"
             accessibilityRole="button"
-            className="h-11 w-11 items-center justify-center rounded-full bg-slate-100 active:bg-slate-200"
+            className="h-11 w-11 items-center justify-center rounded-full bg-background-default active:bg-surface-muted"
             hitSlop={8}
             onPress={onClose}
           >
-            <X color="#475569" size={20} strokeWidth={2.5} />
+            <X color={COLORS.icon.default} size={20} strokeWidth={2.5} />
           </Pressable>
         </View>
 
-        <Text className="mt-8 text-[36px] font-black leading-[40px] text-slate-950">
+        <Text className="mt-8 text-[36px] font-black leading-[40px] text-ink-primary">
           Create a free account
         </Text>
-        <Text className="mt-4 text-[17px] font-semibold leading-7 text-slate-500">
+        <Text className="mt-4 text-[17px] font-semibold leading-7 text-ink-secondary">
           Create an account to save favorites and keep parking preferences
           ready for future sync.
         </Text>
@@ -180,14 +181,14 @@ export function CreateAccountSheet({
           accessibilityRole="button"
           className={`mt-6 min-h-14 items-center justify-center rounded-2xl px-5 ${
             isGoogleSubmitting
-              ? 'bg-blue-300'
-              : 'bg-blue-600 active:bg-blue-700'
+              ? 'bg-accent-soft'
+              : 'bg-accent-primary active:bg-accent-pressed'
           }`}
           disabled={isGoogleSubmitting}
           onPress={onCreateAccount}
           style={{ borderCurve: 'continuous' }}
         >
-          <Text className="text-[16px] font-extrabold text-white">
+          <Text className="text-[16px] font-extrabold text-ink-on-accent">
             Sign In / Sign Up with email
           </Text>
         </Pressable>
@@ -197,14 +198,14 @@ export function CreateAccountSheet({
           accessibilityRole="button"
           className={`mt-3 min-h-14 items-center justify-center rounded-2xl px-5 ${
             isGoogleSubmitting
-              ? 'bg-slate-200 opacity-60'
-              : 'bg-slate-100 active:bg-slate-200'
+              ? 'bg-surface-muted opacity-60'
+              : 'bg-background-default active:bg-surface-muted'
           }`}
           disabled={isGoogleSubmitting}
           onPress={onClose}
           style={{ borderCurve: 'continuous' }}
         >
-          <Text className="text-[16px] font-extrabold text-slate-900">
+          <Text className="text-[16px] font-extrabold text-ink-primary">
             Continue as guest
           </Text>
         </Pressable>
@@ -212,15 +213,15 @@ export function CreateAccountSheet({
         {account.error ? (
           <Text
             accessibilityRole="alert"
-            className="mt-3 text-[13px] font-semibold leading-5 text-red-700"
+            className="mt-3 text-[13px] font-semibold leading-5 text-feedback-error"
           >
             {account.error.message}
           </Text>
         ) : null}
 
         <View className="mt-6 flex-row gap-3">
-          <Lock color="#94A3B8" size={22} strokeWidth={2.4} />
-          <Text className="flex-1 text-[13px] font-semibold leading-5 text-slate-500">
+          <Lock color={COLORS.text.muted} size={22} strokeWidth={2.4} />
+          <Text className="flex-1 text-[13px] font-semibold leading-5 text-ink-secondary">
             Use your email and password to sign in securely.
           </Text>
         </View>
@@ -231,9 +232,9 @@ export function CreateAccountSheet({
 
 const styles = StyleSheet.create({
   background: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 34,
-    borderTopRightRadius: 34,
+    backgroundColor: COLORS.surface.default,
+    borderTopLeftRadius: RADII.sheet,
+    borderTopRightRadius: RADII.sheet,
   },
   content: {
     paddingHorizontal: 24,
@@ -244,7 +245,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   handleIndicator: {
-    backgroundColor: 'rgba(15,23,42,0.18)',
+    backgroundColor: COLORS.border.strong,
     borderRadius: 999,
     height: 5,
     width: 44,

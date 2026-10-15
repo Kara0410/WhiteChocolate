@@ -10,7 +10,7 @@ import {
   View,
   type KeyboardEvent,
 } from 'react-native';
-import { ArrowLeft, MapPin, Search, X } from 'lucide-react-native';
+import { ArrowLeft, MapPin, X } from 'lucide-react-native';
 import Animated, {
   FadeIn,
   FadeInDown,
@@ -20,6 +20,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { FigmaSearchIcon } from '@/components/ui/figma-icons';
+import { GlassSurface } from '@/components/ui/glass-surface';
 import {
   MAP_ELEVATIONS,
   MAP_LAYERS,
@@ -33,6 +35,7 @@ import {
   getMapSearchLayout,
   MAP_SEARCH_BAR_HEIGHT,
 } from '@/utils/map-search-layout';
+import { COLORS, HOME_LAYOUT } from '@/constants/theme';
 
 const SEARCH_BACKDROP_ENTERING = FadeIn.duration(140).reduceMotion(
   ReduceMotion.System,
@@ -63,23 +66,23 @@ const SearchResultRow = memo(function SearchResultRow({
       accessibilityLabel={`Search for ${item.primaryText}`}
       accessibilityRole="button"
       accessibilityState={{ disabled }}
-      className="min-h-16 flex-row items-center border-t border-slate-100 px-4 py-3 active:bg-slate-50"
+      className="min-h-16 flex-row items-center border-t border-border-subtle px-4 py-3 active:bg-surface-input"
       disabled={disabled}
       onPress={() => onPress(item)}
     >
-      <View className="h-10 w-10 items-center justify-center rounded-full bg-blue-50">
-        <MapPin color="#2563EB" size={18} strokeWidth={2.3} />
+      <View className="h-10 w-10 items-center justify-center rounded-full bg-accent-soft">
+        <MapPin color={COLORS.accent.primary} size={18} strokeWidth={2.3} />
       </View>
       <View className="ml-3 flex-1">
         <Text
-          className="text-[15px] font-extrabold text-slate-950"
+          className="text-body-strong text-ink-primary"
           numberOfLines={1}
         >
           {item.primaryText}
         </Text>
         {item.secondaryText ? (
           <Text
-            className="mt-1 text-[12px] font-semibold text-slate-500"
+            className="mt-1 text-caption text-ink-secondary"
             numberOfLines={1}
           >
             {item.secondaryText}
@@ -96,7 +99,7 @@ function searchSuggestionKeyExtractor(item: PlaceSearchSuggestion) {
 
 export function MapSearchBar() {
   const insets = useSafeAreaInsets();
-  const { height: windowHeight } = useWindowDimensions();
+  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const inputRef = useRef<TextInput>(null);
   const focusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [keyboardTop, setKeyboardTop] = useState<number | null>(null);
@@ -216,6 +219,8 @@ export function MapSearchBar() {
     viewportBottom,
   });
   const isVisible = activeOverlay === 'none' || isSearchActive;
+  const horizontalInset =
+    windowWidth < 360 ? 16 : HOME_LAYOUT.horizontalInset;
 
   if (!isVisible) {
     return null;
@@ -227,7 +232,7 @@ export function MapSearchBar() {
         <AnimatedPressable
           accessibilityLabel="Close search"
           accessibilityRole="button"
-          className="absolute inset-0 bg-slate-950/10"
+          className="absolute inset-0 bg-ink-primary/10"
           entering={SEARCH_BACKDROP_ENTERING}
           exiting={SEARCH_BACKDROP_EXITING}
           onPress={handleCloseSearch}
@@ -239,90 +244,91 @@ export function MapSearchBar() {
       ) : null}
 
       <View
-        className="absolute left-4 right-4"
+        className="absolute"
         pointerEvents="box-none"
         style={{
           elevation: MAP_ELEVATIONS.mapSearch,
+          left: horizontalInset,
+          right: horizontalInset,
           top: searchTop,
           zIndex: MAP_LAYERS.mapSearch,
         }}
       >
-        <View
-          className="overflow-hidden rounded-[28px] border border-white/80 bg-white/95 shadow-overlay"
-          style={{
-            borderCurve: 'continuous',
-            height: MAP_SEARCH_BAR_HEIGHT,
-          }}
+        <GlassSurface
+          style={{ height: MAP_SEARCH_BAR_HEIGHT }}
+          variant="search"
         >
           {isSearchActive ? (
             <View className="h-full flex-row items-center px-2">
               <Pressable
                 accessibilityLabel="Close search"
                 accessibilityRole="button"
-                className="h-11 w-11 items-center justify-center rounded-full active:bg-slate-100"
+                className="h-11 w-11 items-center justify-center rounded-full active:bg-surface-muted"
                 hitSlop={4}
                 onPress={handleCloseSearch}
               >
-                <ArrowLeft color="#475569" size={21} strokeWidth={2.4} />
+                <ArrowLeft color={COLORS.icon.default} size={21} strokeWidth={2.4} />
               </Pressable>
               <TextInput
                 ref={inputRef}
                 accessibilityLabel="Search place or address"
                 autoCapitalize="none"
                 autoCorrect={false}
-                className="h-full flex-1 px-1 text-[16px] font-semibold text-slate-950"
+                className="h-full flex-1 px-1 text-[16px] font-semibold text-ink-primary"
                 clearButtonMode="never"
                 onChangeText={setQuery}
-                placeholder="Search place or address"
-                placeholderTextColor="#94A3B8"
+                placeholder="Search here"
+                placeholderTextColor={COLORS.text.placeholder}
                 returnKeyType="search"
                 value={query}
               />
               {isLoading || isResolvingPlace ? (
                 <View className="h-11 w-11 items-center justify-center">
-                  <ActivityIndicator color="#2563EB" size="small" />
+                  <ActivityIndicator color={COLORS.accent.primary} size="small" />
                 </View>
               ) : query.length > 0 ? (
                 <Pressable
                   accessibilityLabel="Clear search"
                   accessibilityRole="button"
-                  className="h-11 w-11 items-center justify-center rounded-full active:bg-slate-100"
+                  className="h-11 w-11 items-center justify-center rounded-full active:bg-surface-muted"
                   hitSlop={4}
                   onPress={handleClearQuery}
                 >
-                  <X color="#475569" size={18} strokeWidth={2.5} />
+                  <X color={COLORS.icon.default} size={18} strokeWidth={2.5} />
                 </Pressable>
               ) : (
                 <View className="h-11 w-11 items-center justify-center">
-                  <Search color="#64748B" size={20} strokeWidth={2.3} />
+                  <FigmaSearchIcon color={COLORS.accent.primary} size={20} />
                 </View>
               )}
             </View>
           ) : (
             <Pressable
-              accessibilityLabel="Search place or address"
+              accessibilityLabel="Search"
               accessibilityRole="button"
-              className="h-full flex-row items-center px-4 active:bg-slate-50"
+              className="h-full flex-row items-center px-[14px] active:bg-surface-glass-readable"
               onPress={openSearch}
             >
-              <Search color="#475569" size={21} strokeWidth={2.35} />
-              <Text className="ml-3 flex-1 text-[16px] font-semibold text-slate-600">
-                Search place or address
+              <FigmaSearchIcon color={COLORS.accent.primary} size={20} />
+              <Text className="ml-3 flex-1 text-[16px] font-normal text-ink-placeholder">
+                Search here
               </Text>
             </Pressable>
           )}
-        </View>
+        </GlassSurface>
       </View>
 
       {isSearchActive ? (
         <Animated.View
-          className="absolute left-4 right-4 overflow-hidden rounded-[24px] border border-white/80 bg-white/95 shadow-overlay"
+          className="absolute overflow-hidden rounded-card border border-border-glass bg-surface-glass-readable shadow-overlay"
           entering={SEARCH_RESULTS_ENTERING}
           exiting={SEARCH_RESULTS_EXITING}
           style={{
             borderCurve: 'continuous',
             elevation: MAP_ELEVATIONS.mapSearch,
+            left: horizontalInset,
             maxHeight: suggestionMaxHeight,
+            right: horizontalInset,
             top: resultsTop,
             zIndex: MAP_LAYERS.mapSearch,
           }}
@@ -334,35 +340,35 @@ export function MapSearchBar() {
             keyboardShouldPersistTaps="handled"
             keyExtractor={searchSuggestionKeyExtractor}
             ListEmptyComponent={
-              <View className="border-t border-slate-100 px-4 py-6">
+              <View className="border-t border-border-subtle px-4 py-6">
                 {isLoading ? (
                   <View className="flex-row items-center">
-                    <ActivityIndicator color="#2563EB" />
-                    <Text className="ml-3 text-[14px] font-semibold text-slate-500">
+                    <ActivityIndicator color={COLORS.accent.primary} />
+                    <Text className="ml-3 text-[14px] font-semibold text-ink-secondary">
                       Searching Google Places...
                     </Text>
                   </View>
                 ) : isResolvingPlace ? (
                   <View className="flex-row items-center">
-                    <ActivityIndicator color="#2563EB" />
-                    <Text className="ml-3 text-[14px] font-semibold text-slate-500">
+                    <ActivityIndicator color={COLORS.accent.primary} />
+                    <Text className="ml-3 text-[14px] font-semibold text-ink-secondary">
                       Loading place...
                     </Text>
                   </View>
                 ) : error ? (
                   <Text
                     accessibilityRole="alert"
-                    className="text-[14px] font-semibold text-red-600"
+                    className="text-[14px] font-semibold text-feedback-error"
                     selectable
                   >
                     {error}
                   </Text>
                 ) : hasSearched ? (
-                  <Text className="text-[14px] font-semibold text-slate-500">
+                  <Text className="text-[14px] font-semibold text-ink-secondary">
                     No places found
                   </Text>
                 ) : (
-                  <Text className="text-[14px] font-semibold text-slate-500">
+                  <Text className="text-[14px] font-semibold text-ink-secondary">
                     Try an address, landmark, or business name.
                   </Text>
                 )}

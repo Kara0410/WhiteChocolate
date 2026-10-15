@@ -1,4 +1,5 @@
 import { BADGE_COLORS } from '@/constants/parking';
+import { COLORS } from '@/constants/theme';
 
 export function getBadgeColor(groupName: string) {
   for (const key of Object.keys(BADGE_COLORS)) {
@@ -7,5 +8,5 @@ export function getBadgeColor(groupName: string) {
     }
   }
 
-  return '#6b7280';
+  return COLORS.status.unknown;
 }

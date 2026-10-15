@@ -14,6 +14,7 @@ import { QuickActionsSection } from '@/components/account/quick-actions-section'
 import { SupportSection } from '@/components/account/support-section';
 import { SettingsErrorPanel } from '@/components/settings/settings-error-panel';
 import { useAccount } from '@/hooks/use-account';
+import { COLORS } from '@/constants/theme';
 
 export function AccountScreen() {
   const insets = useSafeAreaInsets();
@@ -30,7 +31,7 @@ export function AccountScreen() {
   }, [router]);
 
   return (
-    <View className="flex-1 bg-slate-100">
+    <View className="flex-1 bg-background-default">
       <ScrollView
         contentContainerStyle={{
           paddingBottom: Math.max(insets.bottom, 10) + 112,
@@ -44,22 +45,22 @@ export function AccountScreen() {
           accessibilityHint="Returns to the previous page"
           accessibilityLabel="Back"
           accessibilityRole="button"
-          className="mb-5 min-h-11 flex-row items-center self-start rounded-full bg-white px-3 shadow-floating active:bg-slate-200"
+          className="mb-5 min-h-11 flex-row items-center self-start rounded-full bg-surface-default px-3 shadow-floating active:bg-surface-muted"
           hitSlop={8}
           onPress={goBack}
           style={{ borderCurve: 'continuous' }}
         >
-          <ChevronLeft color="#334155" size={20} strokeWidth={2.6} />
-          <Text className="mr-1 text-[14px] font-extrabold text-slate-700">
+          <ChevronLeft color={COLORS.icon.default} size={20} strokeWidth={2.6} />
+          <Text className="mr-1 text-[14px] font-extrabold text-ink-secondary">
             Back
           </Text>
         </Pressable>
 
         <View className="mb-6">
-          <Text className="text-[30px] font-black tracking-[-0.8px] text-slate-950">
+          <Text className="text-[30px] font-black tracking-[-0.8px] text-ink-primary">
             You
           </Text>
-          <Text className="mt-1 text-[14px] font-semibold text-slate-500">
+          <Text className="mt-1 text-[14px] font-semibold text-ink-secondary">
             Profile, preferences, and account controls
           </Text>
         </View>

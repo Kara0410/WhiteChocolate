@@ -49,6 +49,7 @@ import {
   type AccountMode,
   type OnboardingStepId,
 } from '@/utils/onboarding-flow';
+import { COLORS } from '@/constants/theme';
 
 type OnboardingStep = {
   id: OnboardingStepId;
@@ -89,7 +90,7 @@ const STEPS: OnboardingStep[] = [
 
 const SIGNED_IN_STEPS = STEPS.filter((step) => step.id !== 'account');
 const INPUT_CLASS =
-  'mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-[15px] font-semibold text-slate-900';
+  'mt-4 rounded-2xl border border-border-subtle bg-surface-input px-4 py-3 text-[15px] font-semibold text-ink-primary';
 
 function StepIndicator({
   activeIndex,
@@ -105,8 +106,8 @@ function StepIndicator({
           key={step.id}
           className={
             index === activeIndex
-              ? 'h-2.5 w-8 rounded-full bg-blue-600'
-              : 'h-2.5 w-2.5 rounded-full bg-slate-300'
+              ? 'h-2.5 w-8 rounded-full bg-accent-primary'
+              : 'h-2.5 w-2.5 rounded-full bg-surface-muted'
           }
         />
       ))}
@@ -117,14 +118,14 @@ function StepIndicator({
 function FeatureIcons() {
   return (
     <View className="mt-8 flex-row justify-center gap-3">
-      <View className="h-14 w-14 items-center justify-center rounded-[22px] bg-blue-50">
-        <MapPin color="#2563EB" size={24} strokeWidth={2.5} />
+      <View className="h-14 w-14 items-center justify-center rounded-[22px] bg-accent-soft">
+        <MapPin color={COLORS.accent.primary} size={24} strokeWidth={2.5} />
       </View>
       <View className="h-14 w-14 items-center justify-center rounded-[22px] bg-rose-50">
-        <Heart color="#E11D48" size={23} strokeWidth={2.5} />
+        <Heart color={COLORS.accent.primary} size={23} strokeWidth={2.5} />
       </View>
-      <View className="h-14 w-14 items-center justify-center rounded-[22px] bg-amber-50">
-        <Info color="#D97706" size={24} strokeWidth={2.5} />
+      <View className="h-14 w-14 items-center justify-center rounded-[22px] bg-status-limited-soft">
+        <Info color={COLORS.feedback.warning} size={24} strokeWidth={2.5} />
       </View>
     </View>
   );
@@ -145,17 +146,17 @@ function PrimaryButton({
     <Pressable
       accessibilityRole="button"
       className={`mt-8 min-h-14 flex-row items-center justify-center rounded-full px-5 ${
-        disabled ? 'bg-blue-300' : 'bg-blue-600 active:bg-blue-700'
+        disabled ? 'bg-accent-soft' : 'bg-accent-primary active:bg-accent-pressed'
       }`}
       disabled={disabled}
       onPress={onPress}
       style={{ borderCurve: 'continuous' }}
     >
       {isLoading ? (
-        <ActivityIndicator color="#FFFFFF" size="small" />
+        <ActivityIndicator color={COLORS.surface.default} size="small" />
       ) : null}
       <Text
-        className={`text-[15px] font-black text-white${
+        className={`text-[15px] font-black text-ink-on-accent${
           isLoading ? ' ml-2' : ''
         }`}
       >
@@ -177,13 +178,13 @@ function SecondaryButton({
   return (
     <Pressable
       accessibilityRole="button"
-      className="mt-4 min-h-11 items-center justify-center rounded-full px-4 active:bg-slate-100"
+      className="mt-4 min-h-11 items-center justify-center rounded-full px-4 active:bg-background-default"
       disabled={disabled}
       onPress={onPress}
     >
       <Text
         className={`text-[14px] font-extrabold ${
-          disabled ? 'text-slate-300' : 'text-slate-600'
+          disabled ? 'text-ink-muted' : 'text-ink-secondary'
         }`}
       >
         {label}
@@ -215,29 +216,29 @@ function AccountPathOption({
       accessibilityState={{ disabled }}
       className={`min-h-[72px] flex-row items-center rounded-2xl border px-5 active:opacity-90 ${
         isPrimary
-          ? 'border-blue-600 bg-blue-600 active:bg-blue-700'
+          ? 'border-accent-primary bg-accent-primary active:bg-accent-pressed'
           : isGuest
-            ? 'border-slate-200 bg-slate-100 active:bg-slate-200'
-            : 'border-slate-200 bg-white active:bg-slate-50'
+            ? 'border-border-subtle bg-background-default active:bg-surface-muted'
+            : 'border-border-subtle bg-surface-default active:bg-surface-input'
       } ${disabled ? 'opacity-50' : ''}`}
       disabled={disabled}
       onPress={onPress}
       style={{ borderCurve: 'continuous' }}
     >
       <Icon
-        color={isPrimary ? '#FFFFFF' : '#2563EB'}
+        color={isPrimary ? COLORS.surface.default : COLORS.accent.primary}
         size={21}
         strokeWidth={2.5}
       />
       <Text
         className={`ml-4 flex-1 text-[16px] font-extrabold ${
-          isPrimary ? 'text-white' : 'text-slate-900'
+          isPrimary ? 'text-ink-on-accent' : 'text-ink-primary'
         }`}
       >
         {label}
       </Text>
       <ChevronRight
-        color={isPrimary ? '#FFFFFF' : '#64748B'}
+        color={isPrimary ? COLORS.surface.default : COLORS.text.secondary}
         size={21}
         strokeWidth={2.5}
       />
@@ -273,7 +274,7 @@ type EmailAuthViewProps = {
 
 function GoogleAuthWebNotice() {
   return (
-    <Text className="mt-6 rounded-2xl bg-slate-100 px-4 py-3 text-center text-[13px] font-semibold leading-5 text-slate-600">
+    <Text className="mt-6 rounded-2xl bg-background-default px-4 py-3 text-center text-[13px] font-semibold leading-5 text-ink-secondary">
       Google sign-in is available in the iOS and Android app.
     </Text>
   );
@@ -331,7 +332,7 @@ function EmailAuthView({
         keyboardType="email-address"
         onChangeText={onChangeEmail}
         placeholder="you@example.com"
-        placeholderTextColor="#94A3B8"
+        placeholderTextColor={COLORS.text.muted}
         textContentType="emailAddress"
         value={email}
       />
@@ -344,7 +345,7 @@ function EmailAuthView({
         editable={!isAccountOperationRunning}
         onChangeText={onChangePassword}
         placeholder="Password"
-        placeholderTextColor="#94A3B8"
+        placeholderTextColor={COLORS.text.muted}
         secureTextEntry
         textContentType={isRegister ? 'newPassword' : 'password'}
         value={password}
@@ -359,7 +360,7 @@ function EmailAuthView({
           editable={!isAccountOperationRunning}
           onChangeText={onChangeConfirmPassword}
           placeholder="Confirm password"
-          placeholderTextColor="#94A3B8"
+          placeholderTextColor={COLORS.text.muted}
           secureTextEntry
           textContentType="newPassword"
           value={confirmPassword}
@@ -373,7 +374,7 @@ function EmailAuthView({
           disabled={isAccountOperationRunning}
           onPress={onForgotPassword}
         >
-          <Text className="text-[14px] font-extrabold text-blue-700">
+          <Text className="text-[14px] font-extrabold text-accent-primary">
             Forgot password?
           </Text>
         </Pressable>
@@ -381,7 +382,7 @@ function EmailAuthView({
       {isRegister && confirmPassword.length > 0 && !passwordsMatch ? (
         <Text
           accessibilityRole="alert"
-          className="mt-3 text-[13px] font-semibold leading-5 text-red-700"
+          className="mt-3 text-[13px] font-semibold leading-5 text-feedback-error"
         >
           Passwords do not match.
         </Text>
@@ -412,7 +413,7 @@ function EmailAuthView({
       {visibleError ? (
         <Text
           accessibilityRole="alert"
-          className="mt-3 text-[13px] font-semibold leading-5 text-red-700"
+          className="mt-3 text-[13px] font-semibold leading-5 text-feedback-error"
         >
           {visibleError}
         </Text>
@@ -420,7 +421,7 @@ function EmailAuthView({
       {registrationNotice ? (
         <Text
           accessibilityRole="alert"
-          className="mt-3 rounded-2xl bg-blue-50 px-4 py-3 text-[13px] font-semibold leading-5 text-blue-800"
+          className="mt-3 rounded-2xl bg-accent-soft px-4 py-3 text-[13px] font-semibold leading-5 text-accent-primary"
         >
           {registrationNotice}
         </Text>
@@ -491,17 +492,17 @@ function GuestConfirmationView({
 }) {
   return (
     <View className="mt-7">
-      <View className="gap-3 rounded-2xl bg-slate-50 px-4 py-4">
+      <View className="gap-3 rounded-2xl bg-surface-input px-4 py-4">
         {GUEST_CAPABILITIES.map((capability) => (
           <View key={capability} className="flex-row items-start gap-3">
-            <Check color="#2563EB" size={19} strokeWidth={2.7} />
-            <Text className="flex-1 text-[14px] font-semibold leading-5 text-slate-700">
+            <Check color={COLORS.accent.primary} size={19} strokeWidth={2.7} />
+            <Text className="flex-1 text-[14px] font-semibold leading-5 text-ink-secondary">
               {capability}
             </Text>
           </View>
         ))}
       </View>
-      <Text className="mt-4 text-[13px] font-semibold leading-5 text-slate-500">
+      <Text className="mt-4 text-[13px] font-semibold leading-5 text-ink-secondary">
         Favorites and synced preferences require an account. You can register
         later from the app.
       </Text>
@@ -1027,7 +1028,7 @@ export default function OnboardingScreen() {
   };
 
   return (
-    <View className="flex-1 bg-slate-100">
+    <View className="flex-1 bg-background-default">
       <ScrollView
         contentContainerStyle={{
           flexGrow: 1,
@@ -1043,10 +1044,10 @@ export default function OnboardingScreen() {
         <View className="w-full max-w-[520px] self-center">
           <View
             key={step.id}
-            className={`border border-white/80 bg-white ${
+            className={`border border-border-glass bg-surface-default ${
               isAccountStep && accountMode === 'choice'
                 ? 'rounded-[36px] px-7 py-8 shadow-overlay'
-                : 'rounded-[32px] px-6 py-7 shadow-overlay'
+                : 'rounded-sheet px-6 py-7 shadow-overlay'
             }`}
             style={{ borderCurve: 'continuous' }}
           >
@@ -1057,14 +1058,14 @@ export default function OnboardingScreen() {
                   accessibilityRole="button"
                   className={`h-11 w-11 items-center justify-center rounded-full ${
                     isBackDisabled
-                      ? 'bg-slate-100'
-                      : 'bg-slate-100 active:bg-slate-200'
+                      ? 'bg-background-default'
+                      : 'bg-background-default active:bg-surface-muted'
                   }`}
                   disabled={isBackDisabled}
                   onPress={goBack}
                 >
                   <ArrowLeft
-                    color={isBackDisabled ? '#CBD5E1' : '#475569'}
+                    color={isBackDisabled ? COLORS.border.strong : COLORS.icon.default}
                     size={22}
                     strokeWidth={2.6}
                   />
@@ -1075,14 +1076,14 @@ export default function OnboardingScreen() {
             <View
               className={
                 isAccountStep && accountMode === 'choice'
-                  ? 'h-16 w-16 items-center justify-center self-start rounded-[24px] bg-blue-50'
-                  : 'self-start rounded-[26px] bg-blue-50 p-4'
+                  ? 'h-16 w-16 items-center justify-center self-start rounded-[24px] bg-accent-soft'
+                  : 'self-start rounded-[26px] bg-accent-soft p-4'
               }
             >
               {isAccountStep && accountMode === 'choice' ? (
-                <User color="#2563EB" size={32} strokeWidth={2.4} />
+                <User color={COLORS.accent.primary} size={32} strokeWidth={2.4} />
               ) : (
-                <StepIcon color="#2563EB" size={32} strokeWidth={2.4} />
+                <StepIcon color={COLORS.accent.primary} size={32} strokeWidth={2.4} />
               )}
             </View>
 
@@ -1091,8 +1092,8 @@ export default function OnboardingScreen() {
             <Text
               className={
                 isAccountStep && accountMode === 'choice'
-                  ? 'mt-6 text-[36px] font-black leading-[40px] tracking-[-1px] text-slate-950'
-                  : 'mt-8 text-[31px] font-black leading-[36px] text-slate-950'
+                  ? 'mt-6 text-[36px] font-black leading-[40px] tracking-[-1px] text-ink-primary'
+                  : 'mt-8 text-[31px] font-black leading-[36px] text-ink-primary'
               }
             >
               {isAccountStep ? accountTitle : step.title}
@@ -1100,8 +1101,8 @@ export default function OnboardingScreen() {
             <Text
               className={
                 isAccountStep && accountMode === 'choice'
-                  ? 'mt-4 text-[17px] font-semibold leading-7 text-slate-500'
-                  : 'mt-3 text-[15px] font-semibold leading-6 text-slate-500'
+                  ? 'mt-4 text-[17px] font-semibold leading-7 text-ink-secondary'
+                  : 'mt-3 text-[15px] font-semibold leading-6 text-ink-secondary'
               }
             >
               {isAccountStep
@@ -1114,9 +1115,9 @@ export default function OnboardingScreen() {
             {isAccountStep ? (
               <>
                 {account.loading ? (
-                  <View className="mt-8 flex-row items-center gap-3 rounded-2xl bg-slate-100 px-4 py-3">
-                    <ActivityIndicator color="#2563EB" size="small" />
-                    <Text className="text-[13px] font-semibold text-slate-600">
+                  <View className="mt-8 flex-row items-center gap-3 rounded-2xl bg-background-default px-4 py-3">
+                    <ActivityIndicator color={COLORS.accent.primary} size="small" />
+                    <Text className="text-[13px] font-semibold text-ink-secondary">
                       Checking your account...
                     </Text>
                   </View>
@@ -1152,7 +1153,7 @@ export default function OnboardingScreen() {
             {isLocationStep && locationMessage ? (
               <Text
                 accessibilityRole="alert"
-                className="mt-5 rounded-2xl bg-slate-100 px-4 py-3 text-[13px] font-semibold leading-5 text-slate-600"
+                className="mt-5 rounded-2xl bg-background-default px-4 py-3 text-[13px] font-semibold leading-5 text-ink-secondary"
               >
                 {locationMessage}
               </Text>
@@ -1178,7 +1179,7 @@ export default function OnboardingScreen() {
             {isReadyStep && completionError ? (
               <Text
                 accessibilityRole="alert"
-                className="mt-4 rounded-2xl bg-red-50 px-4 py-3 text-[13px] font-semibold leading-5 text-red-700"
+                className="mt-4 rounded-2xl bg-feedback-error-soft px-4 py-3 text-[13px] font-semibold leading-5 text-feedback-error"
               >
                 {completionError}
               </Text>
@@ -1200,7 +1201,7 @@ export default function OnboardingScreen() {
                   setCompletionError(null);
                 }}
               >
-                <Text className="text-[11px] font-bold text-slate-300">
+                <Text className="text-[11px] font-bold text-ink-muted">
                   Reset onboarding
                 </Text>
               </Pressable>
