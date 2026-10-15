@@ -137,7 +137,7 @@ export function GlassSurface({
               overflow: 'hidden',
             },
           ]}
-          tint="extraLight"
+          tint="light"
         />
       )}
       <View

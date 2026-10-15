@@ -151,7 +151,7 @@ const designTokens = {
       '0 8px 13px rgba(0,0,0,0.15), -1px -3px 4px rgba(255,255,255,0.40) inset, 4px 5px 6px rgba(255,255,255,0.40) inset',
   },
   glass: {
-    blurIntensity: 38,
+    blurIntensity: 24,
     blurReductionFactor: 4,
     fillOpacity: 0.1,
     svgBackdropBlurRadius: 7.5,
