@@ -16,11 +16,7 @@ export type StreetAvailabilityPolyline = {
   width: number;
 };
 
-/**
- * Uses only result bubbles that are projected into the current map viewport.
- * Segment coordinates come directly from the persisted source WKT; this function
- * never joins parking bubbles or fabricates a road path.
- */
+/** Uses the already-grouped search markers; no second deduplication occurs here. */
 export function buildStreetAvailabilitySegments(
   markers: ProjectedParkingMarker[],
   options: { activeSearchResults: boolean; mapHeight: number; mapWidth: number },
@@ -33,45 +29,47 @@ export function buildStreetAvailabilitySegments(
     return [];
   }
 
-  const seen = new Set<string>();
-  return markers.flatMap(({ item, x, y, width, height }) => {
-    const line = item.lineGeometry;
-    if (
-      item.type !== 'spot' ||
-      item.colorStatus === 'neutral' ||
-      !line ||
-      line.length < 2 ||
-      !Number.isFinite(x) ||
-      !Number.isFinite(y) ||
-      x + width / 2 < 0 ||
-      x - width / 2 > options.mapWidth ||
-      y + height / 2 < 0 ||
-      y - height / 2 > options.mapHeight ||
-      seen.has(item.id) ||
-      line.some(
-        (point) =>
-          !Number.isFinite(point.latitude) ||
-          !Number.isFinite(point.longitude) ||
-          Math.abs(point.latitude) > 90 ||
-          Math.abs(point.longitude) > 180,
-      )
-    ) {
-      return [];
-    }
+  return markers.flatMap(
+    ({ item, x, y, width, height }): StreetAvailabilitySegment[] => {
+      const line = item.lineGeometry;
+      if (
+        item.type !== 'spot' ||
+        item.colorStatus === 'neutral' ||
+        !line ||
+        line.length < 2 ||
+        !Number.isFinite(x) ||
+        !Number.isFinite(y) ||
+        x + width / 2 < 0 ||
+        x - width / 2 > options.mapWidth ||
+        y + height / 2 < 0 ||
+        y - height / 2 > options.mapHeight ||
+        line.some(
+          (point) =>
+            !Number.isFinite(point.latitude) ||
+            !Number.isFinite(point.longitude) ||
+            Math.abs(point.latitude) > 90 ||
+            Math.abs(point.longitude) > 180,
+        )
+      ) {
+        return [];
+      }
 
-    seen.add(item.id);
-    return [{ id: item.id, coordinates: line, colorStatus: item.colorStatus }];
-  });
+      return [
+        {
+          id: item.id,
+          coordinates: line,
+          colorStatus: item.colorStatus,
+        },
+      ];
+    },
+  );
 }
 
-/** Bold, immediately-readable at a glance — matches the reference's visual weight far
- * better than a thin technical polyline. */
-export const STREET_OVERLAY_LINE_WIDTH = 12;
-/** Soft drop-shadow halo drawn under the bold line for contrast against light road
- * surfaces — the closest approximation of the reference's "subtle shadow" available on
- * this expo-maps version's polyline type (no native line-cap/shadow config exposed). */
-export const STREET_OVERLAY_HALO_WIDTH = 16;
-const STREET_OVERLAY_HALO_COLOR = 'rgba(30,30,30,0.14)';
+/** Road-filling visual weight at the recommendation zoom level. */
+export const STREET_OVERLAY_LINE_WIDTH = 22;
+/** A restrained contrast edge beneath the saturated road color. */
+export const STREET_OVERLAY_HALO_WIDTH = 26;
+const STREET_OVERLAY_HALO_COLOR = 'rgba(30,30,30,0.10)';
 
 const STREET_OVERLAY_COLOR_BY_STATUS: Record<AvailabilityColorStatus, string> = {
   green: COLORS.status.available,
@@ -80,12 +78,8 @@ const STREET_OVERLAY_COLOR_BY_STATUS: Record<AvailabilityColorStatus, string> = 
   neutral: COLORS.status.unknown,
 };
 
-/** Builds the native-map polyline array for the search-results street-availability
- * overlay: one halo + one bold colored line per segment, halo first so the bold line
- * draws on top. Known limitation: this expo-maps version's polyline type exposes only
- * id/coordinates/color/width (+ iOS contourStyle: STRAIGHT/GEODESIC, Android geodesic) —
- * no line-cap or join config, so true rounded caps aren't reproducible here; the halo is
- * the available approximation for "soft, designed" rather than "thin, technical". */
+/** Builds one halo and one saturated native line per consolidated corridor. The
+ * installed expo-maps API exposes width but no line-cap/join control. */
 export function buildStreetAvailabilityPolylines(
   segments: StreetAvailabilitySegment[],
 ): StreetAvailabilityPolyline[] {

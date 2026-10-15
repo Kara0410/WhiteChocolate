@@ -34,11 +34,18 @@ export type ParkingClusterResponse = {
   colorStatus: AvailabilityColorStatus;
   minPrice: number | null;
   avgPrice: number | null;
+  maxPrice?: number | null;
+  hasUnknownPricing?: boolean;
   pricingStatus?: 'free' | 'paid' | 'unknown';
   bestSpot: ParkingBestSpot;
   expansionZoom?: number;
   distanceToDestination?: number;
   walkingCategory?: WalkingCategory;
+  /** Stable source street identity used only to consolidate connected search overlays. */
+  streetCorridorKey?: string | null;
+  /** Raw records represented by a destination-search street recommendation. */
+  underlyingParkingRecords?: ParkingClusterResponse[];
+  representativeParkingRecordId?: string;
   /** Real WGS84 path for this segment's street kerb, reprojected from the source WKT.
    * Null for clusters (no single underlying segment's geometry) and unparseable shapes. */
   lineGeometry: ParkingCoordinates[] | null;

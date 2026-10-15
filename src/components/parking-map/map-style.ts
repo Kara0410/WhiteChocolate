@@ -5,7 +5,7 @@ import { COLORS } from '@/constants/theme';
  * embedded raster. These documented extensions reproduce the reference's
  * light land, quiet roads, pale parks, cyan water, and low-contrast labels.
  */
-export const WHITE_CHOCOLATE_GOOGLE_MAP_STYLE = JSON.stringify([
+const WHITE_CHOCOLATE_GOOGLE_MAP_STYLERS = [
   {
     elementType: 'geometry',
     stylers: [{ color: COLORS.map.land }],
@@ -65,5 +65,19 @@ export const WHITE_CHOCOLATE_GOOGLE_MAP_STYLE = JSON.stringify([
     featureType: 'water',
     elementType: 'geometry',
     stylers: [{ color: COLORS.map.water }],
+  },
+];
+
+export const WHITE_CHOCOLATE_GOOGLE_MAP_STYLE = JSON.stringify(
+  WHITE_CHOCOLATE_GOOGLE_MAP_STYLERS,
+);
+
+/** Search recommendations prioritize the availability corridor over provider labels. */
+export const WHITE_CHOCOLATE_SEARCH_GOOGLE_MAP_STYLE = JSON.stringify([
+  ...WHITE_CHOCOLATE_GOOGLE_MAP_STYLERS,
+  {
+    featureType: 'road',
+    elementType: 'labels',
+    stylers: [{ visibility: 'off' }],
   },
 ]);

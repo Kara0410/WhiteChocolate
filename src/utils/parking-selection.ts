@@ -59,6 +59,8 @@ export function hasSameParkingSelectionData(
     first.colorStatus === second.colorStatus &&
     first.minPrice === second.minPrice &&
     first.avgPrice === second.avgPrice &&
+    first.maxPrice === second.maxPrice &&
+    first.hasUnknownPricing === second.hasUnknownPricing &&
     first.pricingStatus === second.pricingStatus &&
     first.expansionZoom === second.expansionZoom &&
     first.distanceToDestination === second.distanceToDestination &&

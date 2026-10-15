@@ -85,6 +85,9 @@ export function parkingMapFeatureToResponse(
       availabilityPercent: percentage,
       pricePerHour: minimumRate,
     },
+    streetCorridorKey: segment
+      ? (segment.streetName ?? segment.sourceAreaName)
+      : null,
     expansionZoom:
       feature.kind === 'segment-cluster' ? feature.expansionZoom : undefined,
     // Segment-clusters never carry a single underlying segment's geometry (clustering

@@ -7,6 +7,7 @@ import {
 } from '../src/components/parking-map/street-availability-overlay';
 import type { ParkingClusterResponse } from '../src/types/parking-map';
 import type { ProjectedParkingMarker } from '../src/components/parking-map/marker-density';
+import { WHITE_CHOCOLATE_SEARCH_GOOGLE_MAP_STYLE } from '../src/components/parking-map/map-style';
 
 const roadPath = [
   { latitude: 48.14, longitude: 11.57 },
@@ -19,6 +20,7 @@ function projectedMarker(
   options: {
     colorStatus?: ParkingClusterResponse['colorStatus'];
     lineGeometry?: ParkingClusterResponse['lineGeometry'];
+    streetCorridorKey?: string | null;
     type?: ParkingClusterResponse['type'];
     x?: number;
     y?: number;
@@ -29,6 +31,7 @@ function projectedMarker(
     type: options.type ?? 'spot',
     colorStatus: options.colorStatus ?? 'green',
     lineGeometry: options.lineGeometry === undefined ? roadPath : options.lineGeometry,
+    streetCorridorKey: options.streetCorridorKey ?? 'Teststr.',
   } as ParkingClusterResponse;
 
   return {
@@ -85,5 +88,22 @@ test('street lines use the saturated Figma colors and bold native widths', () =>
     polylines.filter(({ id }) => !id.endsWith(':halo')).map(({ color }) => color),
     ['#71E517', '#FF9500', '#E51717'],
   );
-  assert.ok(polylines.every(({ width }) => width >= 12));
+  assert.ok(polylines.every(({ width }) => width >= 22));
+});
+
+test('search map style suppresses road labels behind availability corridors', () => {
+  const style = JSON.parse(WHITE_CHOCOLATE_SEARCH_GOOGLE_MAP_STYLE) as Array<{
+    elementType?: string;
+    featureType?: string;
+    stylers?: Array<{ visibility?: string }>;
+  }>;
+
+  assert.ok(
+    style.some(
+      (rule) =>
+        rule.featureType === 'road' &&
+        rule.elementType === 'labels' &&
+        rule.stylers?.some(({ visibility }) => visibility === 'off'),
+    ),
+  );
 });

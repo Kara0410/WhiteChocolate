@@ -88,6 +88,7 @@ test('lineGeometry is populated for a segment feature with valid source geometry
   }
   assert.ok(response.lineGeometry !== null);
   assert.equal(response.lineGeometry?.length, 2);
+  assert.equal(response.streetCorridorKey, 'Teststr.');
 });
 
 test('lineGeometry is null for a segment feature with missing source geometry', () => {

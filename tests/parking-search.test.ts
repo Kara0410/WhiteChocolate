@@ -2,7 +2,15 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import type { ParkingClusterResponse } from '../src/types/parking-map';
-import { getCuratedNearbyParkingSpots } from '../src/utils/parkingSearch';
+import { getDisplayedParkingMarkerItems } from '../src/components/parking-map/marker-density';
+import {
+  buildStreetAvailabilityPolylines,
+  buildStreetAvailabilitySegments,
+} from '../src/components/parking-map/street-availability-overlay';
+import {
+  formatParkingPriceLabel,
+  getCuratedNearbyParkingSpots,
+} from '../src/utils/parkingSearch';
 
 const ORIGIN = { latitude: 48.137, longitude: 11.575 };
 const METERS_PER_DEGREE_LATITUDE = 111_320;
@@ -62,18 +70,157 @@ test('sorts by distance and respects the limit', () => {
   assert.equal(results[0].distanceFromSearchMeters, 100);
 });
 
-test('keeps adjacent source segments independently usable', () => {
+test('groups one nearby street into one recommendation with count-based availability', () => {
   const results = getCuratedNearbyParkingSpots({
     origin: ORIGIN,
     spots: [
-      spot({ id: 'segment-a', latitude: latitudeMetersNorth(100) }),
-      spot({ id: 'segment-b', latitude: latitudeMetersNorth(110) }),
+      spot({
+        id: 'segment-a',
+        latitude: latitudeMetersNorth(100),
+        streetCorridorKey: 'Knollerstr.',
+        availabilityPercent: 10,
+        availableSpots: 1,
+        totalCapacity: 10,
+        bestSpot: {
+          id: 'segment-a',
+          label: 'Knollerstr.',
+          availableSpots: 1,
+          availabilityPercent: 10,
+          pricePerHour: 2,
+        },
+      }),
+      spot({
+        id: 'segment-b',
+        latitude: latitudeMetersNorth(110),
+        streetCorridorKey: 'Knollerstraße',
+        availabilityPercent: 30,
+        availableSpots: 9,
+        totalCapacity: 30,
+        bestSpot: {
+          id: 'segment-b',
+          label: 'Knollerstraße',
+          availableSpots: 9,
+          availabilityPercent: 30,
+          pricePerHour: 2,
+        },
+      }),
     ],
   });
-  assert.deepEqual(results.map((result) => result.id), [
-    'segment-a',
-    'segment-b',
-  ]);
+
+  assert.equal(results.length, 1);
+  assert.equal(results[0].bestSpot.label, 'Knollerstr.');
+  assert.equal(results[0].availabilityPercent, 25);
+  assert.equal(results[0].availableSpots, 10);
+  assert.equal(results[0].totalCapacity, 40);
+  assert.equal(results[0].distanceFromSearchMeters, 100);
+  assert.equal(results[0].underlyingParkingRecords?.length, 2);
+});
+
+test('falls back to averaging percentages when street-level counts are unavailable', () => {
+  const results = getCuratedNearbyParkingSpots({
+    origin: ORIGIN,
+    spots: [
+      spot({
+        id: 'fend-a',
+        streetCorridorKey: 'Fendstr.',
+        totalCapacity: 0,
+        availableSpots: null,
+        availabilityPercent: 20,
+      }),
+      spot({
+        id: 'fend-b',
+        streetCorridorKey: 'Fendstraße',
+        totalCapacity: 0,
+        availableSpots: null,
+        availabilityPercent: 80,
+      }),
+    ],
+  });
+
+  assert.equal(results.length, 1);
+  assert.equal(results[0].availabilityPercent, 50);
+  assert.equal(results[0].availableSpots, null);
+});
+
+test('preserves a street price range instead of inventing one rate', () => {
+  const [result] = getCuratedNearbyParkingSpots({
+    origin: ORIGIN,
+    spots: [
+      spot({ id: 'price-a', streetCorridorKey: 'Preisstr.', minPrice: 2, avgPrice: 2 }),
+      spot({ id: 'price-b', streetCorridorKey: 'Preisstraße', minPrice: 4, avgPrice: 4 }),
+    ],
+  });
+
+  assert.equal(result.minPrice, 2);
+  assert.equal(result.maxPrice, 4);
+  assert.equal(formatParkingPriceLabel(result), 'EUR 2.00–4.00/hr');
+});
+
+test('does not merge a same-name street in a distant geographic component', () => {
+  const results = getCuratedNearbyParkingSpots({
+    origin: ORIGIN,
+    spots: [
+      spot({ id: 'local', streetCorridorKey: 'Ringstr.' }),
+      spot({
+        id: 'distant',
+        latitude: latitudeMetersNorth(700),
+        streetCorridorKey: 'Ringstraße',
+      }),
+    ],
+  });
+
+  assert.equal(results.length, 2);
+});
+
+test('one grouped street feeds one bubble and one colored road line', () => {
+  const firstPath = [
+    { latitude: ORIGIN.latitude, longitude: ORIGIN.longitude },
+    { latitude: latitudeMetersNorth(120), longitude: ORIGIN.longitude },
+  ];
+  const parallelPath = firstPath.map((point) => ({
+    latitude: point.latitude,
+    longitude: point.longitude + 0.00004,
+  }));
+  const grouped = getCuratedNearbyParkingSpots({
+    origin: ORIGIN,
+    spots: [
+      spot({
+        id: 'corridor-a',
+        colorStatus: 'red',
+        streetCorridorKey: 'Einsteinstr.',
+        lineGeometry: firstPath,
+      }),
+      spot({
+        id: 'corridor-b',
+        colorStatus: 'red',
+        streetCorridorKey: 'Einsteinstraße',
+        lineGeometry: parallelPath,
+      }),
+    ],
+  });
+  const markerItems = getDisplayedParkingMarkerItems([], null, grouped, false);
+  const segments = buildStreetAvailabilitySegments(
+    markerItems.map((item) => ({
+      item,
+      x: 100,
+      y: 100,
+      width: 44,
+      height: 44,
+      tier: 'small' as const,
+    })),
+    { activeSearchResults: true, mapHeight: 800, mapWidth: 400 },
+  );
+
+  assert.equal(grouped.length, 1);
+  assert.equal(markerItems.length, 1);
+  assert.equal(segments.length, 1);
+  assert.equal(
+    buildStreetAvailabilityPolylines(segments).filter(
+      ({ id }) => !id.endsWith(':halo'),
+    ).length,
+    1,
+  );
+  assert.deepEqual(grouped[0].lineGeometry, firstPath);
 });
 
 test('prefers availability between equally close options', () => {

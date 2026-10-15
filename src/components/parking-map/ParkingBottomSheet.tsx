@@ -26,6 +26,7 @@ import type { ParkingClusterResponse } from '@/types/parking-map';
 import { logAppError, normalizeAppError } from '@/utils/app-errors';
 import { openParkingNavigation } from '@/utils/openParkingNavigation';
 import { normalizeParkingAvailabilityPercentage } from '@/utils/parking-estimates';
+import { formatParkingPriceLabel } from '@/utils/parkingSearch';
 
 import { ParkingDetailHeader } from './ParkingDetailHeader';
 import { ParkingDetailSection } from './ParkingDetailSection';
@@ -75,16 +76,6 @@ function estimateAge(generatedAt?: string | null) {
   return `Estimated ${hours} hr${hours === 1 ? '' : 's'} ago`;
 }
 
-function priceLabel(item: ParkingClusterResponse) {
-  if (item.pricingStatus === 'free') return 'Free';
-  const rate = item.avgPrice ?? item.minPrice;
-  if (item.pricingStatus === 'paid' && rate !== null) {
-    return `€${rate.toFixed(2)} / hr`;
-  }
-  if (item.pricingStatus === 'paid') return 'Paid · rate unavailable';
-  return 'Pricing unavailable';
-}
-
 function shareMessage(
   item: ParkingClusterResponse,
   title: string,
@@ -118,11 +109,15 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
     [percentage],
   );
   const title = item.bestSpot.label || 'Parking area';
+  const favoriteItem =
+    item.underlyingParkingRecords?.find(
+      ({ id }) => id === item.representativeParkingRecordId,
+    ) ?? item;
   const account = useAccount();
   const { showCreateAccountSheet } = useAuthSheet();
   const { error: favoriteError, isFavorite, refreshFavorites, toggleFavorite } =
     useFavoriteParking();
-  const itemIsFavorite = isFavorite(item.id);
+  const itemIsFavorite = isFavorite(favoriteItem.id);
 
   const handleNavigate = useCallback(() => {
     void openParkingNavigation({
@@ -151,8 +146,8 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
       showCreateAccountSheet({ origin: 'parking-favorite' });
       return;
     }
-    toggleFavorite(item);
-  }, [account.isSignedIn, item, showCreateAccountSheet, toggleFavorite]);
+    toggleFavorite(favoriteItem);
+  }, [account.isSignedIn, favoriteItem, showCreateAccountSheet, toggleFavorite]);
 
   return (
     <View style={styles.detailContent}>
@@ -208,7 +203,7 @@ const ParkingDetailContent = memo(function ParkingDetailContent({
         </ParkingDetailSection>
 
         <ParkingDetailSection title="Parking information">
-          <ParkingInfoRow label="Pricing" value={priceLabel(item)} />
+          <ParkingInfoRow label="Pricing" value={formatParkingPriceLabel(item)} />
           <ParkingInfoRow
             label="Estimated spaces"
             value={

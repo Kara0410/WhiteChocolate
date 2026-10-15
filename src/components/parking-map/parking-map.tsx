@@ -37,7 +37,10 @@ import {
   buildStreetAvailabilityPolylines,
   type StreetAvailabilityPolyline,
 } from '@/components/parking-map/street-availability-overlay';
-import { WHITE_CHOCOLATE_GOOGLE_MAP_STYLE } from '@/components/parking-map/map-style';
+import {
+  WHITE_CHOCOLATE_GOOGLE_MAP_STYLE,
+  WHITE_CHOCOLATE_SEARCH_GOOGLE_MAP_STYLE,
+} from '@/components/parking-map/map-style';
 import { useFavoriteParking } from '@/context/FavoriteParkingContext';
 import { useMapOverlay } from '@/context/MapOverlayContext';
 import { useParkingMapData } from '@/hooks/use-parking-map-data';
@@ -558,6 +561,17 @@ export function ParkingMap({
         ? buildStreetAvailabilityPolylines(streetAvailabilitySegments)
         : EMPTY_STREET_OVERLAY_POLYLINES,
     [isSearchRecommendationMode, streetAvailabilitySegments],
+  );
+  const googleMapProperties = useMemo(
+    () => ({
+      ...GOOGLE_MAP_PROPERTIES,
+      mapStyleOptions: {
+        json: isSearchRecommendationMode
+          ? WHITE_CHOCOLATE_SEARCH_GOOGLE_MAP_STYLE
+          : WHITE_CHOCOLATE_GOOGLE_MAP_STYLE,
+      },
+    }),
+    [isSearchRecommendationMode],
   );
   const canFocusCamera = useCallback(
     () =>
@@ -1526,7 +1540,7 @@ export function ParkingMap({
           onMapLoaded={handleGoogleMapLoaded}
           onMapClick={handleMapPress}
           polylines={streetOverlayPolylines}
-          properties={GOOGLE_MAP_PROPERTIES}
+          properties={googleMapProperties}
           style={MAP_VIEW_STYLE}
           uiSettings={GOOGLE_MAP_UI_SETTINGS}
         />
